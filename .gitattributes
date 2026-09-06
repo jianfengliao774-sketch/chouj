@@ -1,0 +1,2 @@
+# Preserve the reviewed source bytes and exported SHA-256 values on every OS.
+* -text

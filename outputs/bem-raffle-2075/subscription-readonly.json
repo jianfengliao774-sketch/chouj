@@ -1,0 +1,139 @@
+{
+  "schemaVersion": 1,
+  "mode": "mainnet-readonly-subscription-verification",
+  "simulation": false,
+  "readOnly": true,
+  "chainId": 56,
+  "rpc": "https://bsc-dataseed.bnbchain.org",
+  "coordinator": "0xd691f04bc0C9a24Edb78af9E005Cf85768F694C9",
+  "queriedAtIso": "2026-09-06T10:18:14.781Z",
+  "asOfBlock": 120285172,
+  "asOfBlockHash": "0x9af11df718347f47454d554001e5e9f545c5cc409c2416211221145828d13e41",
+  "asOfIso": "2026-09-06T10:18:12.000Z",
+  "creation": {
+    "transactionHash": "0x31cffeb6930e9e187ea2d6b5d508ed9388b366cc3d58a28bbfa91f2f6f5c2cfa",
+    "status": "success",
+    "statusCode": 1,
+    "blockNumber": 120284864,
+    "blockHash": "0x249043371e12210bb92a3d59f1efa3793a724866146c69b2a9fefd59366ca091",
+    "iso": "2026-09-06T10:15:53.000Z",
+    "from": "0x6F4d78fB59eC938cBAF65b9fc822aD04d00c155E",
+    "to": "0xd691f04bc0C9a24Edb78af9E005Cf85768F694C9",
+    "method": "createSubscription()",
+    "valueWei": "0",
+    "emitter": "0xd691f04bc0C9a24Edb78af9E005Cf85768F694C9",
+    "event": "SubscriptionCreated",
+    "eventTopic": "0x1d3015d7ba850fa198dc7b1a3f5d42779313a681035f77c8c03764c61005518d",
+    "logIndex": 234,
+    "subscriptionId": "77448922846944714067228295447454335582743032090484984390044471441057479138462",
+    "owner": "0x6F4d78fB59eC938cBAF65b9fc822aD04d00c155E"
+  },
+  "subscription": {
+    "subscriptionId": "77448922846944714067228295447454335582743032090484984390044471441057479138462",
+    "owner": "0x6F4d78fB59eC938cBAF65b9fc822aD04d00c155E",
+    "ownerMatchesCreation": true,
+    "linkBalanceBaseUnits": "0",
+    "linkBalance": "0.0",
+    "nativeBalanceWei": "0",
+    "nativeBalanceBnb": "0.0",
+    "requestCount": "0",
+    "consumers": [],
+    "consumerCount": 0
+  },
+  "readiness": {
+    "created": true,
+    "fundedNative": false,
+    "hasConsumers": false,
+    "gameReadyToRequest": false,
+    "remainingStepsZh": [
+      "为本订阅充值原生 BNB（现有游戏以 nativePayment=true 请求）。",
+      "主网游戏部署后，将其真实合约地址添加为该订阅消费者；勿添加本地模拟地址。",
+      "部署、消费者和容器开局授权另行按明确授权执行；本次核实未执行任何链上写入。"
+    ]
+  },
+  "crossCheck": {
+    "rpc": "https://bsc-dataseed-public.bnbchain.org",
+    "status": "completed",
+    "chainIdMatches": true,
+    "snapshotBlockHashMatches": true,
+    "subscriptionRawMatches": true,
+    "receiptBlockHashMatches": true,
+    "receiptStatusMatches": true
+  },
+  "abi": [
+    "event SubscriptionCreated(uint256 indexed subId,address owner)",
+    "function getSubscription(uint256 subId) view returns(uint96 balance,uint96 nativeBalance,uint64 reqCount,address owner,address[] consumers)",
+    "function createSubscription() returns(uint256)"
+  ],
+  "raw": {
+    "transaction": {
+      "blockHash": "0x249043371e12210bb92a3d59f1efa3793a724866146c69b2a9fefd59366ca091",
+      "blockNumber": "0x72b66c0",
+      "from": "0x6f4d78fb59ec938cbaf65b9fc822ad04d00c155e",
+      "gas": "0x1b0d3",
+      "gasPrice": "0x2faf080",
+      "maxFeePerGas": "0x2faf080",
+      "maxPriorityFeePerGas": "0x2faf080",
+      "hash": "0x31cffeb6930e9e187ea2d6b5d508ed9388b366cc3d58a28bbfa91f2f6f5c2cfa",
+      "input": "0xa21a23e4",
+      "nonce": "0x14f",
+      "to": "0xd691f04bc0c9a24edb78af9e005cf85768f694c9",
+      "transactionIndex": "0x15",
+      "value": "0x0",
+      "type": "0x2",
+      "accessList": [],
+      "chainId": "0x38",
+      "v": "0x1",
+      "r": "0x5b0a45cc8aae91c9d103a0dead946dd4aafa32a74824f8cdebf5d9f2621757e8",
+      "s": "0x57cf4e717025d0573661a5bc0bf8a3b22205c268a20798e8eb472e897bea5a31",
+      "yParity": "0x1"
+    },
+    "receipt": {
+      "type": "0x2",
+      "from": "0x6f4d78fb59ec938cbaf65b9fc822ad04d00c155e",
+      "to": "0xd691f04bc0c9a24edb78af9e005cf85768f694c9",
+      "status": "0x1",
+      "cumulativeGasUsed": "0x582a96",
+      "logsBloom": "0x00000000400000000000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000004000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000800000100000000000040000000000000000000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+      "logs": [
+        {
+          "address": "0xd691f04bc0c9a24edb78af9e005cf85768f694c9",
+          "topics": [
+            "0x1d3015d7ba850fa198dc7b1a3f5d42779313a681035f77c8c03764c61005518d",
+            "0xab3a8971e149929aec1024a070bdf9cda11f05eeb1959e085b039c0ac0841c9e"
+          ],
+          "data": "0x0000000000000000000000006f4d78fb59ec938cbaf65b9fc822ad04d00c155e",
+          "blockNumber": "0x72b66c0",
+          "transactionHash": "0x31cffeb6930e9e187ea2d6b5d508ed9388b366cc3d58a28bbfa91f2f6f5c2cfa",
+          "transactionIndex": "0x15",
+          "blockHash": "0x249043371e12210bb92a3d59f1efa3793a724866146c69b2a9fefd59366ca091",
+          "blockTimestamp": "0x6a9d3d59",
+          "logIndex": "0xea",
+          "removed": false
+        }
+      ],
+      "transactionHash": "0x31cffeb6930e9e187ea2d6b5d508ed9388b366cc3d58a28bbfa91f2f6f5c2cfa",
+      "contractAddress": null,
+      "gasUsed": "0x1acd8",
+      "blockHash": "0x249043371e12210bb92a3d59f1efa3793a724866146c69b2a9fefd59366ca091",
+      "blockNumber": "0x72b66c0",
+      "transactionIndex": "0x15",
+      "effectiveGasPrice": "0x2faf080"
+    },
+    "getSubscriptionReturn": "0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000006f4d78fb59ec938cbaf65b9fc822ad04d00c155e00000000000000000000000000000000000000000000000000000000000000a00000000000000000000000000000000000000000000000000000000000000000"
+  },
+  "sources": [
+    {
+      "title": "用户提供的创建交易",
+      "url": "https://bscscan.com/tx/0x31cffeb6930e9e187ea2d6b5d508ed9388b366cc3d58a28bbfa91f2f6f5c2cfa"
+    },
+    {
+      "title": "Chainlink VRF v2.5 官方支持网络",
+      "url": "https://docs.chain.link/vrf/v2-5/supported-networks#bnb-chain-mainnet"
+    },
+    {
+      "title": "官方 coordinator 链上合约",
+      "url": "https://bscscan.com/address/0xd691f04bc0C9a24Edb78af9E005Cf85768F694C9#readContract"
+    }
+  ]
+}

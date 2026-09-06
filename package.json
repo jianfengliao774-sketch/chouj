@@ -1,0 +1,27 @@
+{
+  "name": "chouj-bem2075",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BEHEMOTH 2075 raffle: BNB Chain production website, fixed contracts and keeper",
+  "engines": {
+    "node": ">=24 <25"
+  },
+  "scripts": {
+    "build": "node bem-production-site/build.mjs",
+    "start": "node bem-production-site/server.mjs",
+    "test": "node --test test/bem-production-history.test.mjs test/bem-production-rpc.test.mjs test/bem-production-player-guards.test.mjs test/bem-production-keeper.test.mjs test/bem-raffle-keeper.test.mjs test/bem-production-selectable.test.mjs test/bem-production-series.test.mjs",
+    "compile:contracts": "node scripts/compile_bem_production.mjs",
+    "check:chain": "node scripts/check_bem_production_dependencies.mjs",
+    "keeper:inspect": "node scripts/run_bem_production_keeper.mjs --rpc https://bsc-dataseed.bnbchain.org"
+  },
+  "dependencies": {
+    "ethers": "6.15.0"
+  },
+  "devDependencies": {
+    "ganache": "7.9.2",
+    "solc": "0.8.36",
+    "vite": "8.2.2"
+  },
+  "packageManager": "pnpm@11.19.0"
+}

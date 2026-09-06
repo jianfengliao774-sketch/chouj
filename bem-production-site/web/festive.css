@@ -1,0 +1,302 @@
+/* Warm paper surrounds a restrained vermilion draw machine. */
+:root {
+  color-scheme: light;
+  --accent: #bf292c;
+  --muted: #867769;
+  --line: #e2d7c4;
+}
+body {
+  color: #493a2c;
+  background: radial-gradient(ellipse at 50% 0%, #fffcf4, transparent 65%), #f4eedf;
+}
+.simulation-banner { background: #efe2c7; border-color: #dfcba3; color: #87602f; }
+.status-dot { box-shadow: none; }
+.brand { color: #423328; }
+.brand small { color: #9a8770; }
+.brand-chip { color: #bb282e; background: #f9f1df; border-color: #c8a66f; box-shadow: none; }
+.chain-indicator, .admin-link { color: #927c63; }
+.admin-link:hover { color: #bc282c; }
+.wallet-bar { background: #fffaf0; border-color: #e2d4bb; box-shadow: none; }
+.wallet-bar .eyebrow, .wallet-foot, .brand small { color: #97836d; }
+.wallet-foot { border-color: #e8ddc9; }
+.wallet-foot > span:first-child { color: #77624c; }
+.wallet-address { color: #a34736; }
+.notice, .notice.success { color: #856644; }
+.notice.pending { color: #a5732f; }
+.notice.error { color: #b8272b; }
+button { background: #faf4e7; color: #795d3f; border-color: #d7c3a0; box-shadow: none; }
+button:hover:not(:disabled) { background: #f2e6cf; border-color: #bc975e; }
+button:disabled { opacity: .5; }
+.primary { background: #bd282d; color: #fff6e7; border-color: #bd282d; box-shadow: none; }
+.primary:hover:not(:disabled) { background: #a91e26; border-color: #a91e26; }
+.accent-outline { color: #a63c30; border-color: #ca9b7b; }
+.quiet { background: transparent; color: #8e775d; }
+.tabs button { color: #8b7965; }
+#record-count { background: #eadcc3; color: #956333; }
+.card { border-color: #e1d4be; background: #fffcf5; box-shadow: 0 8px 30px #8f713b06; }
+.reactor { background: #fffcf5; border-top-color: #d8ba84; }
+.purchase-card { background: #fffaf0; border-top: 2px solid #bf292c; }
+.purchase-card h2 { color: #a72a2d; }
+.timing-card { background: #faf4e7; }
+.hero h1 { color: #4b392b; }
+.hero-content .hero-heading .community-slogan { color: #a94432; }
+.hero-message .community-copy, .processor-intro { color: #796451; }
+.hero-message .community-copy > span, .community-tag { color: #937b62; }
+.hero-message .local-mode-note { color: #9b7744; border-color: #c5a16e; }
+.processor-chip .processor-chip-caption { color: #947b59; }
+.prize strong { color: #bd282d; text-shadow: none; }
+.prize > span { color: #74593e; }
+.prize small { color: #9a8166; }
+.hero-content .hero-prize-stack {
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 6px; min-width: 0; max-width: 100%;
+}
+.hero-prize-stack .processor-merit {
+  display: inline-flex; align-items: center; gap: 7px;
+  max-width: 100%; padding: 6px 9px;
+  border: 1px solid #d8b276; border-radius: 5px;
+  background: #fbf1dd; color: #a93b2e; text-decoration: none;
+}
+.processor-merit .processor-merit-mark { color: #b58642; font-size: 18px; line-height: 1; }
+.processor-merit > span:last-child { min-width: 0; }
+.processor-merit b { display: block; font-size: 11px; font-weight: 600; line-height: 1.45; }
+.processor-merit small { display: block; margin-top: 2px; color: #987447; font-size: 9px; line-height: 1.4; }
+.processor-merit .rank-status { color: #875328; font-size: 11px; }
+.hero-prize-stack a.processor-merit:hover { border-color: #b98948; background: #f6e9ce; }
+@media (max-width: 1100px) {
+  .hero-content .hero-prize-stack { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 7px 12px; }
+  .hero-prize-stack .processor-merit { padding: 5px 7px; }
+}
+@media (max-width: 760px) {
+  .hero-content .hero-prize-stack { flex-direction: column; align-items: flex-start; gap: 5px; }
+}
+.phase { color: #a44731; border-color: #dfba95; background: #faf0dc; }
+.funding-meta { color: #967c60; }
+.progress { background: #eee0c7; }
+.progress > span { background: #c03431; box-shadow: none; }
+.machine {
+  border: 1px solid #b58549;
+  border-radius: 12px;
+  background: linear-gradient(150deg, #cf3436, #bd252d 70%);
+  box-shadow: inset 0 1px #ffedc155, 0 5px 16px #b6222312;
+}
+.machine::before {
+  left: 22%; right: 22%; height: 1px;
+  background: linear-gradient(90deg, transparent, #f9dca0, transparent);
+  box-shadow: none;
+}
+.machine-heading { color: #f4d3af; letter-spacing: .12em; }
+.machine-heading > span:last-child { color: #ffe6b8; }
+.reel {
+  background: #fff4d8;
+  border-color: #d8b779;
+  box-shadow: inset 3px 0 9px #8b531b12, inset -3px 0 9px #8b531b12;
+}
+.reel::before {
+  border-color: #ac7b2c25;
+  background: linear-gradient(90deg, #9b6f2007, transparent 22%, transparent 78%, #9b6f2007);
+}
+.reel::after {
+  background: linear-gradient(#eed4a5 0%, #f5e3bdcc 12%, transparent 35%, transparent 65%, #f5e3bdcc 88%, #eed4a5 100%);
+}
+.reel-strip > span { color: #b42b30; }
+.placeholder { background: #f9ebcd; color: #ba8857; }
+.reel.locked { border-color: #f1d6a0; box-shadow: inset 0 0 10px #c9943320; }
+.reel.locked .reel-strip > span { color: #b2242c; text-shadow: none; }
+.reel-message { color: #ffebcf; }
+.steps { color: #efb7a4; }
+.steps span.done { color: #ffe8b0; }
+.machine #replay { color: #ffe2b0; border-color: #e8b87777; background: transparent; }
+.machine #replay:hover:not(:disabled) { background: #9f1c2433; border-color: #f5d79d; }
+.animation-note { color: #f0c5af; }
+.payout-grid small, .payout-grid strong span { color: #947b5e; }
+.payout-grid strong { color: #a93a2e; }
+.payout-purpose { color: #967d62; }
+.fine-print, .log-heading span, footer { color: #96816b; }
+.muted { color: #8a7763; }
+label { color: #7b6248; }
+.number-input, .purchase-card #selected-numbers, .refund-query > input {
+  background: #fffdf6; border-color: #d2b78e; color: #5b422f;
+}
+.number-input input { color: #604632; }
+.number-input > span, .purchase-total, .purchase-total small { color: #977c5c; }
+#selected-numbers::placeholder { color: #ae977c; }
+.quick-actions button { background: #f8f0df; border-color: #dfcba7; }
+.selection-modes { background: #f3e8d3; border-color: #decaab; }
+.selection-modes button { color: #957e60; }
+.selection-modes button[aria-pressed=true] { color: #aa332d; background: #fffbef; box-shadow: 0 1px 4px #95702c0d; }
+.selection-summary, .selection-availability { color: #87622e; }
+.selection-summary.error, .selection-availability.error { color: #b12b2d; }
+.sold-numbers { background: #f7e3dc; }
+.my-ticket { color: #85694c; }
+.my-ticket strong { color: #ab3a2f; }
+.my-ticket small, #my-numbers, #my-numbers .fine-print { color: #967c60; }
+#my-numbers-section > summary, #my-numbers > strong { color: #9b5738; }
+.owned-numbers { color: #a4412e; background: #f8ecd6; border-color: #dfc18c; }
+.processor-stats > div > span, .processor-source { color: #97846c; }
+.processor-stats strong { color: #7d5d35; }
+.snapshot-link, .processor-source a, .processor-evidence-links a, #selection-legacy-note a { color: #a15436; }
+.snapshot-link:hover:not(:disabled) { color: #be292c; }
+dl > div, details, .event-row, .transfer-row { border-color: #e6d8c1; }
+dt { color: #957b60; }
+dd, summary { color: #6e5239; }
+.callout { color: #805e3c; background: #f7ead2; border-color: #c6a363; }
+.history-table-head, .history-period > span, .history-time, .history-prize > small { color: #96806a; }
+.history-row { border-color: #e4d8c4; }
+.history-period > strong, .history-wallet > .mono { color: #72543a; }
+.history-view { background: #f9eed8; color: #9f4532; border-color: #d5b58b; }
+.copy-address { color: #a5673c; background: transparent; }
+.copy-address:hover:not(:disabled) { color: #bc292e; background: transparent; }
+.winner-record { background: #fbf1dc; border-color: #dfc395; border-top-color: #bd3030; }
+.winner-record > div { color: #94714b; }
+.detail-subtitle, .supplementary-records > details > summary { color: #876d53; }
+.tx-link { color: #a84530; background: transparent; }
+.tx-link:hover:not(:disabled) { color: #c2242b; background: transparent; }
+.transfer-row small, .event-row small { color: #9e8469; }
+.event-row strong { color: #7c5d41; }
+.calc-block { background: #f6ecd8; color: #796044; }
+.empty-state, .refund-wallet { color: #947d64; }
+.refund-status { background: #faf0dd; border-color: #dec49c; color: #80654b; }
+.refund-status > strong, .refund-metrics b { color: #89532f; }
+.refund-metrics span { color: #987e61; }
+dialog { background: #fffcf4; color: #6a4d35; border-color: #ccb181; box-shadow: 0 20px 100px #46301022; }
+dialog pre { color: #826247; border-color: #e0caa6; }
+dialog::backdrop { background: #34201466; }
+.draw-countdown-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 5px 20px;
+  padding: 16px 20px;
+  margin: 0 0 16px;
+  border: 1px solid #dfbd80;
+  border-left: 3px solid #c42a30;
+  border-radius: 9px;
+  background: #fcf0d7;
+}
+#draw-countdown-label { color: #aa302d; font-size: 13px; font-weight: 500; }
+#draw-countdown-value {
+  grid-column: 2; grid-row: 1 / 3;
+  color: #be292d; font: 500 44px/1.1 Consolas, monospace;
+  font-variant-numeric: tabular-nums; letter-spacing: .04em;
+}
+#draw-countdown-note { color: #9a7752; font-size: 10px; line-height: 1.7; margin: 0; }
+@media (max-width: 500px) {
+  .draw-countdown-panel { gap: 6px 12px; padding: 14px 12px; }
+  #draw-countdown-label { font-size: 12px; }
+  #draw-countdown-value { font-size: 35px; }
+  #draw-countdown-note { font-size: 10px; }
+}
+@media (max-width: 360px) {
+  #draw-countdown-value { font-size: 31px; grid-row: 1; }
+  #draw-countdown-note { grid-column: 1 / -1; }
+}
+
+/* Keep the draw and participation ahead of supporting reference material. */
+.draw-layout { grid-template-areas: "stage controls" "about controls"; grid-template-rows: auto 1fr; }
+.draw-layout > .reactor { grid-area: stage; }
+.draw-layout > .side-column { grid-area: controls; }
+.draw-layout > .reactor-about { grid-area: about; margin-top: 0; padding: 22px 26px; }
+.participate-shortcut { display: none; }
+#participation { scroll-margin-top: 18px; }
+.shell > .header { padding: 22px 0 18px; }
+.shell > .wallet-bar { padding: 15px 18px; gap: 12px; }
+.wallet-bar .wallet-foot { font-size: 11px; padding-top: 10px; }
+.wallet-bar .eyebrow, .eyebrow { font-size: 11px; letter-spacing: .08em; }
+.hero-message .community-copy { font-size: 12px; color: #715842; }
+.hero-message .community-copy > span { font-size: 11px; color: #80634a; }
+.hero-message .local-mode-note { font-size: 10px; color: #856135; }
+.funding-meta { font-size: 11px; color: #80654b; }
+.machine-heading { font-size: 11px; letter-spacing: .04em; }
+.machine-heading > span:last-child { font-size: 11px; }
+.machine .reel-message { font-size: 12px; }
+.machine .steps { font-size: 10px; color: #ffe1c6; }
+.machine .animation-note { font-size: 10px; color: #ffe1c6; }
+.machine #replay { min-height: 38px; font-size: 12px; }
+.payout-grid small { font-size: 11px; color: #80664d; }
+.payout-grid strong span, .payout-purpose { font-size: 10px; color: #80664d; }
+.fine-print, .muted { color: #80664f; }
+.reactor > .fine-print { font-size: 11px; line-height: 1.8; }
+.purchase-card .fine-print, .purchase-card #selection-help, .purchase-card #auto-selection-note,
+.purchase-card .selection-summary, .purchase-card .selection-availability {
+  font-size: 12px;
+  line-height: 1.75;
+  color: #76583e;
+}
+.purchase-card .selection-summary.error, .purchase-card .selection-availability.error { color: #b12b2d; }
+.purchase-card #buy-hint { min-height: 42px; }
+.purchase-card #check-numbers { min-height: 40px; font-size: 11px; color: #9b4730; }
+.purchase-card .muted { font-size: 12px; color: #80634a; margin-bottom: 18px; }
+.purchase-card .selection-modes { margin-bottom: 16px; }
+.my-ticket, .my-ticket small, #my-numbers-section > summary { font-size: 12px; }
+.my-ticket small { color: #80664f; }
+.timing-card .muted, .timing-card .fine-print, .timing-card dl > div { font-size: 12px; line-height: 1.75; }
+.timing-card dt { color: #80664f; }
+.processor-stats { flex-wrap: wrap; }
+.processor-stats > div > span { font-size: 11px; color: #80664f; }
+.processor-source, .snapshot-link { font-size: 10px; color: #826448; }
+.reactor-about .processor-intro, .reactor-about .community-tag { font-size: 11px; color: #80664f; line-height: 1.8; }
+.chain-indicator .status-dot.ready { color: #477451; }
+.chain-indicator .status-dot.error { color: #bc282c; }
+@media (min-width: 761px) and (max-width: 900px) {
+  .draw-layout { grid-template-columns: 1fr; grid-template-areas: "stage" "controls" "about"; grid-template-rows: auto; }
+  .draw-layout > .side-column { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+}
+@media (max-width: 760px) {
+  .draw-layout { grid-template-areas: "stage" "controls" "about"; grid-template-rows: auto; }
+  .draw-layout > .reactor-about { padding: 20px 18px; }
+  .shell > .header { padding: 14px 3px; }
+  .shell > .wallet-bar { padding: 13px 16px; gap: 11px; }
+  .wallet-bar .wallet-foot { font-size: 10px; }
+  .participate-shortcut {
+    display: inline-flex; align-items: center; min-height: 36px;
+    margin-left: auto; padding: 4px 8px; border: 1px solid #dfc49c;
+    border-radius: 5px; color: #aa332d; background: #fbf1df;
+    font-size: 11px; text-decoration: none;
+  }
+  .machine #replay { min-height: 42px; }
+}
+@media (max-width: 500px) {
+  .hero-message .community-copy { font-size: 12px; }
+  .hero-message .community-copy > span { font-size: 11px; }
+  .machine-heading, .machine-heading > span:last-child { font-size: 10px; }
+  .machine .steps { gap: 7px; font-size: 9px; }
+  .draw-layout > .reactor-about { padding: 18px 15px; }
+}
+
+/* Player language switch; the admin has no language controls or English styles. */
+.header:has(.language-switch) { flex-wrap: wrap; }
+.header:has(.language-switch) .chain-indicator { margin-left: auto; }
+.language-switch {
+  display: inline-flex; flex: none; gap: 2px; padding: 3px;
+  border: 1px solid #dcc7a3; border-radius: 7px; background: #f6eddc;
+}
+.language-switch button {
+  min-width: 42px; min-height: 34px; padding: 5px 9px; border: 0;
+  border-radius: 4px; background: transparent; color: #7b6349;
+  font: 500 12px/1.3 system-ui, sans-serif;
+}
+.language-switch button[aria-pressed="true"] { background: #bd282d; color: #fff7e8; }
+.language-switch button:focus-visible { outline: 2px solid #a93b2e; outline-offset: 3px; }
+.hero-message .community-copy > .i18n-inline { display: inline; color: inherit; font-size: inherit; margin: 0; }
+html[lang="en-US"] .eyebrow { letter-spacing: .045em; }
+html[lang="en-US"] .wallet-actions { flex-wrap: wrap; }
+html[lang="en-US"] .machine .steps { flex-wrap: wrap; }
+html[lang="en-US"] .processor-merit { max-width: 190px; }
+html[lang="en-US"] .timing-card dt { max-width: 58%; }
+html[lang="en-US"] .timing-card dd { text-align: right; }
+html[lang="en-US"] .proof-list dt { min-width: 0; }
+html[lang="en-US"] .selection-modes button { white-space: normal; }
+.supplementary-records p { overflow-wrap: anywhere; }
+@media (max-width: 760px) {
+  .header:has(.language-switch) .brand { flex: 1 1 auto; }
+  .header:has(.language-switch) .chain-indicator { order: 3; max-width: none; width: 100%; margin-left: 0; }
+  .language-switch button { min-height: 38px; padding: 6px 8px; }
+  html[lang="en-US"] .hero-content { gap: 8px; }
+  html[lang="en-US"] .hero-content .hero-prize-stack { width: 100%; }
+  html[lang="en-US"] .hero-content .prize { gap: 6px; }
+  html[lang="en-US"] .hero-content .prize small { display: block; margin-left: 0; }
+  html[lang="en-US"] .tabs { flex-wrap: wrap; gap: 6px 12px; }
+  html[lang="en-US"] .tabs button { padding-left: 0; padding-right: 0; font-size: 12px; }
+  html[lang="en-US"] .tabs .admin-link { font-size: 11px; }
+}

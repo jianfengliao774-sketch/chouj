@@ -1,0 +1,26 @@
+{
+  "status": "production-candidate-not-deployed",
+  "contractName": "Bem2075RaffleBSC",
+  "sourceName": "contracts/production/Bem2075RaffleBSC.sol",
+  "compilerVersion": "0.8.36+commit.8a079791.Emscripten.clang",
+  "optimizer": {
+    "enabled": true,
+    "runs": 200
+  },
+  "evmVersion": "paris",
+  "sourceSha256s": {
+    "contracts/production/BemSelectableRaffle.sol": "b6b7812a0eaf54d3e7b2f307bd4a552fd343952378f4615f590b1faa06fabb44",
+    "contracts/production/BemSelectableRaffleBSC.sol": "a338742191c63affd11f779c2f724299e87c9950dcf75614651612e004938be2",
+    "contracts/production/BemContainerSeriesBSC.sol": "ef1bc76983c30480bdb3afabec59622cca8d6d1c76a725ed63e0bde542743b40",
+    "contracts/production/Bem2075RaffleBSC.sol": "75f24090ae026a7edb44df44c1a008ffe30dc974e2a4393d523fe907599040d8"
+  },
+  "standardJsonSha256": "d17cb7ef0e214f22f97a2138891555769512b3da2d4f23831cbadcf30f666889",
+  "creationBytecodeBytes": 18521,
+  "runtimeBytecodeBytes": 15424,
+  "runtimeBytecodeIsTemplate": true,
+  "runtimeNote": "Constructor immutables are populated during deployment; this template hash is not an on-chain runtime hash.",
+  "staticSourceCompilation": true,
+  "containerChoice": "User-selected BEHEMOTH #2075 container; deployment and series authorization have not been performed by this compilation",
+  "standardJsonInput": "Bem2075RaffleBSC.compile-input.json",
+  "artifact": "Bem2075RaffleBSC.artifact.json"
+}

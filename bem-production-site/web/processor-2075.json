@@ -1,0 +1,172 @@
+{
+  "schemaVersion": 1,
+  "simulation": false,
+  "mode": "mainnet-readonly-snapshot",
+  "label": "主网资料快照",
+  "title": "BEHEMOTH #2075",
+  "chainId": 56,
+  "network": "BNB Smart Chain mainnet",
+  "circuitId": 2075,
+  "asOfBlock": 120277183,
+  "asOfBlockHash": "0xd22de259184e77f101d837faa4f719662246230ad704eb698e018de063cf3f95",
+  "asOfTimestamp": 1788686295,
+  "asOfIso": "2026-09-06T09:18:15.000Z",
+  "iso": "2026-09-06T09:18:15.000Z",
+  "fetchedAt": "2026-09-06T09:19:03.175Z",
+  "rpc": "https://bsc-dataseed.bnbchain.org",
+  "contracts": {
+    "circuits": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+    "mining": "0x7E2E0DC66a3bD9103E69b766afA62d9f7b697b46",
+    "lens": "0x2243Eaf4Dd308AeA7E243C06d7b95265a90b0134",
+    "token": "0x5ce033B2bFCa3Af30b3e8C8457DeaF776A8b695a",
+    "container": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646"
+  },
+  "owner": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+  "minerKey": "0x2763bd9252e326489a9df491453fcddc19865b25624f2b4b122922ad54048683",
+  "miningWeight": {
+    "value": "22938",
+    "display": "22,938",
+    "unit": "PoD verified mining weight",
+    "unitZh": "PoD 已验证权重",
+    "labelZh": "已验证算力",
+    "field": "PodMining.getMiner(key).verifWeight",
+    "isHashesPerSecond": false,
+    "unverifiedWeight": "0",
+    "base": "71",
+    "bonus": "3752",
+    "multiplier": "6",
+    "derivation": "(71 + 3752) × 6 = 22938",
+    "descriptionZh": "协议分配已验证矿池产出的相对权重；不是 H/s、TH/s 或电路门数。"
+  },
+  "output": {
+    "estimatedBemPerSecond": "0.00149539",
+    "estimatedBemPerDay": "129.20169600",
+    "estimatedPerDayBaseUnits": "12920169600",
+    "labelZh": "按快照估算日产出",
+    "unitZh": "BEM / 天",
+    "kind": "conditional-current-rate-estimate",
+    "formula": "u = floor(currentRate * UNVERIFIED_BPS / 10000); v = currentRate - u; minerRate = floor(v * verifWeight / totalVerifWeight) + floor(u * unverWeight / totalUnverWeight); estimatedDaily = minerRate * 86400 / 1e8",
+    "source": "Official PoD frontend per-miner rate formula, evaluated from this snapshot's contract values",
+    "assumptionsZh": [
+      "假设快照时的排放速率、矿机有效状态和矿池权重保持不变。",
+      "不是已领取收益、保证日产量，也不是抽奖收益。",
+      "实际产出随矿池权重、排放速率、矿机资格及合约状态变化。"
+    ],
+    "claimable": {
+      "baseUnits": "252613177",
+      "bem": "2.52613177",
+      "field": "PodLens.pendingLive(minerKey)",
+      "labelZh": "快照时可领取量",
+      "descriptionZh": "该区块的未领取矿机奖励；领取或 NFT 转让会改变可领取量或领取主体。"
+    },
+    "cumulativeClaimed": {
+      "available": false,
+      "bem": null,
+      "baseUnits": null,
+      "labelZh": "累计已领取",
+      "reasonZh": "未完成该 minerKey 的全量 Claimed 事件扫描；公共 RPC 拒绝本次大范围日志查询。没有用 reward debt 或全网 totalMined 代替此矿机累计。"
+    }
+  },
+  "miningStatus": {
+    "status": 1,
+    "active": true,
+    "paused": false,
+    "optimal": true,
+    "taskId": 260,
+    "bestSlotCircuitId": 2075,
+    "isTaskBest": true,
+    "bestSlotCost": "36352",
+    "sinceTimestamp": 1788420238,
+    "sinceIso": "2026-09-03T07:23:58.000Z",
+    "rankingScopeZh": "当前 task 260 / Behemoth 的最优槽位；未核实或声称全网总榜第一。"
+  },
+  "circuit": {
+    "inputs": 12,
+    "outputs": 9,
+    "stateCount": 0,
+    "nandGateCount": 71,
+    "depth": 8,
+    "area": 71,
+    "netlistHash": "0xa375924f2a31f5169606ea20e357efa2aeeb2355aff859f28f40a15519714eef",
+    "descriptionZh": "71 NAND 门是电路规模，不是 PoD 算力。"
+  },
+  "token": {
+    "symbol": "BEM",
+    "decimals": 8
+  },
+  "networkMining": {
+    "totalVerifiedWeight": "1265471",
+    "totalUnverifiedWeight": "34961",
+    "currentRateBaseUnitsPerSecond": "8333333",
+    "currentRateBemPerSecond": "0.08333333",
+    "unverifiedBps": 100,
+    "verifiedPoolRateBaseUnitsPerSecond": "8250000",
+    "unverifiedPoolRateBaseUnitsPerSecond": "83333",
+    "networkDailyEmissionBem": "7199.99971200"
+  },
+  "rawMiner": {
+    "circuits": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+    "circuitId": "2075",
+    "taskId": "260",
+    "gateCount": "71",
+    "stateCount": "0",
+    "depth": "8",
+    "area": "71",
+    "mult": "6",
+    "since": "1788420238",
+    "status": "1",
+    "registrant": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+    "nandBurn": "71",
+    "latchBurn": "0",
+    "bstar": "71",
+    "bonus": "3752",
+    "optimal": true,
+    "commitBlock": "119514736",
+    "firstUnusedId": "2070",
+    "stopBlock": "0",
+    "verifWeight": "22938",
+    "unverWeight": "0",
+    "debt": "455033946654"
+  },
+  "crossCheck": {
+    "rpc": "https://bsc-dataseed-public.bnbchain.org",
+    "asOfBlock": 120277183,
+    "blockHashMatches": true,
+    "claimableMatches": true
+  },
+  "sources": [
+    {
+      "title": "官方 PoD 挖矿页面",
+      "url": "https://tapeout.net/pod/#mine"
+    },
+    {
+      "title": "官方矿池部署配置",
+      "url": "https://tapeout.net/pod/pod-mainnet.json"
+    },
+    {
+      "title": "官方前端 ABI、pendingLive 与矿机产出计算",
+      "url": "https://tapeout.net/pod/assets/main-B_sNtWI0.js"
+    },
+    {
+      "title": "官方 PoD 全网统计（独立更新，不能替代本快照时点）",
+      "url": "https://tapeout.net/pod/pod-stats.json"
+    },
+    {
+      "title": "BSC 主网快照区块",
+      "url": "https://bscscan.com/block/120277183"
+    },
+    {
+      "title": "矿池合约读取",
+      "url": "https://bscscan.com/address/0x7E2E0DC66a3bD9103E69b766afA62d9f7b697b46#readContract"
+    },
+    {
+      "title": "Behemoth 2075 NFT",
+      "url": "https://bscscan.com/nft/0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C/2075"
+    }
+  ],
+  "usageNotesZh": [
+    "仅为主网资料快照，不代表实时排名。",
+    "PoD权重与快照估算产出不关联抽奖中奖概率或95 BEM奖金。",
+    "公开快照生成过程没有发送交易。"
+  ]
+}

@@ -1,0 +1,58 @@
+{
+  "status": "passed",
+  "checkedAt": "2026-09-06T13:08:32.355Z",
+  "scope": "local_mocks",
+  "compilerVersion": "0.8.36+commit.8a079791.Emscripten.clang",
+  "sourceSha256s": {
+    "contracts/production/BemSelectableRaffle.sol": "b6b7812a0eaf54d3e7b2f307bd4a552fd343952378f4615f590b1faa06fabb44",
+    "contracts/production/BemSelectableRaffleBSC.sol": "a338742191c63affd11f779c2f724299e87c9950dcf75614651612e004938be2",
+    "contracts/production/BemContainerSeriesBSC.sol": "ef1bc76983c30480bdb3afabec59622cca8d6d1c76a725ed63e0bde542743b40",
+    "contracts/production/Bem2075RaffleBSC.sol": "75f24090ae026a7edb44df44c1a008ffe30dc974e2a4393d523fe907599040d8"
+  },
+  "note": "BEHEMOTH 2075 scenarios deploy the fixed Bem2075RaffleBSC release leaf. The generic series also validates the internal 13043 binding. Official addresses contain injected local mocks; no mainnet VRF proof or wallet signature is verified.",
+  "releaseContract": "Bem2075RaffleBSC",
+  "transactionGasLimit": "16777216",
+  "tests": [
+    {
+      "name": "only the two exact official tuples can be fixed; registry mismatch rejects deployment",
+      "passed": true
+    },
+    {
+      "name": "Behemoth 2075: activation requires its opened bound container, and recipient equals that container",
+      "passed": true
+    },
+    {
+      "name": "Behemoth 2075: mixed tickets auto-request VRF, fixed result pays 4/1/95 and opens after exactly 60 seconds",
+      "passed": true,
+      "callbackGasBudget": 150000,
+      "callbackGasUsed": "68204",
+      "winningTicket": "5365",
+      "finalPurchaseGas": "1170319",
+      "maxPurchaseGas": "1170319",
+      "contractName": "Bem2075RaffleBSC"
+    },
+    {
+      "name": "TapeOut 13043: activation requires its opened bound container, and recipient equals that container",
+      "passed": true
+    },
+    {
+      "name": "TapeOut 13043: mixed tickets auto-request VRF, fixed result pays 4/1/95 and opens after exactly 60 seconds",
+      "passed": true,
+      "callbackGasBudget": 200000,
+      "callbackGasUsed": "68204",
+      "winningTicket": "5365",
+      "finalPurchaseGas": "1170319",
+      "maxPurchaseGas": "1170319",
+      "contractName": "BemContainerSeriesBSC"
+    },
+    {
+      "name": "VRF request failure rolls back the final chosen ticket, full payment and round advancement",
+      "passed": true
+    },
+    {
+      "name": "expired partial funding has a 60-second next-round cooldown with old refund funds reserved",
+      "passed": true
+    }
+  ],
+  "mainnetTransactionsSent": 0
+}

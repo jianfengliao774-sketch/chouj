@@ -1,0 +1,55 @@
+# Generated dependencies and build output
+node_modules/
+dist/
+coverage/
+# Local operational state and credentials
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.keystore
+keystore/
+keys/
+wallets/
+secrets/
+state/
+private/
+sessions/
+logs/
+*.log
+journal.json
+keeper.lock
+chain-history.json
+*.tmp
+.DS_Store
+Thumbs.db
+# The compatibility directory is for generated public packets only
+local-bem-demo/web/*
+!local-bem-demo/web/.gitkeep
+# Only explicitly selected public evidence belongs in version control
+outputs/**
+!outputs/bem-raffle-2075/
+!outputs/bem-raffle-2075/production/
+!outputs/bem-raffle-2075/BemContainerRaffleBSC.abi.json
+!outputs/bem-raffle-2075/deployment-preferences.json
+!outputs/bem-raffle-2075/subscription-readonly.json
+!outputs/bem-raffle-2075/circuit-2075.json
+!outputs/bem-raffle-2075/production/release-plan.json
+!outputs/bem-raffle-2075/production/deployment-verified.json
+!outputs/bem-raffle-2075/production/deployment-review.json
+!outputs/bem-raffle-2075/production/Bem2075RaffleBSC.artifact.json
+!outputs/bem-raffle-2075/production/Bem2075RaffleBSC.abi.json
+!outputs/bem-raffle-2075/production/Bem2075RaffleBSC.compile-input.json
+!outputs/bem-raffle-2075/production/Bem2075RaffleBSC.build-info.json
+!outputs/bem-raffle-2075/production/Bem2075RaffleBSC.bytecode.txt
+!outputs/bem-raffle-2075/production/Bem2075RaffleBSC.deployed-bytecode.txt
+!outputs/bem-raffle-2075/production/Bem2075RaffleBSC.metadata.json
+!outputs/bem-raffle-2075/production/dependencies-readonly-2026-09-06T13-43-56-447Z.json
+!outputs/bem-raffle-2075/production/verification-keeper.json
+!outputs/bem-raffle-2075/production/verification-selectable.json
+!outputs/bem-raffle-2075/production/verification-series.json
+!outputs/bem-raffle-2075/production/OPERATIONS.md
+!outputs/bem-raffle-2075/production/README.md
+!outputs/bem-raffle-2075/production/WEBSITE-VERIFICATION.md

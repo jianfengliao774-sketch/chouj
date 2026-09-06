@@ -1,0 +1,76 @@
+{
+  "status": "passed",
+  "checkedAt": "2026-09-06T13:09:11.059Z",
+  "scope": "local_mocks",
+  "compilerVersion": "0.8.36+commit.8a079791.Emscripten.clang",
+  "note": "In-memory Ganache only. Official addresses contain local mocks, not real mainnet code or VRF proofs. Base and BSC layer are not the final container series.",
+  "sourceSha256s": {
+    "contracts/production/BemSelectableRaffle.sol": "b6b7812a0eaf54d3e7b2f307bd4a552fd343952378f4615f590b1faa06fabb44",
+    "contracts/production/BemSelectableRaffleBSC.sol": "a338742191c63affd11f779c2f724299e87c9950dcf75614651612e004938be2"
+  },
+  "transactionGasLimit": "16777216",
+  "tests": [
+    {
+      "name": "BSC configuration pins official dependencies, 72 hours and live-call interface",
+      "passed": true
+    },
+    {
+      "name": "BSC candidate rejects another chain before dependency interaction",
+      "passed": true
+    },
+    {
+      "name": "explicit boundary tickets and auto allocation agree with packed ownership and paid event ranges",
+      "passed": true
+    },
+    {
+      "name": "empty, duplicate, unsorted and out-of-range selections revert every booking and payment",
+      "passed": true
+    },
+    {
+      "name": "per-purchase cap rejects 501 automatic or chosen tickets before funding, ownership or payment changes",
+      "passed": true
+    },
+    {
+      "name": "a sold number atomically rejects another buyer including earlier free numbers in its batch",
+      "passed": true
+    },
+    {
+      "name": "missing approval, insufficient balance and taxed transfer roll back assigned ticket IDs",
+      "passed": true
+    },
+    {
+      "name": "expired funding preserves historical ownership while stale and future round orders cannot spend",
+      "passed": true
+    },
+    {
+      "name": "full mixed pool selects the actual numbered owner and retains mandatory circuit plus atomic 4/1/95",
+      "passed": true,
+      "maxPurchaseGas": "1004223",
+      "winningTicket": "5365",
+      "settlementGas": "199942"
+    },
+    {
+      "name": "alternating selected numbers and automatic gaps fill all tickets without overwritten ownership",
+      "passed": true,
+      "maxExplicitGas": "3174180",
+      "maxAutomaticGas": "1930508"
+    },
+    {
+      "name": "500 scattered selections touching 500 fresh storage words fit the BSC transaction gas cap",
+      "passed": true,
+      "selectedCount": 500,
+      "freshStorageWords": 500,
+      "isolatedEventRanges": 500,
+      "purchaseGas": "12977422",
+      "gasHeadroom": "3799794"
+    },
+    {
+      "name": "automatic allocation can scan 9999 previously selected tickets to the final free ticket under the gas cap",
+      "passed": true,
+      "maxEarlierPurchaseGas": "1257283",
+      "scanPurchaseGas": "3023288",
+      "gasHeadroom": "13753928"
+    }
+  ],
+  "mainnetTransactionsSent": 0
+}

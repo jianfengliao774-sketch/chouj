@@ -1,0 +1,1745 @@
+{
+  "compiler": {
+    "version": "0.8.36+commit.8a079791"
+  },
+  "language": "Solidity",
+  "output": {
+    "abi": [
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "vrfSubscriptionId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint16",
+            "name": "confirmations",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint32",
+            "name": "vrfCallbackGasLimit",
+            "type": "uint32"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "constructor"
+      },
+      {
+        "inputs": [],
+        "name": "BadConfiguration",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "DeadlinePassed",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint64",
+            "name": "scheduledDrawAt",
+            "type": "uint64"
+          }
+        ],
+        "name": "DrawNotDue",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "Insolvent",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "InvalidContainer",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "InvalidRandomness",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "InvalidTicketCount",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "NothingToRefund",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          }
+        ],
+        "name": "PreviousRoundUnresolved",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "requested",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "maximum",
+            "type": "uint256"
+          }
+        ],
+        "name": "PurchaseLimitExceeded",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "ReentrantCall",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint64",
+            "name": "opensAt",
+            "type": "uint64"
+          }
+        ],
+        "name": "RoundCoolingDown",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "SeriesNotAuthorized",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint32",
+            "name": "ticket",
+            "type": "uint32"
+          }
+        ],
+        "name": "TicketAlreadySold",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "TicketsNotStrictlyAscending",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "TokenTransferFailed",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "TooEarly",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "UnauthorizedContainer",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "UnauthorizedCoordinator",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "UnexpectedTokenAmount",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "chainId",
+            "type": "uint256"
+          }
+        ],
+        "name": "UnsupportedChain",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "WrongCircuit",
+        "type": "error"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "expectedRoundId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "actualRoundId",
+            "type": "uint256"
+          }
+        ],
+        "name": "WrongRound",
+        "type": "error"
+      },
+      {
+        "inputs": [],
+        "name": "WrongState",
+        "type": "error"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": true,
+            "internalType": "uint32",
+            "name": "cursor",
+            "type": "uint32"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint16",
+            "name": "input0",
+            "type": "uint16"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint16",
+            "name": "input1",
+            "type": "uint16"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint16",
+            "name": "output0",
+            "type": "uint16"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint16",
+            "name": "output1",
+            "type": "uint16"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint16",
+            "name": "candidate",
+            "type": "uint16"
+          },
+          {
+            "indexed": false,
+            "internalType": "bool",
+            "name": "accepted",
+            "type": "bool"
+          }
+        ],
+        "name": "AttemptEvaluated",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+          }
+        ],
+        "name": "BlackholeTransfer",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "container",
+            "type": "address"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "nft",
+            "type": "address"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "tokenId",
+            "type": "uint256"
+          }
+        ],
+        "name": "ContainerBindingFixed",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "container",
+            "type": "address"
+          }
+        ],
+        "name": "ContainerSeriesAuthorized",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint32",
+            "name": "nextCursor",
+            "type": "uint32"
+          }
+        ],
+        "name": "DrawProgress",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "requestId",
+            "type": "uint256"
+          }
+        ],
+        "name": "DrawRequested",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint64",
+            "name": "scheduledDrawAt",
+            "type": "uint64"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint64",
+            "name": "targetDrawBy",
+            "type": "uint64"
+          }
+        ],
+        "name": "DrawScheduled",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint64",
+            "name": "lockedAt",
+            "type": "uint64"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint64",
+            "name": "targetDrawBy",
+            "type": "uint64"
+          }
+        ],
+        "name": "DrawWindowOpened",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "resolvedRoundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "nextRoundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint64",
+            "name": "opensAt",
+            "type": "uint64"
+          }
+        ],
+        "name": "NextRoundScheduled",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "requestId",
+            "type": "uint256"
+          }
+        ],
+        "name": "RandomnessIgnored",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "requestId",
+            "type": "uint256"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "ticketWord",
+            "type": "uint256"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "circuitWord",
+            "type": "uint256"
+          }
+        ],
+        "name": "RandomnessReceived",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "buyer",
+            "type": "address"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "amount",
+            "type": "uint256"
+          }
+        ],
+        "name": "Refunded",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          }
+        ],
+        "name": "RefundsOpened",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint64",
+            "name": "drawDeadline",
+            "type": "uint64"
+          }
+        ],
+        "name": "RoundLocked",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint64",
+            "name": "fundingDeadline",
+            "type": "uint64"
+          }
+        ],
+        "name": "RoundStarted",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "winner",
+            "type": "address"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint32",
+            "name": "winningTicket",
+            "type": "uint32"
+          }
+        ],
+        "name": "Settled",
+        "type": "event"
+      },
+      {
+        "anonymous": false,
+        "inputs": [
+          {
+            "indexed": true,
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "indexed": true,
+            "internalType": "address",
+            "name": "buyer",
+            "type": "address"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint32",
+            "name": "firstTicket",
+            "type": "uint32"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint32",
+            "name": "endExclusive",
+            "type": "uint32"
+          },
+          {
+            "indexed": false,
+            "internalType": "uint256",
+            "name": "paid",
+            "type": "uint256"
+          }
+        ],
+        "name": "TicketsPurchased",
+        "type": "event"
+      },
+      {
+        "inputs": [],
+        "name": "AUTHORIZATION_NFT",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "AUTHORIZATION_TOKEN_ID",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "BEHEMOTH_2075_CONTAINER",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "BLACKHOLE",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "BLACKHOLE_AMOUNT",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "BSC_CHAIN_ID",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "BSC_VRF_COORDINATOR",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "BSC_VRF_KEY_HASH",
+        "outputs": [
+          {
+            "internalType": "bytes32",
+            "name": "",
+            "type": "bytes32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "CIRCUITS",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "CIRCUIT_HASH",
+        "outputs": [
+          {
+            "internalType": "bytes32",
+            "name": "",
+            "type": "bytes32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "CIRCUIT_ID",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "CONTAINER",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "DRAW_TARGET_SECONDS",
+        "outputs": [
+          {
+            "internalType": "uint64",
+            "name": "",
+            "type": "uint64"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "FUNDING_WINDOW_SECONDS",
+        "outputs": [
+          {
+            "internalType": "uint32",
+            "name": "",
+            "type": "uint32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "MAX_DRAW_DELAY",
+        "outputs": [
+          {
+            "internalType": "uint64",
+            "name": "",
+            "type": "uint64"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "MAX_TICKETS_PER_PURCHASE",
+        "outputs": [
+          {
+            "internalType": "uint32",
+            "name": "",
+            "type": "uint32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "MIN_DRAW_DELAY",
+        "outputs": [
+          {
+            "internalType": "uint64",
+            "name": "",
+            "type": "uint64"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "NEXT_ROUND_DELAY",
+        "outputs": [
+          {
+            "internalType": "uint64",
+            "name": "",
+            "type": "uint64"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "OFFICIAL_BEM",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "OPENER",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "ORGANIZER_AMOUNT",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "REQUEST_WINDOW_SECONDS",
+        "outputs": [
+          {
+            "internalType": "uint32",
+            "name": "",
+            "type": "uint32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "ROUND_POOL",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "TAPEOUT_13043_CONTAINER",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "TAPEOUT_NFT",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "TICKETS_PER_ROUND",
+        "outputs": [
+          {
+            "internalType": "uint32",
+            "name": "",
+            "type": "uint32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "TICKET_PRICE",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "WINNER_AMOUNT",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "authorizeSeries",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "bem",
+        "outputs": [
+          {
+            "internalType": "contract ISelectableRaffleToken",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "expectedRoundId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint32",
+            "name": "count",
+            "type": "uint32"
+          }
+        ],
+        "name": "buy",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "expectedRoundId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint16[]",
+            "name": "selectedTickets",
+            "type": "uint16[]"
+          }
+        ],
+        "name": "buySelected",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "callbackGasLimit",
+        "outputs": [
+          {
+            "internalType": "uint32",
+            "name": "",
+            "type": "uint32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "circuitNetlist",
+        "outputs": [
+          {
+            "internalType": "bytes",
+            "name": "",
+            "type": "bytes"
+          }
+        ],
+        "stateMutability": "pure",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "coordinator",
+        "outputs": [
+          {
+            "internalType": "contract ISelectableRaffleVRFCoordinator",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "currentRoundId",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "name": "drawTiming",
+        "outputs": [
+          {
+            "internalType": "uint64",
+            "name": "lockedAt",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "targetDrawBy",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "scheduledDrawAt",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "settledAt",
+            "type": "uint64"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "drawWindow",
+        "outputs": [
+          {
+            "internalType": "uint32",
+            "name": "",
+            "type": "uint32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "fundingWindow",
+        "outputs": [
+          {
+            "internalType": "uint32",
+            "name": "",
+            "type": "uint32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "keyHash",
+        "outputs": [
+          {
+            "internalType": "bytes32",
+            "name": "",
+            "type": "bytes32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "nextRoundOpensAt",
+        "outputs": [
+          {
+            "internalType": "uint64",
+            "name": "",
+            "type": "uint64"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "openNextRound",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          }
+        ],
+        "name": "openRefunds",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "organizer",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "word0",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "word1",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint32",
+            "name": "cursor",
+            "type": "uint32"
+          }
+        ],
+        "name": "previewAttempt",
+        "outputs": [
+          {
+            "components": [
+              {
+                "internalType": "uint16",
+                "name": "input0",
+                "type": "uint16"
+              },
+              {
+                "internalType": "uint16",
+                "name": "input1",
+                "type": "uint16"
+              },
+              {
+                "internalType": "uint16",
+                "name": "output0",
+                "type": "uint16"
+              },
+              {
+                "internalType": "uint16",
+                "name": "output1",
+                "type": "uint16"
+              },
+              {
+                "internalType": "uint16",
+                "name": "candidate",
+                "type": "uint16"
+              },
+              {
+                "internalType": "bool",
+                "name": "accepted",
+                "type": "bool"
+              },
+              {
+                "internalType": "uint32",
+                "name": "ticket",
+                "type": "uint32"
+              }
+            ],
+            "internalType": "struct BemSelectableRaffle.Attempt",
+            "name": "a",
+            "type": "tuple"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "requestId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256[]",
+            "name": "words",
+            "type": "uint256[]"
+          }
+        ],
+        "name": "rawFulfillRandomWords",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "participant",
+            "type": "address"
+          }
+        ],
+        "name": "refund",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "requestConfirmations",
+        "outputs": [
+          {
+            "internalType": "uint16",
+            "name": "",
+            "type": "uint16"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          }
+        ],
+        "name": "requestDraw",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "requestId",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "name": "requestRound",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "name": "rounds",
+        "outputs": [
+          {
+            "internalType": "enum BemSelectableRaffle.Status",
+            "name": "status",
+            "type": "uint8"
+          },
+          {
+            "internalType": "uint32",
+            "name": "sold",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint64",
+            "name": "fundingDeadline",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint64",
+            "name": "drawDeadline",
+            "type": "uint64"
+          },
+          {
+            "internalType": "uint256",
+            "name": "requestId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "ticketWord",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint256",
+            "name": "circuitWord",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint32",
+            "name": "drawCursor",
+            "type": "uint32"
+          },
+          {
+            "internalType": "uint32",
+            "name": "winningTicket",
+            "type": "uint32"
+          },
+          {
+            "internalType": "address",
+            "name": "winner",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint16",
+            "name": "input",
+            "type": "uint16"
+          }
+        ],
+        "name": "runCircuit2075",
+        "outputs": [
+          {
+            "internalType": "uint16",
+            "name": "output",
+            "type": "uint16"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "seriesAuthorized",
+        "outputs": [
+          {
+            "internalType": "bool",
+            "name": "",
+            "type": "bool"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          }
+        ],
+        "name": "settle",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "sourceVerifiedAtBlock",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "subscriptionId",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint16",
+            "name": "",
+            "type": "uint16"
+          }
+        ],
+        "name": "ticketBuyer",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "name": "ticketBuyerId",
+        "outputs": [
+          {
+            "internalType": "uint16",
+            "name": "",
+            "type": "uint16"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint32",
+            "name": "ticket",
+            "type": "uint32"
+          }
+        ],
+        "name": "ticketOwner",
+        "outputs": [
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "roundId",
+            "type": "uint256"
+          },
+          {
+            "internalType": "uint16",
+            "name": "startWord",
+            "type": "uint16"
+          },
+          {
+            "internalType": "uint16",
+            "name": "count",
+            "type": "uint16"
+          }
+        ],
+        "name": "ticketWords",
+        "outputs": [
+          {
+            "internalType": "uint256[]",
+            "name": "words",
+            "type": "uint256[]"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          },
+          {
+            "internalType": "address",
+            "name": "",
+            "type": "address"
+          }
+        ],
+        "name": "ticketsOf",
+        "outputs": [
+          {
+            "internalType": "uint32",
+            "name": "",
+            "type": "uint32"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "totalLiability",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ],
+    "devdoc": {
+      "details": "No organizer, container, processor or funding-window deployment override.",
+      "kind": "dev",
+      "methods": {
+        "rawFulfillRandomWords(uint256,uint256[])": {
+          "details": "Cheap callback: no transfers, circuit execution or untrusted external calls."
+        },
+        "requestDraw(uint256)": {
+          "details": "VRF subscription costs are paid separately, never taken from the BEM pool."
+        },
+        "settle(uint256)": {
+          "details": "Transfer to dead address FIRST, then organizer, then winner, atomically. This locks tokens at the dead address; it does NOT reduce BEM totalSupply()."
+        }
+      },
+      "version": 1
+    },
+    "userdoc": {
+      "kind": "user",
+      "methods": {
+        "authorizeSeries()": {
+          "notice": "One-time activation via the chosen container's execute method. No NFT transfer/approval, revocation, or post-randomness holder veto exists."
+        },
+        "buy(uint256,uint32)": {
+          "notice": "Assign the lowest remaining unsold ticket numbers in this round. Explicit selection and automatic allocation share the same payment and draw rules."
+        },
+        "buySelected(uint256,uint16[])": {
+          "notice": "Tickets are zero-based, strictly ascending, unique, and all unsold. Any invalid ticket or payment failure reverts the ENTIRE purchase."
+        },
+        "openRefunds(uint256)": {
+          "notice": "Fixed timeout refunds only BEFORE requesting randomness. After request, funds wait for that exact result and live circuit execution, even if an external dependency is unavailable. No selective cancellation."
+        },
+        "previewAttempt(uint256,uint256,uint32)": {
+          "notice": "Public replay of any attempt. Settlement always uses the stored cursor. The first 20 attempts use disjoint VRF bits. Later attempts use a fixed, domain-separated cryptographic expansion of the SAME verified words."
+        },
+        "refund(uint256,address)": {
+          "notice": "Anyone can pay gas to refund a participant; money always goes to that participant."
+        },
+        "requestDraw(uint256)": {
+          "notice": "Anyone may request exactly one draw for a locked round."
+        },
+        "runCircuit2075(uint16)": {
+          "notice": "MUST call the real circuit. Known arithmetic is a validation guard, not a substitute for the call. Inputs and outputs use little-endian bytes."
+        },
+        "settle(uint256)": {
+          "notice": "Anyone may settle; recipients and amounts cannot be chosen by the caller."
+        },
+        "ticketOwner(uint256,uint32)": {
+          "notice": "Exact zero-based ticket ownership. Unsold tickets return zero. Ownership remains a historical record after refund; tickets cannot be resold."
+        },
+        "ticketWords(uint256,uint16,uint16)": {
+          "notice": "Up to 625 words. Each has 16 low-to-high uint16 buyer IDs; zero=unsold."
+        }
+      },
+      "notice": "Production release target selected by the user: BEHEMOTH #2075's own container authorizes the series and receives 1 BEM per settled round.",
+      "version": 1
+    }
+  },
+  "settings": {
+    "compilationTarget": {
+      "contracts/production/Bem2075RaffleBSC.sol": "Bem2075RaffleBSC"
+    },
+    "evmVersion": "paris",
+    "libraries": {},
+    "metadata": {
+      "bytecodeHash": "ipfs"
+    },
+    "optimizer": {
+      "enabled": true,
+      "runs": 200
+    },
+    "remappings": []
+  },
+  "sources": {
+    "contracts/production/Bem2075RaffleBSC.sol": {
+      "keccak256": "0x78f3bd293e8786cc2e4e94ef0921124a82a5e88b987f712a804186acc0872cba",
+      "license": "MIT",
+      "urls": [
+        "bzz-raw://9695722d280e8f9864e17ad1aaa335f5dd9cff20f31485b6cf691b610d346232",
+        "dweb:/ipfs/QmVu2SRtPM9xWtAdF6jt6bBxywcqtPHkHHCx5ikmpLDhG4"
+      ]
+    },
+    "contracts/production/BemContainerSeriesBSC.sol": {
+      "keccak256": "0x034557937bc52e01eebec8b287cf1cab488e13fa71b4517eddb70d84f051c039",
+      "license": "MIT",
+      "urls": [
+        "bzz-raw://1af9ea764a997284e0fde42894242ee1fdfccdf6701f5388dc62e73b4bef2c51",
+        "dweb:/ipfs/QmSmUtKem2EcdF8u6VHMs31dXFcCrf2LijwkZ7Yu6vbJWz"
+      ]
+    },
+    "contracts/production/BemSelectableRaffle.sol": {
+      "keccak256": "0xf53aa01d789115aa27835f957002815bf60e08ca3f9704794615798e53c65e45",
+      "license": "MIT",
+      "urls": [
+        "bzz-raw://4d98b09349963e9d7242cb2cf1deae033807904f4dff5379cc37b0327671627e",
+        "dweb:/ipfs/Qmc7FSax33v2FSzqMAfjnkaYNuV7D7S2emjkaWgrDWFchX"
+      ]
+    },
+    "contracts/production/BemSelectableRaffleBSC.sol": {
+      "keccak256": "0x929483e59b159150b9a00a050ec38e4827816b8f15ac269e6ccbc215d4f28c77",
+      "license": "MIT",
+      "urls": [
+        "bzz-raw://626677001d63a5415dd537eb4894b2d547bd64bdb70a1c0f19e9243b87534495",
+        "dweb:/ipfs/QmZq9JARrTWdix94TUTMa6uHJVJ7JLP58XoV5tuHVTiULj"
+      ]
+    }
+  },
+  "version": 1
+}

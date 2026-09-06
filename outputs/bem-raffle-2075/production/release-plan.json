@@ -1,0 +1,149 @@
+{
+  "schemaVersion": 1,
+  "stage": "deployed_configuration_pending",
+  "chainId": 56,
+  "token": {
+    "symbol": "BEM",
+    "address": "0x5ce033B2bFCa3Af30b3e8C8457DeaF776A8b695a",
+    "decimals": 8
+  },
+  "evaluator": {
+    "contract": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+    "circuitId": 2075,
+    "netlistHash": "0xa375924f2a31f5169606ea20e357efa2aeeb2355aff859f28f40a15519714eef",
+    "custody": false
+  },
+  "container": {
+    "status": "confirmed_by_user",
+    "selected": {
+      "label": "BEHEMOTH #2075",
+      "nft": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+      "tokenId": 2075,
+      "address": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646"
+    },
+    "candidates": [
+      {
+        "label": "BEHEMOTH #2075",
+        "nft": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "tokenId": 2075,
+        "address": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646"
+      },
+      {
+        "label": "TapeOut #13043",
+        "nft": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+        "tokenId": 13043,
+        "address": "0x167897fe1d2fE713E1D6C3661D1B08d5353B9D34"
+      }
+    ],
+    "requirements": [
+      "Organizer recipient equals the selected authorization container.",
+      "NFT binding and official accountOf must match at deployment and activation.",
+      "Selection is immutable after deployment. Changing it requires a new deployment.",
+      "No NFT custody, recurring holder signature or post-randomness veto."
+    ]
+  },
+  "rules": {
+    "poolBaseUnits": "10000000000",
+    "ticketPriceBaseUnits": "1000000",
+    "ticketsPerRound": 10000,
+    "displayedTicketRange": [
+      1,
+      10000
+    ],
+    "ticketSelection": "manual_or_lowest_available",
+    "fundingWindowSeconds": 259200,
+    "blackholeAddress": "0x000000000000000000000000000000000000dEaD",
+    "blackholeBaseUnits": "400000000",
+    "organizerBaseUnits": "100000000",
+    "winnerBaseUnits": "9500000000",
+    "settlementOrder": [
+      "blackhole",
+      "organizer_container",
+      "winner"
+    ],
+    "settlementAtomic": true,
+    "blackholeReducesTotalSupply": false,
+    "drawTargetSeconds": 60,
+    "drawTargetGuaranteed": false,
+    "vrfDerivedDrawDelaySeconds": [
+      8,
+      30
+    ],
+    "nextRoundDelaySeconds": 60,
+    "cancelOrRerollAfterRandomnessRequest": false,
+    "maxTicketsPerPurchase": 500,
+    "purchaseBatching": "Each transaction is separately selected and signed; no automatic splitting."
+  },
+  "vrf": {
+    "version": "2.5",
+    "coordinator": "0xd691f04bc0C9a24Edb78af9E005Cf85768F694C9",
+    "keyHash": "0x130dba50ad435d4ecc214aad0d5820474137bd68e7e77724144f27c3c377d3d4",
+    "subscriptionId": "77582411398321098948652233841078712279496169525251928512909841261362926957679",
+    "nativePayment": true,
+    "requestConfirmations": 3,
+    "callbackGasLimit": 250000,
+    "parameterStatus": "deployed_fixed_parameters_real_vrf_pending",
+    "fundingAndConsumerStatus": "see_timestamped_dependencies_report",
+    "subscriptionOwner": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+    "selectionStatus": "confirmed_latest_user_screenshot_and_funded_onchain",
+    "readonlyReport": "production/dependencies-readonly-2026-09-06T13-43-56-447Z.json",
+    "fundingSnapshot": {
+      "chainId": 56,
+      "blockNumber": 120312598,
+      "blockHash": "0xcbdaaff54c69b182868ea993b8466db8e7cba3fb45ced70da2082dc10d2c9b88",
+      "timeUtc": "2026-09-06T13:43:57.000Z",
+      "nativeBalanceBnb": "0.01",
+      "consumers": [
+        "0xBee0848D0c77d434A52d1D0236FcBFdCA0834343"
+      ]
+    },
+    "consumerVerification": {
+      "status": "confirmed_on_chain",
+      "address": "0xBee0848D0c77d434A52d1D0236FcBFdCA0834343",
+      "blockNumber": 120312598,
+      "timeUtc": "2026-09-06T13:43:57.000Z",
+      "report": "production/dependencies-readonly-2026-09-06T13-43-56-447Z.json",
+      "blockHash": "0xcbdaaff54c69b182868ea993b8466db8e7cba3fb45ced70da2082dc10d2c9b88"
+    }
+  },
+  "deployment": {
+    "address": "0xBee0848D0c77d434A52d1D0236FcBFdCA0834343",
+    "transactionHash": "0x7ba26384f8e36e3e9112a29a40464a7a6e77f59ccb2ec6b3c12ee3e8ca070dfa",
+    "deploymentBlock": 120311123,
+    "runtimeCodeHash": "0x924ffeae37682ce516aa4cb8eae09a4cea9acd2148c12634efe60704ddab94b8",
+    "verifiedAt": "2026-09-06T13:36:34.205Z",
+    "report": "production/deployment-verified.json"
+  },
+  "releaseRequirements": [
+    "Final container selection and authorization binding",
+    "Static selectable Solidity plus continuous-round wrapper compiled from reviewed sources",
+    "Final-source local regressions, gas measurements and real-dependency integration",
+    "Independent review of final value-handling contracts",
+    "Mainnet receipt, deployed runtime hash and verified source",
+    "Funded subscription, exact deployed consumer and successful real VRF request",
+    "Independent production frontend without test-wallet, faucet or mock server",
+    "Wallet/network/runtime/immutable validation before signing",
+    "Persistent event history with reorg recovery and public receipt links",
+    "Chinese administration with authentication for operational controls",
+    "Running keeper, alerts and restart recovery before opening ticket sales"
+  ],
+  "sources": [
+    "https://docs.chain.link/vrf/v2-5/supported-networks#bnb-chain-mainnet",
+    "https://docs.chain.link/vrf/v2-5/security",
+    "https://tapeout.net/#containers"
+  ],
+  "gas": {
+    "payer": "container_funded_dedicated_keeper",
+    "fundingSource": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646",
+    "keeperAddress": null,
+    "gasAsset": "BNB",
+    "deductFromBemPool": false,
+    "winnerClaimTransactionRequired": false,
+    "containerTopUpRequiresOwnerSignature": true,
+    "automaticContainerDebitAuthorized": false,
+    "vrfFunding": "separate_native_BNB_subscription_balance",
+    "execution": "permissionless_settle_openNextRound_openRefunds",
+    "status": "keeper_wallet_and_funding_not_configured"
+  },
+  "targetContract": "Bem2075RaffleBSC"
+}

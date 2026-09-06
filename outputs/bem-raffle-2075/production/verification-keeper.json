@@ -1,0 +1,98 @@
+{
+  "checkedAt": "2026-09-06T14:26:05.221Z",
+  "status": "passed",
+  "scope": "mock_rpc_and_private_temporary_files",
+  "mainnetTransactionsSent": 0,
+  "sourceSha256s": {
+    "scripts/run_bem_production_keeper.mjs": "643a560431bede685d855f3ff4ab2ad99bf9da5673fee4bd68dd148ccd41fc1d",
+    "scripts/bem_production_keeper_core.mjs": "700bc34350c159195ceec81252e5cf4b88eaf989bbb4fab66034de5a173856b6",
+    "scripts/run_bem_raffle_keeper.mjs": "0934a4ff40e02d1d6a9b14b6c44e6b6bc9fd5550bdf2fdcec9e50ffec1cb5393",
+    "test/bem-production-keeper.test.mjs": "17d3fcd5d5313c2733d5754c913ea6e425763cb42390a8b21ab1997e2c29b9f7"
+  },
+  "tests": [
+    {
+      "name": "CLI defaults and watch stay read-only; invalid execution and insecure RPC options fail closed",
+      "passed": true
+    },
+    {
+      "name": "read-only snapshots never access signer or execution journal",
+      "passed": true
+    },
+    {
+      "name": "single-instance lock refuses even a stale PID and never deletes it automatically",
+      "passed": true
+    },
+    {
+      "name": "private state cannot be placed in repository or static hosting paths",
+      "passed": true
+    },
+    {
+      "name": "crash after signing resumes the same durable raw/hash/nonce without a second signature",
+      "passed": true
+    },
+    {
+      "name": "dropped transaction recovery replays identical raw bytes and never increments nonce",
+      "passed": true
+    },
+    {
+      "name": "unknown broadcast persistently pauses yet continues querying its original receipt",
+      "passed": true
+    },
+    {
+      "name": "occupied or untracked nonce persistently pauses without replacement signing",
+      "passed": true
+    },
+    {
+      "name": "a mined different transaction at the stored nonce pauses recovery",
+      "passed": true
+    },
+    {
+      "name": "unexpected nonce advancement after a confirmed keeper transaction stops the next signature",
+      "passed": true
+    },
+    {
+      "name": "journal write failure before broadcast cannot send a transaction",
+      "passed": true
+    },
+    {
+      "name": "journal from another deployment or keeper cannot be recovered",
+      "passed": true
+    },
+    {
+      "name": "receipt needs 12 canonical confirmations before allowing another action",
+      "passed": true
+    },
+    {
+      "name": "unconfirmed reorg resumes only the original transaction; confirmed reorg pauses new writes",
+      "passed": true
+    },
+    {
+      "name": "a reverted transaction has a durable terminal failure and cannot generate infinite paid retries",
+      "passed": true
+    },
+    {
+      "name": "consumer removal stops a prepared broadcast and a new paid action",
+      "passed": true
+    },
+    {
+      "name": "gas cap, fee cap and insufficient BNB prevent signing",
+      "passed": true
+    },
+    {
+      "name": "a stale openNextRound intent cannot be replayed to open a different round",
+      "passed": true
+    },
+    {
+      "name": "journal raw transaction tampering cannot change target, value, chain, caller, method, round, nonce or gas",
+      "passed": true
+    },
+    {
+      "name": "live guard rejects chain, code, immutable, holder and missing consumer using one pinned block",
+      "passed": true
+    },
+    {
+      "name": "external errors never expose raw transactions, private keys or RPC URLs",
+      "passed": true
+    }
+  ]
+}
