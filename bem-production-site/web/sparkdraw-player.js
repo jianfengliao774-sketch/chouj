@@ -2,6 +2,7 @@ import {formatUnits,formatEther,getAddress} from 'ethers';
 import {POOL_IDS,POOLS,profile,VERIFIER} from './sparkdraw-profiles.js';
 import {SPARKDRAW as F} from './sparkdraw-config.js';
 import {createWalletPicker} from './wallet-picker.js';
+import {createWalletSession} from './wallet-connection.js';
 import {t,getLanguage,initLanguage,translateKnown} from './player-i18n.js';
 import {createSparkDrawTransactions,parseTickets,GAME,TOKEN} from './sparkdraw-transactions.js';
 const $=id=>document.getElementById(id),money=x=>formatUnits(BigInt(x||0),8).replace(/\.0$/,''),el=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
@@ -11,7 +12,7 @@ let wallet=null,account=null,chain=null,revision=0,mode='auto',snapshot=null,bal
 let personalPage=1,burnPage=1,burnWalletPage=1,historyPage=1,recordsVersion=0,activeResult=null;
 const context=()=>({account,key:JSON.stringify([revision,account,pool,chain,mode,$('ticket-count').value,$('selected-tickets').value])});
 const note=x=>{$('notice').textContent=x;};
-async function api(path,body){const r=await fetch(path,{cache:'no-store',signal:AbortSignal.timeout(15000),...(body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{})});const d=await r.json();if(!r.ok)throw Error(d.error||'Network unavailable');return d;}
+async function api(path,body){const r=await fetch(path,{cache:'no-store',signal:AbortSignal.timeout(15000),...(body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw Error(t('服务暂时无法响应，正在自动重试。','Service temporarily unavailable; retrying.'));}if(!r.ok)throw Error(d.error||'Network unavailable');return d;}
 const rpc=async(method,params)=>{const d=await api('/rpc',{jsonrpc:'2.0',id:++serial,method,params});if(d.error)throw Error(d.error.message);return d.result;};
 const call=async(iface,to,name,args)=>iface.decodeFunctionResult(name,await rpc('eth_call',[{to,data:iface.encodeFunctionData(name,args)},'latest']));
 const manager=createSparkDrawTransactions({rpc,wallet:()=>wallet,context,onChange:()=>renderPending()});
@@ -24,18 +25,29 @@ function bind(p){if(bound.has(p))return;bound.add(p);
   p.on?.('accountsChanged',a=>{if(wallet!==p)return;const next=a[0]?getAddress(a[0]):null;if(next===account)return;account=next;revision++;balance=null;allowance=0n;$('personal-wallet').value=account||'';render();refresh();refreshRecords();});
   p.on?.('chainChanged',c=>{if(wallet!==p)return;const next=Number(BigInt(c));if(next===chain)return;chain=next;revision++;snapshot=null;render();refresh();});
 }
-const picker=createWalletPicker({dialog:$('wallet-picker'),onChange(){},onSelect:async({provider})=>{
+let discoveredWallets=new Map(),restoreTimer,connectingWallet=false;
+let sessionStorage;try{sessionStorage=window.localStorage;}catch{sessionStorage={getItem:()=>null,setItem(){}};}
+const walletSession=createWalletSession({storage:sessionStorage,version:()=>revision,onRestore:async({entry,account:restored,chainId})=>{
+  if(account)return;wallet=entry.provider;account=getAddress(restored);chain=Number(BigInt(chainId));revision++;bind(wallet);
+  $('personal-wallet').value=account;render();await refresh();await refreshRecords();
+}});
+function restoreConnection(){clearTimeout(restoreTimer);if(account||connectingWallet)return;restoreTimer=setTimeout(()=>{if(!account&&!connectingWallet&&!$('wallet-picker').open)walletSession.restore(discoveredWallets).catch(()=>{});},120);}
+window.addEventListener('focus',restoreConnection);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)restoreConnection();});
+const picker=createWalletPicker({dialog:$('wallet-picker'),onChange(entries){discoveredWallets=entries;restoreConnection();},onSelect:async(entry)=>{
+  const {provider}=entry;connectingWallet=true;walletSession.cancel();clearTimeout(restoreTimer);
   try{const r=++revision;const a=await provider.request({method:'eth_requestAccounts'});if(r!==revision)return;
     wallet=provider;account=a[0]?getAddress(a[0]):null;chain=Number(BigInt(await provider.request({method:'eth_chainId'})));bind(provider);
-    $('personal-wallet').value=account||'';render();await refresh();await refreshRecords();
-  }catch(e){failure(e);}
+    if(account)walletSession.remember(entry);$('personal-wallet').value=account||'';render();await refresh();await refreshRecords();
+  }catch(e){failure(e);}finally{connectingWallet=false;}
 }});
-$('connect-wallet').onclick=()=>picker.open();$('burn-connect').onclick=()=>account?refreshRecords():picker.open();
+$('connect-wallet').onclick=()=>{walletSession.cancel();clearTimeout(restoreTimer);picker.open();};$('burn-connect').onclick=()=>account?refreshRecords():picker.open();
 $('switch-network').onclick=async()=>{try{await wallet.request({method:'wallet_switchEthereumChain',params:[{chainId:'0x38'}]});}catch(e){failure(e);}};
-$('copy-browser-url').onclick=()=>navigator.clipboard.writeText(location.href);$('browser-url').value=location.href;
+$('copy-browser-url').onclick=()=>navigator.clipboard.writeText(location.href);
 function selection(){return parseTickets(mode,$('ticket-count').value,$('selected-tickets').value);}
 function render(){
   const p=profile(pool),r=snapshot?.rounds.find(x=>x.roundId===snapshot.currentRoundId),gross=BigInt(p.units),prize=gross*(99n-BigInt(p.burnPercent))/100n;
+  $('connect-wallet').textContent=account?t('切换钱包','Switch wallet'):t('连接钱包','Connect wallet');
   $('wallet-label').textContent=account?t('已连接钱包','Wallet connected'):t('连接钱包，查看余额与持票','Connect wallet to view balances and tickets');$('wallet-address').textContent=account||'';
   $('wallet-balances').textContent=balance?`BEM ${money(balance.bem)} · BNB ${formatEther(balance.bnb)}`:'BEM — · BNB —';$('switch-network').hidden=!wallet||chain===56;
   $('launch-status').textContent=t('新五档合约已部署','Five new pools deployed');$('sale-note').textContent=p.test?t('0.1 BEM 测试场，使用 BNB 主网真实 BEM。','0.1 BEM test with real BEM on BNB mainnet.'):t('首次购买开始 24 小时募集。','The first purchase starts the 24-hour funding period.');
