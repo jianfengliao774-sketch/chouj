@@ -6,6 +6,7 @@ import { formatUnits } from 'ethers';
 import { POOL_IDS, profile } from '../bem-production-site/web/sparkdraw-profiles.js';
 import { playerPageHtml } from '../bem-production-site/player-page-template.mjs';
 import { formatWalletBalance3 } from '../bem-production-site/web/balance-display.js';
+import { latestWinnerForPool, createWinnerRotation } from '../bem-production-site/web/winner-rotation.js';
 
 const web = new URL('../bem-production-site/web/', import.meta.url);
 const read = name => fs.readFileSync(new URL(name, web), 'utf8');
@@ -120,7 +121,8 @@ test('shared pages retain current transaction controls, drand and Vite-managed b
     assert.doesNotMatch(html, /src="\/player-v2\.js"|Chainlink VRF/);
     assert.match(html, /drand/); assert.match(html, /max="5000"/);
     assert.match(html, /href="\.\/assets\/sparkdraw-mark\.svg"/);
-    assert.match(html, /src="\.\/assets\/sparkdraw-emblem\.svg"/);
+    assert.match(html, /src="\.\/assets\/sparkdraw-bem-emblem\.png"/);
+    assert.match(html, /src="\.\/assets\/sparkdraw-brand-banner\.png"/);
     assert.doesNotMatch(html, /src="\/sparkdraw-(?:mark|emblem)\.svg"/);
   }
 });
@@ -130,4 +132,49 @@ test('community copy stays multiline without reverting new burn percentages or c
   assert.match(player, /\$\('round-label'\)\.textContent=roundName\(r\)/);
   assert.match(player, /奖金也须在结算后 24 小时内领取/);
   assert.match(read('sparkdraw.css'), /community-copy \{ white-space: pre-line/);
+});
+
+test('winner selection keeps only the latest confirmed valid result of the requested pool',()=>{
+  const row=(poolId,roundId,winningTicket=999)=>({poolId,roundId,winningTicket,status:5,winner:'0x'+'1'.repeat(40)});
+  const rows=[row('0.1','1'),row('5','99'),row('0.1','9007199254740993'),row('0.1','9007199254740992'),{...row('0.1','9999999999999999'),status:4},row('0.1','99999999999999999',10000)];
+  const original=JSON.stringify(rows);
+  assert.equal(latestWinnerForPool(rows,'0.1').roundId,'9007199254740993');
+  assert.equal(latestWinnerForPool(rows,'5').roundId,'99');
+  assert.equal(latestWinnerForPool(rows,'100'),null);assert.equal(latestWinnerForPool(null,'0.1'),null);
+  assert.equal(JSON.stringify(rows),original);
+});
+
+test('winner rotation displays one pool for ten seconds and refreshes do not reset its timer',()=>{
+  let now=0,id=0;const timers=new Map(),seen=[];
+  const setTimer=(fn,ms)=>{timers.set(++id,{at:now+ms,fn});return id;};
+  const tick=ms=>{const end=now+ms;for(;;){const next=[...timers].filter(([,t])=>t.at<=end).sort((a,b)=>a[1].at-b[1].at)[0];if(!next)break;timers.delete(next[0]);now=next[1].at;next[1].fn();}now=end;};
+  const rotation=createWinnerRotation({onDisplay:r=>seen.push(r?.poolId||null),setTimer,clearTimer:n=>timers.delete(n)});
+  const rows=['0.1','5','10'].map(poolId=>({poolId,roundId:'1',winningTicket:999,winner:'0x'+'1'.repeat(40)}));
+  rotation.update(rows);assert.equal(seen.at(-1),'0.1');
+  tick(5000);rotation.update(rows.map(r=>({...r})));rotation.render();tick(4999);assert.equal(seen.at(-1),'0.1');
+  tick(1);assert.equal(seen.at(-1),'5');tick(10000);assert.equal(seen.at(-1),'10');tick(10000);assert.equal(seen.at(-1),'0.1');
+  rotation.togglePause();tick(30000);assert.equal(seen.at(-1),'0.1');rotation.togglePause();tick(10000);assert.equal(seen.at(-1),'5');
+  rotation.setHidden(true);tick(30000);assert.equal(seen.at(-1),'5');rotation.setHidden(false);tick(10000);assert.equal(seen.at(-1),'10');
+  rotation.update([rows[2]]);assert.equal(timers.size,0);rotation.dispose();rotation.update(rows);assert.equal(timers.size,0);
+});
+
+test('new winner records receive a full ten seconds and an empty feed does not invent results',()=>{
+  let scheduled=[],cleared=[],shown=[];
+  const rotation=createWinnerRotation({onDisplay:r=>shown.push(r),setTimer:(fn,ms)=>{scheduled.push({fn,ms});return scheduled.length;},clearTimer:id=>cleared.push(id)});
+  const a={poolId:'0.1',roundId:'1',winningTicket:0,winner:'0x'+'1'.repeat(40)},b={...a,poolId:'5'};
+  rotation.update([a,b]);rotation.update([{...a,roundId:'2'},b]);
+  assert.equal(scheduled.length,2);assert.equal(scheduled.at(-1).ms,10000);assert.deepEqual(cleared,[1]);
+  rotation.update([]);assert.equal(shown.at(-1),null);rotation.dispose();
+});
+
+test('new branding and copy preserve price data while hiding removed display elements',()=>{
+  const html=read('index.html'),market=read('prize-market.js');
+  assert.match(html,/>Tapeout·芯火夺宝</);
+  assert.match(html,/id="purchase-round-label"/);assert.match(player,/\$\('purchase-round-label'\)\.textContent=roundName\(r\)/);
+  assert.match(html,/重要提醒：/);assert.match(html,/单个地址最大购买份额为50%/);
+  assert.match(html,/id="bem-unit-price" hidden/);assert.match(html,/id="market-sources" hidden/);
+  assert.doesNotMatch(market,/createElement\('a'\)/);
+  assert.doesNotMatch(html,/reveal-cadence|本期与往期|参与本期/);
+  assert.match(player,/暂无可退本金，连接后会自动更新/);
+  assert.match(player,/queryRecords\('winners',\{pool:winnerPool,page:1\}\)/);
 });

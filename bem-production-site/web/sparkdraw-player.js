@@ -1,3 +1,4 @@
+import {createWinnerRotation,latestWinnerForPool} from './winner-rotation.js';
 import {randomUnsoldTickets} from './random-tickets.js';
 import {formatUnits,formatEther,getAddress} from 'ethers';
 import {formatWalletBalance3} from './balance-display.js';
@@ -79,7 +80,7 @@ function render(){
   $('buy').textContent=flow?t('等待钱包与链上确认…','Waiting for wallet / confirmation…'):!account?t('连接钱包并购买','Connect wallet to buy'):t('授权并购买','Approve & buy');
   $('purchase-state').textContent=!account?t('点击购买会连接钱包。','Click buy to connect your wallet.'):manager.blocked({method:'buy'})?t('购买记录核对中，可继续领取奖金或退款。钱包加速或取消后将更新结果。','Checking your purchase. Prize and refund claims remain available; wallet replacements will be checked.'):!open?t('读取状态中，或本期购买时间已结束。','Loading state, or sales for this round have ended.'):t('本钱包本期还可购买 {count} 份。','This wallet may buy {count} more tickets this round.',{count:String(5000n-held)});
   $('my-count').textContent=account?String(held):'—';
-  $('round-label').textContent=roundName(r);
+  $('round-label').textContent=roundName(r);$('purchase-round-label').textContent=roundName(r);
   $('round-phase').textContent=r?statusText(r.status):t('读取中','Loading');$('funding-amount').textContent=`${money(BigInt(r?.sold||0)*p.ticketPrice)} / ${pool} BEM`;$('funding-tickets').textContent=`${r?.sold||0} / 10,000`;$('funding-progress').firstElementChild.style.width=((r?.sold||0)/100)+'%';
   $('contract-links').replaceChildren(...[[t('场次合约','Pool contract'),p.address],['BEM',F.bem],[t('收款容器','Revenue container'),F.revenue],[t('随机数验证合约','Randomness verifier'),VERIFIER],[t('开奖处理器','Draw processor'),'0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C']].flatMap(([label,address])=>{const dd=el('dd','');dd.append(links('address',address));return[el('dt',label),dd];}));
   $('snapshot-label').textContent=snapshot?t('已核验 · 区块 {block}','Verified · Block {block}',{block:snapshot.blockNumber}):'';
@@ -135,7 +136,7 @@ function revealReels(win, replay=false){
     strip.replaceChildren(...Array.from({length:steps+1},(_,n)=>el('span',String(n%10))));
     strip.setAttribute('aria-hidden','true');placeholder.hidden=true;reel.classList.add('rolling');
     const animation=strip.animate([{transform:'translateY(0)'},{transform:`translateY(-${steps*100}%)`}],
-      {duration:5000*(i+1),easing:'linear',fill:'forwards'});
+      {duration:3000*(i+1),easing:'linear',fill:'forwards'});
     reelAnimations.push(animation);
     animation.finished.then(()=>{
       if(generation!==reelGeneration)return;
@@ -200,8 +201,8 @@ function renderRefund(){
   if(!group){b.disabled=!refundError;b.textContent=refundError?t('重新查询退款','Retry refund lookup'):t('正在查询退款…','Finding refunds…');$('refund-state').textContent=refundError?t('暂时未能读取，正在自动重试。','Lookup unavailable; retrying automatically.'):t('正在查询本钱包在当前场次的全部可退本金。','Finding all refundable rounds for this wallet in this pool.');return;}
   const pending=group.refunds.length&&manager.blocked({poolId:pool,method:'refundMany',args:[group.refunds,account]});
   b.disabled=refundFlow||manager.busy||!!pending||!group.refunds.length;
-  b.textContent=refundFlow?t('等待钱包确认…','Waiting for wallet…'):pending?t('领取已提交，等待确认','Claim submitted; awaiting confirmation'):group.refundCount>F.refundBatchLimit?t('领取本批本金（{n}期）','Claim this batch ({n} rounds)',{n:group.refunds.length}):group.refunds.length?t('领取全部本金','Claim all principal'):t('暂无可领取本金','No principal to claim');
-  $('refund-state').textContent=group.refunds.length?t('当前场次共 {n} 期可退，本金退回当前钱包。','{n} refundable rounds in this pool. Principal returns to your wallet.',{n:group.refundCount}):t('当前场次暂无已确认的可退本金，连接后会自动更新。','No confirmed refundable principal in this pool. Updates automatically.');
+  b.textContent=refundFlow?t('等待钱包确认…','Waiting for wallet…'):pending?t('领取已提交，等待确认','Claim submitted; awaiting confirmation'):group.refundCount>F.refundBatchLimit?t('领取本批本金（{n}期）','Claim this batch ({n} rounds)',{n:group.refunds.length}):group.refunds.length?t('领取全部本金','Claim all principal'):t('暂无可退本金','No refundable principal');
+  $('refund-state').textContent=group.refunds.length?t('当前场次共 {n} 期可退，本金退回当前钱包。','{n} refundable rounds in this pool. Principal returns to your wallet.',{n:group.refundCount}):t('暂无可退本金，连接后会自动更新。','No refundable principal. Updates automatically after connecting.');
   if(group.refundCount>F.refundBatchLimit)$('refund-state').textContent+=t(' 本次合并 {n} 期，金额 {amount} BEM；余下可继续领取。',' This batch claims {n} rounds ({amount} BEM); claim the remainder afterward.',{n:group.refunds.length,amount:money(group.refundBatchAmount)});
 }
 async function claimRefunds(){
@@ -236,7 +237,11 @@ function walletCards(container,rows,claims=[],owner=account){container.replaceCh
 }
 async function refreshRecords(){const version=++recordsVersion,id=pool,queriedAccount=account;const jobs=[];
   jobs.push(queryRecords('winners',{pool:id,page:historyPage}).then(d=>{if(version!==recordsVersion)return;$('history-list').replaceChildren(...d.rows.map(r=>roundCard(r)));$('history-summary').textContent=t('已确认 {n} 条中奖记录','{n} confirmed wins',{n:d.total});$('history-page').textContent=`${d.page} / ${d.totalPages}`;$('history-prev').disabled=d.page<=1;$('history-next').disabled=d.page>=d.totalPages;}));
-  jobs.push(queryRecords('winners',{pool:'all'}).then(d=>{if(version!==recordsVersion)return;$('winner-ticker').replaceChildren(el('span',d.rows.length?d.rows.slice(0,5).map(r=>`${r.poolId} BEM · ${roundName(r)} · ${String(r.winningTicket+1).padStart(5,'0')} · ${r.winner}`).join('   |   '):t('等待首位中奖者 · 开奖后自动播报','Waiting for the first winner · Updates after settlement')));}));
+  for(const winnerPool of POOL_IDS)jobs.push(queryRecords('winners',{pool:winnerPool,page:1}).then(d=>{
+    if(version!==recordsVersion)return;
+    winnerByPool.set(winnerPool,latestWinnerForPool(d.rows,winnerPool));
+    winnerRotation.update(POOL_IDS.map(id=>winnerByPool.get(id)).filter(Boolean));
+  }));
   if(account){jobs.push(queryRecords('wallet',{pool:'all',address:account,page:burnWalletPage}).then(d=>{if(version!==recordsVersion)return;refundData={account:queriedAccount,groups:d.claims||[]};refundError=false;renderRefund();$('burn-wallet-status').textContent=account;walletCards($('burn-wallet-records'),d.rows,d.claims);const pager=el('p',`${d.page} / ${d.totalPages}`);if(d.page>1)pager.append(button(t('上一页','Previous'),()=>{burnWalletPage--;refreshRecords();}));if(d.page<d.totalPages)pager.append(button(t('下一页','Next'),()=>{burnWalletPage++;refreshRecords();}));$('burn-wallet-records').append(pager);}).catch(e=>{if(version===recordsVersion){refundError=true;renderRefund();}throw e;}));}else{$('burn-wallet-status').textContent=t('连接钱包自动查询待领取和已销毁记录。','Connect your wallet to view claims and burned balances.');$('burn-wallet-records').replaceChildren();}
   const a=$('personal-wallet').value.trim();if(/^0x[a-fA-F0-9]{40}$/.test(a))jobs.push(queryRecords('wallet',{pool:$('personal-pool').value,address:a,page:personalPage,...($('personal-round').value.trim()?{round:$('personal-round').value.trim()}:{})}).then(d=>{if(version!==recordsVersion)return;walletCards($('personal-list'),d.rows,d.claims,a);$('personal-status').textContent=t('已确认 {n} 期记录','{n} confirmed rounds',{n:d.total});$('personal-page').textContent=`${d.page} / ${d.totalPages}`;$('personal-prev').disabled=d.page<=1;$('personal-next').disabled=d.page>=d.totalPages;}));
   jobs.push(queryRecords('burns',{pool:$('burn-pool').value,page:burnPage}).then(d=>{if(version!==recordsVersion)return;$('burn-records').replaceChildren(...d.rows.map(r=>{const card=el('p',`${r.poolId} BEM · ${roundName(r)} · ${burnMoney(r.amountBaseUnits)} BEM · ${formatSiteTime(r.timeUtc,getLanguage())} `);card.append(links('tx',r.transactionHash));return card;}));$('burn-status').textContent=t('已确认 {n} 笔销毁','{n} confirmed burns',{n:d.total});$('burn-page').textContent=`${d.page} / ${d.totalPages}`;$('burn-prev').disabled=d.page<=1;$('burn-next').disabled=d.page>=d.totalPages;}));
@@ -256,6 +261,21 @@ for(const type of ['history','burn','personal'])for(const dir of ['prev','next']
 $('refund').onclick=()=>claimRefunds().catch(failure);
 $('replay').onclick=()=>{if(activeResult)revealReels(activeResult,true);};
 window.addEventListener('bem:languagechange',()=>{note(translateKnown($('notice').textContent));render();refreshRecords();burnSummary();});
+const winnerByPool=new Map();
+const winnerRotation=createWinnerRotation({onDisplay:(record,{paused,count})=>{
+  const text=record?t('场次：{pool} BEM · 期号：{round} · 中奖号码：{ticket} · 中奖地址：{winner}',
+    'Pool: {pool} BEM · Round: {round} · Winning number: {ticket} · Winner: {winner}',
+    {pool:record.poolId,round:roundName(record),ticket:String(record.winningTicket+1).padStart(5,'0'),winner:record.winner})
+    :t('等待首位中奖者 · 开奖后自动播报','Waiting for the first winner · Updates after settlement');
+  if($('winner-ticker').textContent!==text)$('winner-ticker').textContent=text;
+  $('ticker-pause').hidden=count<2;$('ticker-pause').setAttribute('aria-pressed',String(paused));
+  $('ticker-pause').textContent=paused?t('继续','Resume'):t('暂停','Pause');
+}});
+$('ticker-pause').onclick=()=>winnerRotation.togglePause();
+document.addEventListener('visibilitychange',()=>winnerRotation.setHidden(document.hidden));
+window.addEventListener('beforeunload',()=>winnerRotation.dispose());
+window.addEventListener('bem:languagechange',()=>winnerRotation.render());
+winnerRotation.setHidden(document.hidden);
 initLanguage();render();switchTab(tab);refresh();burnSummary();
 setInterval(()=>{$('site-time').textContent=formatSiteTime(chainNow(),getLanguage());document.querySelectorAll('[data-deadline]').forEach(n=>countdown(n,Number(n.dataset.deadline)));},1000);
 setInterval(()=>{if(!document.hidden){refresh();if(!flow)poll();}},2000);setInterval(()=>{if(!document.hidden)refreshRecords();},10000);setInterval(burnSummary,300000);
