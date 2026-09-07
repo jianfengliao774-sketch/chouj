@@ -10,12 +10,14 @@ import { SITE, ROOT, GAME, CODE_HASH, COORDINATOR, CONTAINER, loadManifest } fro
 import { createReadRpc, validateReadRequest } from './rpc.mjs';
 import { createAdminAuth } from './auth.mjs';
 import { createChainHistory } from './chain-history.mjs';
+import { poolRegistry } from './pools.mjs';
+import { createMarketPriceService } from './market-price.mjs';
 
 const format = value => JSON.stringify(value, (_, x) => typeof x === 'bigint' ? x.toString() : x);
 const ABI = new Interface(['function getSubscription(uint256) view returns(uint96 balance,uint96 nativeBalance,uint64 reqCount,address owner,address[] consumers)']);
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
 
-export async function createProductionServer({ port = 8788, rpc = createReadRpc(), manifest, history, staticRoot = path.join(SITE, 'dist'), publicOrigin, adminCredential } = {}) {
+export async function createProductionServer({ port = 8788, rpc = createReadRpc(), manifest, history, staticRoot = path.join(SITE, 'dist'), publicOrigin, adminCredential, market = createMarketPriceService() } = {}) {
   let publicUrl = null;
   if (publicOrigin !== undefined) {
     publicUrl = new URL(publicOrigin);
@@ -85,6 +87,18 @@ export async function createProductionServer({ port = 8788, rpc = createReadRpc(
       if (++count.requests > 600) return json(res, 429, { error: '访问较频繁，请稍后重试。' }, { 'retry-after': '10' });
       if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { mode: 'production', chainId: 56, gameAddress: GAME, salesEnabled: false });
       if (req.method === 'GET' && url.pathname === '/api/config') return json(res, 200, manifest);
+      if (req.method === 'GET' && url.pathname === '/api/pools') return json(res, 200, poolRegistry());
+      if (req.method === 'GET' && url.pathname === '/api/market') return json(res, 200, await market.getQuote());
+      if (req.method === 'GET' && ['/api/announcements', '/api/burns'].includes(url.pathname)) {
+        const pool = url.searchParams.get('pool') || 'all';
+        const page = Number(url.searchParams.get('page') || 1), pageSize = Number(url.searchParams.get('pageSize') || 20);
+        if (!['all', 'legacy100', '1', '10', '50', '100'].includes(pool) || !Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 50) return json(res, 400, { error: '无效场次或分页' });
+        const isNew = !['all', 'legacy100'].includes(pool);
+        const records = isNew ? { rows: [], page, pageSize, total: 0, totalPages: 0 }
+          : url.pathname === '/api/burns' ? history.listBurns({ page, pageSize }) : history.listAnnouncements({ page, pageSize });
+        return json(res, 200, { schemaVersion: 2, chainId: 56, pool, deploymentPending: isNew,
+          index: isNew ? { state: 'awaiting_deployment' } : history.getStatus(), ...records });
+      }
       if (req.method === 'GET' && url.pathname === '/api/status') return json(res, 200, await readStatus());
       if (req.method === 'POST' && url.pathname === '/rpc') {
         const input = await body(req), batch = Array.isArray(input);

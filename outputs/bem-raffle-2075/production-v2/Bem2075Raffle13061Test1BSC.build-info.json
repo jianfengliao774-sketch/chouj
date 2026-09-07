@@ -1,0 +1,53 @@
+{
+  "status": "production-candidate-not-deployed",
+  "contractName": "Bem2075Raffle13061Test1BSC",
+  "sourceName": "contracts/production-v2/test1/Bem2075Raffle13061Test1BSC.sol",
+  "compilerVersion": "0.8.36+commit.8a079791.Emscripten.clang",
+  "sourceSha256s": {
+    "contracts/production-v2/BemSelectableRaffleV2.sol": "cf8d5c5ffe12749f1cc8877ee3db4ed7ca0e09b3b4909ef44f5aaad324db5fb7",
+    "contracts/production-v2/BemSelectableRaffle13061BSC.sol": "cb17dd67a7c08db826d44044f2f80a4a470d9368ad2a998a3a4a7f7549642743",
+    "contracts/production-v2/BemContainer13061SeriesBSC.sol": "2e5cb90f6ca49f758e059fb096b4600331dbca10beb7e73bb8802f25a83d2015",
+    "contracts/production-v2/test1/Bem2075Raffle13061Test1BSC.sol": "b9791706dcf87f0aafb6a3c733faf8af548fd8b84617871abd6c5af24a88b210"
+  },
+  "preservedProductionSourceSha256s": {
+    "contracts/production/BemSelectableRaffle.sol": "b6b7812a0eaf54d3e7b2f307bd4a552fd343952378f4615f590b1faa06fabb44",
+    "contracts/production/BemSelectableRaffleBSC.sol": "a338742191c63affd11f779c2f724299e87c9950dcf75614651612e004938be2",
+    "contracts/production/BemContainerSeriesBSC.sol": "ef1bc76983c30480bdb3afabec59622cca8d6d1c76a725ed63e0bde542743b40",
+    "contracts/production/Bem2075RaffleBSC.sol": "75f24090ae026a7edb44df44c1a008ffe30dc974e2a4393d523fe907599040d8"
+  },
+  "optimizer": {
+    "enabled": true,
+    "runs": 200
+  },
+  "evmVersion": "paris",
+  "fixedBindings": {
+    "processor": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+    "processorId": 2075,
+    "authorizationContainer": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646",
+    "revenueContainer": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+    "revenueNft": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+    "revenueTokenId": 13061
+  },
+  "testOnly": true,
+  "fixedRules": {
+    "poolBaseUnits": "100000000",
+    "ticketPriceBaseUnits": "10000",
+    "ticketsPerRound": 10000,
+    "maxTicketsPerPurchase": 1000,
+    "maxTicketsPerAddress": 5000,
+    "blackholeBaseUnits": "4000000",
+    "organizerBaseUnits": "1000000",
+    "winnerBaseUnits": "95000000",
+    "fundingWindowSeconds": 86400,
+    "refundClaimWindowSeconds": 86400
+  },
+  "standardJsonSha256": "b596d89ae27eaf76ca3e0a0155dbf5a45a8ff5f1922e7557846ea50c4ede5b10",
+  "creationBytecodeBytes": 22874,
+  "runtimeBytecodeBytes": 18638,
+  "runtimeBytecodeIsTemplate": true,
+  "runtimeNote": "Constructor immutables require separate verification against live getters; the template hash is not an on-chain runtime hash.",
+  "staticSourceCompilation": true,
+  "mainnetTransactionsSent": 0,
+  "standardJsonInput": "Bem2075Raffle13061Test1BSC.compile-input.json",
+  "artifact": "Bem2075Raffle13061Test1BSC.artifact.json"
+}

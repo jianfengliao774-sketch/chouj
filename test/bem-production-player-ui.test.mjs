@@ -8,7 +8,7 @@ import * as refundGuards from '../bem-production-site/web/refund-guards.js';
 import * as transactionRecords from '../bem-production-site/web/transaction-tracker.js';
 
 const APP = new URL('../bem-production-site/web/app.js', import.meta.url);
-const HTML = new URL('../bem-production-site/web/index.html', import.meta.url);
+const HTML = new URL('../bem-production-site/web/legacy.html', import.meta.url);
 const A = '0x304F06903324B8056cB1ED627144EfB2C34df3a8';
 const B = '0x0000000000000000000000000000000000000012';
 const HASH = '0x' + 'a'.repeat(64);

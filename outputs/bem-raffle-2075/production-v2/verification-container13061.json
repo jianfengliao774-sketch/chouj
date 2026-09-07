@@ -1,0 +1,109 @@
+{
+  "status": "passed",
+  "checkedAt": "2026-09-07T02:09:27.757Z",
+  "scope": "local_mocks",
+  "compilerVersion": "0.8.36+commit.8a079791.Emscripten.clang",
+  "sourceSha256s": {
+    "contracts/production-v2/BemSelectableRaffleV2.sol": "cf8d5c5ffe12749f1cc8877ee3db4ed7ca0e09b3b4909ef44f5aaad324db5fb7",
+    "contracts/production-v2/BemSelectableRaffle13061BSC.sol": "cb17dd67a7c08db826d44044f2f80a4a470d9368ad2a998a3a4a7f7549642743",
+    "contracts/production-v2/BemContainer13061SeriesBSC.sol": "2e5cb90f6ca49f758e059fb096b4600331dbca10beb7e73bb8802f25a83d2015",
+    "contracts/production-v2/Bem2075Raffle13061BSC.sol": "c9e0866c6921bd4f996418da443f781c0a9b0142dadb8c26408cfff643866815",
+    "contracts/production-v2/test1/Bem2075Raffle13061Test1BSC.sol": "b9791706dcf87f0aafb6a3c733faf8af548fd8b84617871abd6c5af24a88b210",
+    "contracts/production-v2/pool10/Bem2075Raffle13061Pool10BSC.sol": "a0236c56100891d39e9e466a55631f53ca52da21924185317aa8551d884178c9",
+    "contracts/production-v2/pool50/Bem2075Raffle13061Pool50BSC.sol": "8ece9ba3f7ce8ab64b9a147fb056ce95a878e8ed1c9fc7ecc2908f771831c376"
+  },
+  "preservedProductionSourceSha256s": {
+    "contracts/production/BemSelectableRaffle.sol": "b6b7812a0eaf54d3e7b2f307bd4a552fd343952378f4615f590b1faa06fabb44",
+    "contracts/production/BemSelectableRaffleBSC.sol": "a338742191c63affd11f779c2f724299e87c9950dcf75614651612e004938be2",
+    "contracts/production/BemContainerSeriesBSC.sol": "ef1bc76983c30480bdb3afabec59622cca8d6d1c76a725ed63e0bde542743b40",
+    "contracts/production/Bem2075RaffleBSC.sol": "75f24090ae026a7edb44df44c1a008ffe30dc974e2a4393d523fe907599040d8"
+  },
+  "tests": [
+    {
+      "name": "13061 only receives revenue; the original 2075 container alone activates the unchanged processor and rules",
+      "passed": true
+    },
+    {
+      "name": "candidate deployment rejects a revenue registry mismatch, unopened account or wrong token binding",
+      "passed": true
+    },
+    {
+      "name": "1 BEM test: all 10000 tickets settle 4% / 1% / 95% with no residual BEM",
+      "passed": true,
+      "poolBem": "1",
+      "ticketsPerRound": 10000,
+      "priceBaseUnits": "10000",
+      "winningInternalTicket": "9999",
+      "winningDisplayTicket": "10000",
+      "finalPurchaseGas": "2006763",
+      "settlementGas": "214659"
+    },
+    {
+      "name": "1 BEM: participant claims a partial refund themselves after24h and pays transaction gas",
+      "passed": true,
+      "poolBem": "1",
+      "refundBaseUnits": "100000",
+      "claimedByParticipant": true,
+      "gasPaidBaseUnits": "4270796417130"
+    },
+    {
+      "name": "10 BEM production: all 10000 tickets settle 4% / 1% / 95% with no residual BEM",
+      "passed": true,
+      "poolBem": "10",
+      "ticketsPerRound": 10000,
+      "priceBaseUnits": "100000",
+      "winningInternalTicket": "9999",
+      "winningDisplayTicket": "10000",
+      "finalPurchaseGas": "2006763",
+      "settlementGas": "214659"
+    },
+    {
+      "name": "10 BEM: participant claims a partial refund themselves after24h and pays transaction gas",
+      "passed": true,
+      "poolBem": "10",
+      "refundBaseUnits": "1000000",
+      "claimedByParticipant": true,
+      "gasPaidBaseUnits": "4270797279280"
+    },
+    {
+      "name": "50 BEM production: all 10000 tickets settle 4% / 1% / 95% with no residual BEM",
+      "passed": true,
+      "poolBem": "50",
+      "ticketsPerRound": 10000,
+      "priceBaseUnits": "500000",
+      "winningInternalTicket": "9999",
+      "winningDisplayTicket": "10000",
+      "finalPurchaseGas": "2006763",
+      "settlementGas": "214659"
+    },
+    {
+      "name": "50 BEM: participant claims a partial refund themselves after24h and pays transaction gas",
+      "passed": true,
+      "poolBem": "50",
+      "refundBaseUnits": "5000000",
+      "claimedByParticipant": true,
+      "gasPaidBaseUnits": "4270791675305"
+    },
+    {
+      "name": "100 BEM production: all 10000 tickets settle 4% / 1% / 95% with no residual BEM",
+      "passed": true,
+      "poolBem": "100",
+      "ticketsPerRound": 10000,
+      "priceBaseUnits": "1000000",
+      "winningInternalTicket": "9999",
+      "winningDisplayTicket": "10000",
+      "finalPurchaseGas": "2006763",
+      "settlementGas": "214659"
+    },
+    {
+      "name": "100 BEM: participant claims a partial refund themselves after24h and pays transaction gas",
+      "passed": true,
+      "poolBem": "100",
+      "refundBaseUnits": "10000000",
+      "claimedByParticipant": true,
+      "gasPaidBaseUnits": "4270795210120"
+    }
+  ],
+  "mainnetTransactionsSent": 0,
+  "mainnetDeployed": false
+}

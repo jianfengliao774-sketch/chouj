@@ -300,5 +300,21 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
     return clone({ ...row, transactionRecords: row.transactions.map(hash => ({ transactionHash: hash,
       explorerUrl: `https://bscscan.com/tx/${hash}`, receipt: db.receipts[hash] })) });
   }
-  return { sync, getStatus, listRounds, getRound, listTransactions };
+  function listAnnouncements(options = {}) {
+    const rows = rounds().filter(row => row.status === 5 && row.settlementTxHash && row.winner)
+      .map(row => ({ poolId: 'legacy100', poolBaseUnits: '10000000000', roundId: row.roundId,
+        winner: row.winner, amountBaseUnits: '9500000000', timeUtc: row.settledAt,
+        transactionHash: row.settlementTxHash, gameAddress: HISTORY_GAME }));
+    return paginate(rows, options);
+  }
+  function listBurns(options = {}) {
+    const rows = db.events.filter(event => event.name === 'BlackholeTransfer')
+      .sort((a, b) => -eventOrder(a, b)).map(event => ({ poolId: 'legacy100',
+        poolBaseUnits: '10000000000', roundId: event.args.roundId, amountBaseUnits: event.args.amount,
+        kind: 'settlement', timeUtc: event.timeUtc, transactionHash: event.transactionHash,
+        logIndex: event.logIndex, blockNumber: event.blockNumber, gameAddress: HISTORY_GAME,
+        destination: '0x000000000000000000000000000000000000dEaD' }));
+    return paginate(rows, options);
+  }
+  return { sync, getStatus, listRounds, getRound, listTransactions, listAnnouncements, listBurns };
 }

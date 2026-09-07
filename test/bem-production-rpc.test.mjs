@@ -290,8 +290,10 @@ async function httpFixture({ publicOrigin } = {}) {
     }
     throw new Error('Upstream secret must not appear in responses');
   };
-  const history = { getStatus: () => ({ state: 'ready' }), listRounds: () => ({ rows: [] }) };
-  const { server } = await createProductionServer({ port: 8788, rpc, manifest, history, publicOrigin, adminCredential: credential });
+  const empty = ({page=1,pageSize=20}={}) => ({rows:[],page,pageSize,total:0,totalPages:0});
+  const history = { getStatus: () => ({ state: 'ready' }), listRounds: empty, listBurns: empty, listAnnouncements: empty };
+  const market = { getQuote: async () => ({chainId:56,token:BEM,updatedAt:null,stale:true,usdt:null,bnb:null}) };
+  const { server } = await createProductionServer({ port: 8788, rpc, manifest, history, publicOrigin, adminCredential: credential, market });
   // Dispatch directly through the HTTP request listener: no listen(), port,
   // socket connection or network request is created by these tests.
   const send = ({ url = '/rpc', method = 'POST', body = request('eth_chainId'), host = new URL(publicOrigin ?? ORIGIN).host,
@@ -309,6 +311,19 @@ async function httpFixture({ publicOrigin } = {}) {
   });
   return { server, send, forwarded };
 }
+
+test('new pool, burn, announcement and price endpoints remain read-only and distinguish undeployed pools', async()=>{
+  const f=await httpFixture();
+  const pools=await f.send({url:'/api/pools',method:'GET'});assert.equal(pools.status,200);assert.equal(pools.body.schemaVersion,2);
+  assert.ok(pools.body.pools.every(p=>p.deployment===null&&p.salesEnabled===false));
+  for(const endpoint of ['/api/burns','/api/announcements']){
+    const current=await f.send({url:endpoint+'?pool=100',method:'GET'});assert.equal(current.status,200);assert.equal(current.body.deploymentPending,true);assert.equal(current.body.index.state,'awaiting_deployment');assert.deepEqual(current.body.rows,[]);
+    const original=await f.send({url:endpoint+'?pool=legacy100',method:'GET'});assert.equal(original.body.deploymentPending,false);assert.equal(original.body.index.state,'ready');
+    for(const query of ['?pool=untrusted','?page=-1','?pageSize=100000'])assert.equal((await f.send({url:endpoint+query,method:'GET'})).status,400);
+  }
+  const price=await f.send({url:'/api/market',method:'GET'});assert.equal(price.status,200);assert.equal(price.body.stale,true);assert.equal(price.body.usdt,null);
+  assert.deepEqual(f.forwarded,[]);
+});
 
 test('HTTP envelope blocks foreign hosts/origins and refuses write methods inside a mixed batch', async () => {
   const f = await httpFixture();

@@ -1,0 +1,124 @@
+{
+  "schemaVersion": 1,
+  "type": "bem-container-13061-readonly",
+  "checkedAt": "2026-09-07T00:44:36.978Z",
+  "readOnly": true,
+  "mainnetTransactionsSent": 0,
+  "walletSignaturesRequested": 0,
+  "privateKeysRead": false,
+  "rpcUrl": "https://bsc-dataseed.bnbchain.org",
+  "input": {
+    "address": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+    "addressLength": 42,
+    "checksumValid": true,
+    "nft": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+    "tokenId": 13061,
+    "opener": "0x021745DE2f42A7839d96f2d3634d0294487D81F1"
+  },
+  "snapshot": {
+    "chainId": 56,
+    "blockNumber": 120400622,
+    "blockHash": "0xe11d85afd917f9b15c7f2cb10b53bb48ae0698c6ab1768843c58abb90a9a2236",
+    "timeUtc": "2026-09-07T00:44:39.000Z",
+    "recheckedBlockHash": "0xe11d85afd917f9b15c7f2cb10b53bb48ae0698c6ab1768843c58abb90a9a2236"
+  },
+  "code": {
+    "address": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+    "blockTag": "0x72d2aee",
+    "bytes": 173,
+    "keccak256": "0xc6bd82ae4e27c01d0a769d216526f84e5fc2e16765ac30b4da84d56944f5c470",
+    "rawResult": "0x363d3d373d3d3d363d73af4e78a2257c9c5480c2f8310e3b00437260751d5af43d82803e903d91602b57fd5bf300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000038000000000000000000000000b1024b89886b9a34aa4ff5f31c411d708b20a14c0000000000000000000000000000000000000000000000000000000000003305"
+  },
+  "abi": [
+    "function token() view returns(uint256 chainId,address tokenContract,uint256 tokenId)",
+    "function owner() view returns(address)",
+    "function ownerOf(uint256) view returns(address)",
+    "function accountOf(address,uint256) view returns(address)",
+    "function isOpened(address,uint256) view returns(bool)"
+  ],
+  "reads": [
+    {
+      "label": "containerToken",
+      "to": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+      "method": "token",
+      "args": [],
+      "blockTag": "0x72d2aee",
+      "data": "0xfc0c546a",
+      "rawResult": "0x0000000000000000000000000000000000000000000000000000000000000038000000000000000000000000b1024b89886b9a34aa4ff5f31c411d708b20a14c0000000000000000000000000000000000000000000000000000000000003305",
+      "decoded": [
+        "56",
+        "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+        "13061"
+      ]
+    },
+    {
+      "label": "containerOwner",
+      "to": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+      "method": "owner",
+      "args": [],
+      "blockTag": "0x72d2aee",
+      "data": "0x8da5cb5b",
+      "rawResult": "0x0000000000000000000000007674fa446d42b1f7f150dc5e678cc525d275ea53",
+      "decoded": [
+        "0x7674fa446D42b1f7f150DC5e678cc525d275Ea53"
+      ]
+    },
+    {
+      "label": "nftOwner13061",
+      "to": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+      "method": "ownerOf",
+      "args": [
+        13061
+      ],
+      "blockTag": "0x72d2aee",
+      "data": "0x6352211e0000000000000000000000000000000000000000000000000000000000003305",
+      "rawResult": "0x0000000000000000000000007674fa446d42b1f7f150dc5e678cc525d275ea53",
+      "decoded": [
+        "0x7674fa446D42b1f7f150DC5e678cc525d275Ea53"
+      ]
+    },
+    {
+      "label": "registryAccount13061",
+      "to": "0x021745DE2f42A7839d96f2d3634d0294487D81F1",
+      "method": "accountOf",
+      "args": [
+        "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+        13061
+      ],
+      "blockTag": "0x72d2aee",
+      "data": "0x0c1905e5000000000000000000000000b1024b89886b9a34aa4ff5f31c411d708b20a14c0000000000000000000000000000000000000000000000000000000000003305",
+      "rawResult": "0x000000000000000000000000001f110422f04a90bf7d6ec96714f75046bd7126",
+      "decoded": [
+        "0x001f110422F04a90bF7D6eC96714f75046BD7126"
+      ]
+    },
+    {
+      "label": "registryOpened13061",
+      "to": "0x021745DE2f42A7839d96f2d3634d0294487D81F1",
+      "method": "isOpened",
+      "args": [
+        "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+        13061
+      ],
+      "blockTag": "0x72d2aee",
+      "data": "0x8b508494000000000000000000000000b1024b89886b9a34aa4ff5f31c411d708b20a14c0000000000000000000000000000000000000000000000000000000000003305",
+      "rawResult": "0x0000000000000000000000000000000000000000000000000000000000000001",
+      "decoded": [
+        true
+      ]
+    }
+  ],
+  "checks": {
+    "contractDeployed": true,
+    "bindingMatches": true,
+    "registeredContainerMatches": true,
+    "opened": true,
+    "containerOwnerMatchesNftOwner": true
+  },
+  "owner": "0x7674fa446D42b1f7f150DC5e678cc525d275Ea53",
+  "scope": "Verifies public container identity and ownership at the recorded block. Does not prove user control of the owner wallet, inspect container assets, change the raffle, authorize a series, or validate a replacement deployment.",
+  "priorAttempt": {
+    "requestedBlock": 120400108,
+    "result": "Fresh snapshot used because the public RPC returned missing trie node for the earlier historical state; no data from different snapshots were mixed."
+  }
+}

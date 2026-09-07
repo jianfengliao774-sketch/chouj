@@ -85,6 +85,11 @@ test('indexes the complete confirmed lifecycle with actual winners, receipts, an
   assert.deepEqual(round.proof, { lockTxHash: lock, requestTxHash: lock, randomnessTxHash: vrf, settlementTxHash: settle, refundTxHashes: [] });
   assert.equal(round.transactionRecords.at(-1).receipt.transactionHash, settle);
   assert.equal(s.history.listTransactions({ roundId: '1', pageSize: 1 }).transactions[0].transactionHash, settle);
+  const announcements=s.history.listAnnouncements();
+  assert.equal(announcements.rows[0].winner,BOB);assert.equal(announcements.rows[0].amountBaseUnits,'9500000000');
+  assert.equal(announcements.rows[0].poolId,'legacy100');assert.equal(announcements.rows[0].transactionHash,settle);
+  const burns=s.history.listBurns();assert.equal(burns.rows[0].transactionHash,settle);assert.equal(burns.rows[0].amountBaseUnits,'400000000');
+  assert.equal(burns.rows[0].kind,'settlement');assert.equal(burns.rows[0].timeUtc,round.settledAt);
   const recovered = s.make(); assert.equal(recovered.getStatus().state, 'syncing');
   assert.equal(recovered.getRound('1').winner, BOB); await recovered.sync();
   assert.equal(recovered.getRound('1').events.length, round.events.length, 'restart does not duplicate logs');
@@ -110,6 +115,7 @@ test('a confirmed-chain reorg rolls back old winner and receipt before rebuildin
   await s.history.sync(); const row = s.history.getRound('1');
   assert.equal(row.winner, BOB); assert.equal(row.winningTicket, 9999); assert.equal(row.settlementTxHash, replacement);
   assert.ok(!row.transactions.includes(old));
+  assert.equal(s.history.listAnnouncements().rows[0].transactionHash,replacement);
   const saved = JSON.parse(await fs.readFile(s.storagePath, 'utf8')); assert.equal(saved.receipts[old], undefined);
   assert.equal(s.make().getRound('1').winner, BOB);
 });
