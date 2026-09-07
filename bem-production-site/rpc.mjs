@@ -22,7 +22,8 @@ export function validateReadRequest(request) {
   if (['eth_getCode', 'eth_getBalance', 'eth_getTransactionCount'].includes(m)
     && (p.length !== 2 || !validAddress(p[0]) || !validBlock(p[1]))) error('Invalid address or block');
   if (['eth_getTransactionByHash', 'eth_getTransactionReceipt'].includes(m) && (p.length !== 1 || !validHash(p[0]))) error('Invalid transaction hash');
-  if (m === 'eth_getBlockByNumber' && (p.length !== 2 || !validBlock(p[0]) || p[1] !== false)) error('Only block headers are available');
+  if (m === 'eth_getBlockByNumber' && (p.length !== 2 || !validBlock(p[0]) ||
+    (p[1] !== false && !(p[1] === true && /^0x[0-9a-f]{1,64}$/i.test(p[0]))))) error('Full transactions require a numeric block');
   if (['eth_call', 'eth_estimateGas'].includes(m)) {
     const tx = p[0];
     if (!tx || Array.isArray(tx) || typeof tx !== 'object' || p.length < 1 || p.length > 2

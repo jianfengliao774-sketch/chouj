@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { setTimeout as delay, setImmediate as tick } from 'node:timers/promises';
 import { createReadRpc } from '../bem-production-site/rpc.mjs';
-import { GAME } from '../bem-production-site/config.mjs';
+import { profile } from '../bem-production-site/web/sparkdraw-profiles.js';
+const GAME=profile('0.1').address;
 
 const HASH = '0x' + 'ab'.repeat(32);
 const call = (data = '0x1234', block = '0x64') => [{ to: GAME, data }, block];
