@@ -13,6 +13,32 @@ function announce(target, wallet, info = {}) {
 }
 const values = registry => [...registry.entries().values()];
 
+test('TP and MetaMask mobile flags identify their own cards without wallet access', () => {
+  for(const [flags,name,rdns] of [
+    [{isTokenPocket:true,isMetaMask:true},'TokenPocket','pro.tokenpocket'],
+    [{isTp:true,isMetaMask:true},'TokenPocket','pro.tokenpocket'],
+    [{isMetaMask:true},'MetaMask','io.metamask'],
+  ]){
+    const target=new EventTarget(),wallet=Object.assign(provider(),flags);target.ethereum=wallet;
+    const registry=createWalletRegistry(target,()=>{});registry.discover();
+    assert.equal(values(registry).length,1);
+    assert.equal(values(registry)[0].name,name);assert.equal(values(registry)[0].rdns,rdns);
+    assert.equal(values(registry)[0].provider,wallet);assert.deepEqual(wallet.requests,[]);
+  }
+});
+
+test('specific wallet flags take precedence over MetaMask compatibility flags', () => {
+  for(const [flags,name] of [
+    [{isTokenPocket:true},'TokenPocket'],[{isOkxWallet:true},'OKX Wallet'],
+    [{isBinance:true},'Binance Wallet'],[{isTrust:true},'Trust Wallet'],
+    [{isRabby:true},'Rabby Wallet'],[{isCoinbaseWallet:true},'Coinbase Wallet'],
+  ]){
+    const target=new EventTarget();target.ethereum=Object.assign(provider(),{isMetaMask:true},flags);
+    const registry=createWalletRegistry(target,()=>{});registry.discover();
+    assert.equal(values(registry)[0].name,name);
+  }
+});
+
 test('OKX dedicated, nested and shared mobile providers expose the OKX card without account requests', () => {
   for (const injection of ['dedicated','nested','shared','legacyFlag']) {
     const target = new EventTarget(), okx = provider();
@@ -169,6 +195,17 @@ function fixture(t, wallets) {
 }
 const cardName = card => card.querySelectorAll('strong')[0].textContent;
 const cardIcon = card => card.querySelectorAll('img')[0]?.src;
+
+test('TP and MetaMask injected together remain separately selectable with their own icons', t => {
+  const ui=fixture(t,[]),tp=Object.assign(provider(),{isTokenPocket:true,isMetaMask:true}),fox=Object.assign(provider(),{isMetaMask:true});
+  ui.target.ethereum={providers:[tp,fox]};ui.picker.open();
+  const tpCard=ui.cards().find(c=>cardName(c)==='TokenPocket'),foxCard=ui.cards().find(c=>cardName(c)==='MetaMask');
+  assert.equal(tpCard.disabled,false);assert.equal(foxCard.disabled,false);
+  assert.equal(cardIcon(tpCard),'/wallet-icons/tokenpocket.png');assert.equal(cardIcon(foxCard),'/wallet-icons/metamask.svg');
+  tpCard.dispatchEvent(new Event('click'));assert.equal(ui.selected[0].provider,tp);
+  ui.picker.open();ui.cards().find(c=>cardName(c)==='MetaMask').dispatchEvent(new Event('click'));
+  assert.equal(ui.selected[1].provider,fox);assert.deepEqual([...tp.requests,...fox.requests],[]);
+});
 
 test('OKX injected after the original three-second window remains discoverable until the picker closes', t => {
   t.mock.timers.enable({apis:['setTimeout']});

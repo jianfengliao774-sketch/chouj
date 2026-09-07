@@ -1,5 +1,17 @@
 # 钱包连接与 5,000 份购买验证
 
+## 当前移动端接入（2026-09-08）
+
+钱包选择器支持 OKX、TokenPocket（TP）、MetaMask（小狐狸）、币安及常见 EIP-1193/EIP-6963 钱包。OKX 扫描专属接口和共享接口；TP 按自身标记识别，小狐狸按 MetaMask 标记识别，其他钱包自身标记优先于其 MetaMask 兼容标记。不同 provider 对象分别保留，选择哪个钱包就使用哪个对象请求连接和交易。
+
+新增 TP 专属卡片，图标来自 [TokenPocket 官网 favicon](https://www.tokenpocket.pro/favicon.png)，SHA-256 为 71e494cb22ad03f9d7498e67016f1532c2fa81b77bf11267c4cb6e3ff57475fe。依据 [TP 官方协议说明](https://help.tokenpocket.pro/developer-en/wallet/js-sdk) 和 [MetaMask 异步注入说明](https://github.com/MetaMask/detect-provider)，在选择弹窗打开期间持续扫描，响应初始化、页面恢复事件；发现过程不请求账户权限。已连接但网络不在 BNB 主网时，通过页面的切换网络按钮请求钱包切换。
+
+玩家 API 与只读 RPC 使用 AbortController 计时，兼容缺少 AbortSignal.timeout 的浏览器。用户已明确取消前一笔待确认时阻止再次购买的限制；每次主动购买仍独立跟踪，旧交易记录不会删除或自动重发。180 ms 后的只读提前准备、5 秒有效期、当前钱包请求期间的串行处理继续保留。
+
+本次 133 项自动检查、22 个隔离浏览器场景通过，覆盖 TP/MetaMask 先授权再确认 5,000 份购买、延迟五秒注入、TP 与其他 provider 共存、切换到 BNB 网络，以及原有 OKX、币安和额度场景。测试使用模拟钱包及链上响应，没有真实签名或广播，尚未覆盖所有手机系统和 App 版本。
+
+下文是前期排障和性能测量记录；其中“三秒检测”和“待确认时阻止重复购买”等描述已被上述行为替代。
+
 ## 反向代理请求大小
 
 `buySelected(uint256,uint16[])` 的数组元素仍各占 32 字节 ABI 编码空间。5,000 个号码编码为 JSON-RPC 估算请求后约为 **320,401 字节**，超过 Nginx `256k`。服务器会先返回 HTTP 413，浏览器无法进入钱包支付请求。

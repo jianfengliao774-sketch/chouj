@@ -31,6 +31,13 @@ try{
     {name:'OKX mobile shared provider uses its own wallet card',mobile:true,approval:false,selected:false,okx:'shared'},
     {name:'OKX mobile late provider appears after five seconds',mobile:true,approval:false,selected:false,okx:'dedicated',injectionDelay:5000},
     {name:'OKX mobile older browser without AbortSignal.timeout opens purchase',mobile:true,approval:false,selected:false,okx:'dedicated',legacyTimeout:true},
+    {name:'TokenPocket mobile approval then confirmed purchase',mobile:true,approval:true,selected:false,mobileWallet:'tp',confirmPurchase:'direct'},
+    {name:'TokenPocket mobile legacy flag arrives after five seconds',mobile:true,approval:false,selected:false,mobileWallet:'tpLegacy',injectionDelay:5000},
+    {name:'MetaMask mobile approval then confirmed purchase',mobile:true,approval:true,selected:false,mobileWallet:'metamask',confirmPurchase:'direct'},
+    {name:'MetaMask mobile delayed initialized event',mobile:true,approval:false,selected:false,mobileWallet:'metamask',injectionDelay:5000,initializedEvent:true},
+    {name:'TokenPocket mobile remains selectable beside a MetaMask-compatible provider',mobile:true,approval:false,selected:false,mobileWallet:'tp',mixedProviders:true},
+    {name:'Trust mobile shared injection keeps its own wallet card',mobile:true,approval:false,selected:false,mobileWallet:'trust'},
+    {name:'TokenPocket mobile switches to BNB before purchasing',mobile:true,approval:false,selected:false,mobileWallet:'tp',switchNetwork:true},
     {name:'sold-out pool disables purchasing and shows zero available',mobile:false,approval:false,selected:false,sold:10000,held:0},
   ].filter(s=>!process.env.SCENARIO_FILTER||s.name.includes(process.env.SCENARIO_FILTER))){
     let receiptAvailable=!scenario.holdReceipt;
@@ -38,16 +45,18 @@ try{
     const context=await browser.newContext({viewport:scenario.mobile?{width:390,height:844}:{width:1280,height:900},isMobile:scenario.mobile,hasTouch:scenario.mobile});
     const page=await context.newPage(),errors=[],requests=[];
     page.on('pageerror',e=>errors.push(e.message));
-    await page.addInitScript(({account,hash,blockHash,mobile,walletDelay,rejectApproval,confirmPurchase,okx,legacyTimeout})=>{
+    await page.addInitScript(({account,hash,blockHash,mobile,walletDelay,rejectApproval,confirmPurchase,okx,legacyTimeout,mobileWallet,initializedEvent,mixedProviders,switchNetwork})=>{
       if(legacyTimeout)Object.defineProperty(AbortSignal,'timeout',{value:undefined,configurable:true});
-      window.__walletRequests=[];window.__purchases=[];let authorized=false,currentAccount=account;const listeners={};
+      window.__walletRequests=[];window.__purchases=[];window.__wrongWalletRequests=[];let authorized=false,currentAccount=account,currentChain=switchNetwork?'0x1':'0x38';const listeners={};
       document.addEventListener('click',e=>{if(e.target.closest?.('#buy'))window.__buyClickedAt=performance.now();},true);
-      const provider={...(okx?{isOkxWallet:true}:{isBinance:true}),on(name,fn){(listeners[name]??=[]).push(fn);},async request(q){
+      const flags=okx?{isOkxWallet:true}:({tp:{isTokenPocket:true,isMetaMask:true},tpLegacy:{isTp:true,isMetaMask:true},metamask:{isMetaMask:true},trust:{isTrust:true,isMetaMask:true}}[mobileWallet]||{isBinance:true});
+      const provider={...flags,on(name,fn){(listeners[name]??=[]).push(fn);},async request(q){
         window.__walletRequests.push({method:q.method,params:q.params,at:performance.now()});
         if(['eth_accounts','eth_chainId','eth_getTransactionCount'].includes(q.method))await new Promise(r=>setTimeout(r,walletDelay));
         if(q.method==='eth_requestAccounts'){authorized=true;return[currentAccount];}
         if(q.method==='eth_accounts')return authorized?[currentAccount]:[];
-        if(q.method==='eth_chainId')return'0x38';
+        if(q.method==='eth_chainId')return currentChain;
+        if(q.method==='wallet_switchEthereumChain'){currentChain=q.params[0].chainId;for(const fn of listeners.chainChanged||[])fn(currentChain);return null;}
         if(q.method==='eth_getTransactionCount')return window.__approval?'0x2':'0x1';
         if(q.method==='eth_sendTransaction'){
           const tx=q.params[0];
@@ -57,10 +66,17 @@ try{
         }
         throw Error('Unexpected wallet method: '+q.method);
       }};
-      window.__installWallet=()=>{if(okx==='dedicated')window.okxwallet=provider;else if(okx==='shared')window.ethereum=provider;else if(mobile)window.binancew3w={ethereum:provider};else window.ethereum=provider;};
+      window.__installWallet=()=>{
+        if(mixedProviders){const other={isMetaMask:true,async request(q){window.__wrongWalletRequests.push(q.method);if(q.method==='eth_accounts')return[];throw Error('Wrong wallet selected');}};other.providers=[other,provider];window.ethereum=other;}
+        else if(okx==='dedicated')window.okxwallet=provider;
+        else if(okx==='shared'||mobileWallet)window.ethereum=provider;
+        else if(mobile)window.binancew3w={ethereum:provider};
+        else window.ethereum=provider;
+        if(initializedEvent)window.dispatchEvent(new Event('ethereum#initialized'));
+      };
       window.__switchWallet=()=>{currentAccount='0x2222222222222222222222222222222222222222';for(const fn of listeners.accountsChanged||[])fn([currentAccount]);};
       if(!mobile)window.__installWallet();
-    },{account,hash,blockHash,mobile:scenario.mobile,walletDelay,rejectApproval:scenario.rejectApproval,confirmPurchase:scenario.confirmPurchase,okx:scenario.okx,legacyTimeout:scenario.legacyTimeout});
+    },{account,hash,blockHash,mobile:scenario.mobile,walletDelay,rejectApproval:scenario.rejectApproval,confirmPurchase:scenario.confirmPurchase,okx:scenario.okx,legacyTimeout:scenario.legacyTimeout,mobileWallet:scenario.mobileWallet,initializedEvent:scenario.initializedEvent,mixedProviders:scenario.mixedProviders,switchNetwork:scenario.switchNetwork});
     await page.route('**/*',async route=>{
       const request=route.request(),url=new URL(request.url());
       assert.equal(url.origin,'http://127.0.0.1:18796','No external requests allowed');
@@ -120,15 +136,21 @@ try{
     });
     await page.goto('http://127.0.0.1:18796/?pool=5');
     await page.locator('#connect-wallet').click();
-    const walletName=scenario.okx?/OKX Wallet/:/Binance Wallet/;
+    const walletName=scenario.okx?/OKX Wallet/:scenario.mobileWallet?.startsWith('tp')?/TokenPocket/:scenario.mobileWallet==='metamask'?/MetaMask/:scenario.mobileWallet==='trust'?/Trust Wallet/:/Binance Wallet/;
     if(scenario.mobile){
       assert.equal(await page.getByRole('button',{name:walletName}).isDisabled(),true);
       if(scenario.injectionDelay)await page.waitForTimeout(scenario.injectionDelay);
       await page.evaluate(()=>window.__installWallet());
     }
     const walletButton=page.getByRole('button',{name:walletName});
+    if(scenario.mobileWallet?.startsWith('tp'))await walletButton.locator('img').evaluate(img=>{if(!img.complete)return new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('TP icon failed'));});if(!img.naturalWidth)throw Error('TP icon failed');});
     await walletButton.click();
     await page.waitForFunction(()=>document.getElementById('wallet-address').textContent.startsWith('0x'));
+    if(scenario.switchNetwork){
+      assert.equal(await page.locator('#buy').isDisabled(),true);
+      await page.locator('#switch-network').click();
+      await page.waitForFunction(()=>document.getElementById('switch-network').hidden);
+    }
     await page.waitForFunction(()=>document.getElementById('purchase-limit').textContent.includes('当前最多可买'));
     assert.ok((await page.locator('#purchase-limit').textContent()).replaceAll(',','').includes(`当前最多可买 ${expected}`));
     if(expected===0){
@@ -179,6 +201,7 @@ try{
     if(scenario.selected)assert.deepEqual(decoded[1].map(Number),Array.from({length:5000},(_,i)=>i));
     if(scenario.approval)assert.equal(TOKEN.decodeFunctionData('approve',sent[0].params[0].data)[1],5000n*p.ticketPrice);
     assert.ok(requests.some(rows=>rows.length>=3),'Independent reads use batches');
+    if(scenario.mixedProviders)assert.equal(await page.evaluate(()=>window.__wrongWalletRequests.some(method=>method!=='eth_accounts')),false,'Connect and payment must use the chosen provider');
     assert.deepEqual(errors,[]);
     if(scenario.confirmPurchase){
       if(scenario.holdReceipt){
