@@ -27,17 +27,22 @@ try{
     {name:'wallet-wrapped 5000 purchase confirms and unlocks',mobile:false,approval:false,selected:false,confirmPurchase:'wrapped'},
     {name:'wallet-selected direct nonce confirms and unlocks',mobile:false,approval:false,selected:false,confirmPurchase:'nonce',holdReceipt:true},
     {name:'mobile allows a second intentional purchase while the first is pending',mobile:true,approval:false,selected:false,confirmPurchase:'direct',holdReceipt:true,repeatPurchase:true},
+    {name:'OKX mobile dedicated provider connects and opens approval and purchase',mobile:true,approval:true,selected:false,okx:'dedicated'},
+    {name:'OKX mobile shared provider uses its own wallet card',mobile:true,approval:false,selected:false,okx:'shared'},
+    {name:'OKX mobile late provider appears after five seconds',mobile:true,approval:false,selected:false,okx:'dedicated',injectionDelay:5000},
+    {name:'OKX mobile older browser without AbortSignal.timeout opens purchase',mobile:true,approval:false,selected:false,okx:'dedicated',legacyTimeout:true},
     {name:'sold-out pool disables purchasing and shows zero available',mobile:false,approval:false,selected:false,sold:10000,held:0},
-  ]){
+  ].filter(s=>!process.env.SCENARIO_FILTER||s.name.includes(process.env.SCENARIO_FILTER))){
     let receiptAvailable=!scenario.holdReceipt;
     let expected=Math.min(5000,10000-(scenario.sold||0),5000-(scenario.held||0));
     const context=await browser.newContext({viewport:scenario.mobile?{width:390,height:844}:{width:1280,height:900},isMobile:scenario.mobile,hasTouch:scenario.mobile});
     const page=await context.newPage(),errors=[],requests=[];
     page.on('pageerror',e=>errors.push(e.message));
-    await page.addInitScript(({account,hash,blockHash,mobile,walletDelay,rejectApproval,confirmPurchase})=>{
+    await page.addInitScript(({account,hash,blockHash,mobile,walletDelay,rejectApproval,confirmPurchase,okx,legacyTimeout})=>{
+      if(legacyTimeout)Object.defineProperty(AbortSignal,'timeout',{value:undefined,configurable:true});
       window.__walletRequests=[];window.__purchases=[];let authorized=false,currentAccount=account;const listeners={};
       document.addEventListener('click',e=>{if(e.target.closest?.('#buy'))window.__buyClickedAt=performance.now();},true);
-      const provider={isBinance:true,on(name,fn){(listeners[name]??=[]).push(fn);},async request(q){
+      const provider={...(okx?{isOkxWallet:true}:{isBinance:true}),on(name,fn){(listeners[name]??=[]).push(fn);},async request(q){
         window.__walletRequests.push({method:q.method,params:q.params,at:performance.now()});
         if(['eth_accounts','eth_chainId','eth_getTransactionCount'].includes(q.method))await new Promise(r=>setTimeout(r,walletDelay));
         if(q.method==='eth_requestAccounts'){authorized=true;return[currentAccount];}
@@ -52,10 +57,10 @@ try{
         }
         throw Error('Unexpected wallet method: '+q.method);
       }};
-      window.__installWallet=()=>{if(mobile)window.binancew3w={ethereum:provider};else window.ethereum=provider;};
+      window.__installWallet=()=>{if(okx==='dedicated')window.okxwallet=provider;else if(okx==='shared')window.ethereum=provider;else if(mobile)window.binancew3w={ethereum:provider};else window.ethereum=provider;};
       window.__switchWallet=()=>{currentAccount='0x2222222222222222222222222222222222222222';for(const fn of listeners.accountsChanged||[])fn([currentAccount]);};
       if(!mobile)window.__installWallet();
-    },{account,hash,blockHash,mobile:scenario.mobile,walletDelay,rejectApproval:scenario.rejectApproval,confirmPurchase:scenario.confirmPurchase});
+    },{account,hash,blockHash,mobile:scenario.mobile,walletDelay,rejectApproval:scenario.rejectApproval,confirmPurchase:scenario.confirmPurchase,okx:scenario.okx,legacyTimeout:scenario.legacyTimeout});
     await page.route('**/*',async route=>{
       const request=route.request(),url=new URL(request.url());
       assert.equal(url.origin,'http://127.0.0.1:18796','No external requests allowed');
@@ -115,11 +120,13 @@ try{
     });
     await page.goto('http://127.0.0.1:18796/?pool=5');
     await page.locator('#connect-wallet').click();
+    const walletName=scenario.okx?/OKX Wallet/:/Binance Wallet/;
     if(scenario.mobile){
-      assert.equal(await page.getByRole('button',{name:/Binance Wallet/}).isDisabled(),true);
+      assert.equal(await page.getByRole('button',{name:walletName}).isDisabled(),true);
+      if(scenario.injectionDelay)await page.waitForTimeout(scenario.injectionDelay);
       await page.evaluate(()=>window.__installWallet());
     }
-    const walletButton=page.getByRole('button',{name:/Binance Wallet/});
+    const walletButton=page.getByRole('button',{name:walletName});
     await walletButton.click();
     await page.waitForFunction(()=>document.getElementById('wallet-address').textContent.startsWith('0x'));
     await page.waitForFunction(()=>document.getElementById('purchase-limit').textContent.includes('当前最多可买'));

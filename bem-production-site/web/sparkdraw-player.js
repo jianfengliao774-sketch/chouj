@@ -10,6 +10,7 @@ import {SPARKDRAW as F} from './sparkdraw-config.js';
 import {createWalletPicker} from './wallet-picker.js';
 import {createWalletSession} from './wallet-connection.js';
 import {createReadRpcBatcher} from './read-rpc-batcher.js';
+import {withRequestTimeout} from './request-timeout.js';
 import {availablePurchaseLimit,clampPurchaseCount} from './purchase-limit.js';
 import {createPurchasePreparation} from './purchase-preparation.js';
 import {walletRequestRejected} from './wallet-request-errors.js';
@@ -26,7 +27,7 @@ const poolLabel=id=>id==='0.1'?t('历史场次','Archived pool'):id+' BEM';
 const roundName=r=>r?.displayRoundId?roundDisplay(r):r?.status===0?t('待开盘','Not opened'):t('期号同步中','Number syncing');
 const context=()=>({account,key:JSON.stringify([revision,account,pool,chain,snapshot?.currentRoundId,mode,$('ticket-count').value,$('selected-tickets').value])});
 const note=x=>{$('notice').textContent=x;};
-async function api(path,body){const r=await fetch(path,{cache:'no-store',signal:AbortSignal.timeout(15000),...(body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw Error(t('服务暂时无法响应，正在自动重试。','Service temporarily unavailable; retrying.'));}if(!r.ok)throw Error(d.error||'Network unavailable');return d;}
+async function api(path,body){return withRequestTimeout(15000,async signal=>{const r=await fetch(path,{cache:'no-store',signal,...(body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw Error(t('服务暂时无法响应，正在自动重试。','Service temporarily unavailable; retrying.'));}if(!r.ok)throw Error(d.error||'Network unavailable');return d;});}
 const rpc=createReadRpcBatcher();
 const call=async(iface,to,name,args,block='latest')=>iface.decodeFunctionResult(name,await rpc('eth_call',[{to,data:iface.encodeFunctionData(name,args)},block]));
 const manager=createSparkDrawTransactions({rpc,wallet:()=>wallet,context,onChange:()=>render()});
