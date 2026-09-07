@@ -1,6 +1,6 @@
-# SparkDraw drand candidate — not deployed
+# SparkDraw drand V5 — deployment prepared
 
-This branch is an independent contract candidate. The live 1 BEM game and its pending Chainlink request are unchanged. No mainnet deployment, purchase, prize claim, refund or burn was sent while developing this candidate.
+The release contract is `TapeoutSparkDrawBSC`, built on `BemDrandRaffleCandidate`, with the shared `DrandEvmnetVerifier`. The live 1 BEM game and its pending Chainlink request are unchanged. No mainnet deployment, purchase, prize claim, refund or burn was sent while preparing this release; the designated wallet must sign deployment transactions.
 
 ## Implemented in the candidate
 
@@ -19,14 +19,17 @@ This branch is an independent contract candidate. The live 1 BEM game and its pe
 
 Real public drand proof used in local EVM tests; forged and wrong-round proofs rejected. Tests cover failed token transfers, delayed settlement, exact refund/prize claim boundaries, duplicate claims, multi-round principal aggregation and preservation of other rounds' balances.
 
-Local Ganache fixtures, not mainnet transactions: 5,000 scattered selected tickets consumed 15,534,516 gas; 5,000 occupied choices with fallback consumed 8,151,750 gas. Two-round aggregate refund used 135,173 gas. Core runtime was 17,263 bytes. These measurements are scenario-specific, not a guarantee for all transaction states.
+Local Ganache fixtures, not mainnet transactions: 5,000 scattered selected tickets consumed 15,534,560 gas; 5,000 occupied choices with fallback consumed 8,151,794 gas. Two-round aggregate refund used 135,173 gas. Core runtime was 17,393 bytes; the bound release runtime is 17,708 bytes. These measurements are scenario-specific, not a guarantee for all transaction states.
 
 `node scripts/check_drand_candidate_rpc.mjs` performed a read-only BNB mainnet code-override simulation using the real proof. It accepted the valid proof and rejected the wrong beacon round. Verification alone estimated 248,832 gas on that node; recording and settlement cost additional gas.
 
-## Integration still required before release
+## Deployment and integration
 
-- Pin deployment artifacts and verify the actual verifier runtime, official BEM, deployer and revenue-container binding before registering new contracts. The base candidate currently starts funding on the first purchase; its authorization hooks are intentionally not a finished series wrapper.
-- Connect the new ABI and ticket bitmaps to the deployment/test page and permanent server index. `sparkdraw-records.mjs` is an integration draft, not a live registered source.
+- `/deploy-sparkdraw.html` prepares six wallet-signed creation transactions, keeps pending hashes locally and saves verified deployments to `BEM_DATA_DIR/sparkdraw-deployments-v5.json`. The server verifies the creator, exact creation bytecode and arguments, runtime and 12 confirmations. It never signs or sends transactions. Existing registrations cannot be silently overwritten.
+- The bound release constructor requires chain 56 and deployer `0x7674fa446D42b1f7f150DC5e678cc525d275Ea53`; it pins official BEM, revenue container #13061, current NFT ownership, opener bindings, and exact verifier runtime. Deployment enables purchases, with the funding clock starting at each round's first purchase. No extra container activation transaction is required.
+- The standard Solidity compiler input is published at `/sparkdraw/standard-input.json`. Source and exact artifacts are in this repository. Explorer source verification and deployed addresses require the actual deployment receipts.
+- `node scripts/check_sparkdraw_deployment_rpc.mjs` simulated all six creations on BNB mainnet at block 120472684 using a temporary verifier override, without transactions. Estimated gas was 4,287,353 for the verifier and 4,398,830–4,399,028 per game. Total estimated cost at 0.05 gwei was about 0.0013141 BNB. Actual wallet fees may differ.
+- After signed deployments, connect the new player ABI and ticket bitmaps to the permanent server event index. `sparkdraw-records.mjs` is an integration draft, not yet a live registered event source. Existing 1 BEM player transactions must not be relabelled as this new version.
 - Refund countdowns are personal-only for the first 12 hours after the refund trigger. From trigger + 12 hours, publish unclaimed wallet addresses and ticket quantities, grouped by pool and round, with the remaining claim time. A confirmed claim removes that wallet from pending notices. At trigger + 24 hours the claim expires; show awaiting burn until a confirmed burn replaces the notice with a permanent public record. Public prize countdowns start immediately upon settlement. The live burn summary counts only registered, confirmed events and is refreshed every five minutes.
 - A funded transaction sender or user transaction is needed to seal due rounds, relay the fixed beacon, settle, and burn expired claims. Solidity does not execute itself. No automatic drand keeper has been funded or enabled.
 - Cross-contract aggregate claims are not implemented. `refundMany` aggregates rounds within one contract.

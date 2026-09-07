@@ -1,5 +1,6 @@
 import { participationQuery } from './participation.mjs';
 import { createBurnSummary } from './burn-summary.mjs';
+import { createSparkDrawDeployments } from './sparkdraw-deployments.mjs';
 // Mainnet website: chain reads only. Wallets sign and broadcast directly in the browser.
 import { createServer } from 'node:http';
 import { isIP } from 'node:net';
@@ -22,7 +23,7 @@ const format = value => JSON.stringify(value, (_, x) => typeof x === 'bigint' ? 
 const ABI = new Interface(['function getSubscription(uint256) view returns(uint96 balance,uint96 nativeBalance,uint64 reqCount,address owner,address[] consumers)']);
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
 
-export async function createProductionServer({ port = 8788, rpc = createReadRpc(), manifest, history, poolHistories = {}, staticRoot = path.join(SITE, 'dist'), publicOrigin, adminCredential, market = createMarketPriceService() } = {}) {
+export async function createProductionServer({ port = 8788, rpc = createReadRpc(), manifest, history, poolHistories = {}, sparkDrawDeployments = null, staticRoot = path.join(SITE, 'dist'), publicOrigin, adminCredential, market = createMarketPriceService() } = {}) {
   let publicUrl = null;
   if (publicOrigin !== undefined) {
     publicUrl = new URL(publicOrigin);
@@ -109,6 +110,13 @@ export async function createProductionServer({ port = 8788, rpc = createReadRpc(
       }
       if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { mode: 'production', chainId: 56, gameAddress: GAME, salesEnabled: false });
       if (req.method === 'GET' && url.pathname === '/api/config') return json(res, 200, manifest);
+      if(req.method==='GET'&&url.pathname==='/api/sparkdraw/deployments')return json(res,200,sparkDrawDeployments?.snapshot()??{version:5,chainId:56,verifier:null,pools:{}});
+      if(req.method==='POST'&&url.pathname==='/api/sparkdraw/deployments'){
+        if(!sparkDrawDeployments)return json(res,503,{error:'部署记录服务尚未就绪'});
+        const input=await body(req);
+        try{return json(res,200,await sparkDrawDeployments.register(input.kind,input.transactionHash));}
+        catch(e){return json(res,400,{error:String(e.message).slice(0,180)});}
+      }
       if (req.method === 'GET' && url.pathname === '/api/pools') {
         const registry = poolRegistry();
         try {
@@ -247,7 +255,9 @@ async function main() {
   const credentialPath = process.env.BEM_ADMIN_CREDENTIALS_FILE;
   if (!credentialPath || !path.isAbsolute(credentialPath)) throw new Error('Set BEM_ADMIN_CREDENTIALS_FILE to an absolute protected path');
   const adminCredential = JSON.parse(await fs.readFile(credentialPath, 'utf8'));
-  const { server } = await createProductionServer({ port, rpc, manifest, history, poolHistories, publicOrigin: process.env.BEM_PUBLIC_ORIGIN, adminCredential });
+  const sparkDrawDeployments=await createSparkDrawDeployments({rpc,storagePath:path.join(dataDir,'sparkdraw-deployments-v5.json'),
+    artifacts:JSON.parse(await fs.readFile(path.join(SITE,'web/sparkdraw-artifacts.json'),'utf8'))});
+  const { server } = await createProductionServer({ port, rpc, manifest, history, poolHistories, sparkDrawDeployments, publicOrigin: process.env.BEM_PUBLIC_ORIGIN, adminCredential });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
   let syncing = false;
   async function sync() { if (syncing) return; syncing = true; try { await Promise.allSettled([history, ...Object.values(poolHistories)].map(index => index.sync())); } finally { syncing = false; } }

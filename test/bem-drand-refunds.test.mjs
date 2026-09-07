@@ -167,6 +167,28 @@ test('candidate returns accumulated actual principal after 24 hours, then burns 
       assert.equal(await testGame.ticketOwner(1,0),a);
       assert.equal(await testGame.ticketOwner(1,9999),b);
     });
+    await t.test('95% closes after thirty minutes with a sold-only prize, while an unsealed 24-hour boundary refunds',async()=>{
+      await wait(circuit.setEvalMode(0));
+      const small=await deploy(gameArtifact,[10000000n,token.target,verifier.target,adminAddress]);
+      for(const signer of [alice,bob])await wait(token.connect(signer).approve(small.target,MaxUint256));
+      await at(target-1860);
+      await wait(small.connect(alice).buy(1,5000,gas));await wait(small.connect(bob).buy(1,4500,gas));
+      const closes=Number(await small.earlyDrawDeadline(1));assert.equal(closes,target-60);
+      await at(closes-1);await assert.rejects(small.closeRound.staticCall(1));
+      await at(closes);await wait(small.closeRound(1,gas));
+      assert.equal(await small.beaconRound(1),BigInt(sample.beacon.round));
+      await at(target);await wait(small.fulfillRandomness(1,signature,gas));
+      for(let i=0;i<20&&(await small.rounds(1)).status===4n;i++)await wait(small.settle(1,gas));
+      const settled=await small.rounds(1);assert.equal(settled.status,5n);assert.ok(settled.winningTicket<9500n);
+      assert.equal((await small.prizes(1)).amount,9025000n,'prize uses 9500 actual sold shares');
+      await wait(small.connect(alice).buy(2,5000,gas));
+      const end=Number((await small.rounds(2)).fundingDeadline);
+      await at(end-900);await wait(small.connect(bob).buy(2,4500,gas));
+      assert.equal(await small.earlyDrawDeadline(2),BigInt(end));
+      await at(end);await assert.rejects(small.closeRound.staticCall(2));
+      assert.equal(await small.refundablePrincipal(2,a),5000000n);
+      assert.equal(await small.refundPublicNoticeAt(2),BigInt(end+43200));
+    });
     t.diagnostic(JSON.stringify({ gameRuntimeBytes: gameArtifact.evm.deployedBytecode.object.length / 2,
       twoRoundAggregateRefundGas: String(receipt.gasUsed), refundablePrincipalPaid: '265000000', unclaimedBurned: '270000000' }));
   } finally { await provider.destroy(); await engine.disconnect(); }

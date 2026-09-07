@@ -166,8 +166,8 @@ function render() {
   put('community-copy', t('您的每一份参与，都在为 Tapeout 生态建设添一份力量。每轮成功开奖，{burn} BEM 转入黑洞销毁，{container} BEM 转入容器，支持社区运营与维护。',
     'Every entry supports the Tapeout ecosystem. Each settled round sends {burn} BEM to the dead address and {container} BEM to the container for community operations.',
     { burn: meta.blackholeAmount, container: meta.organizerAmount }));
-  put('community-allocation', t('社区运营是项目用途承诺。本场次每轮成功开奖，{amount} BEM 转入容器，后续支出由该容器所属电路的当前持有人控制。开奖计算使用 2075，抽奖合约不托管 2075。',
-    'Community operations are a project commitment. Each settled round in this pool sends {amount} BEM to the container; its circuit’s current holder controls later spending. Draws use 2075 for computation, and the raffle does not hold 2075.', { amount: meta.organizerAmount }));
+  put('community-allocation', t('本场次每轮成功开奖，{amount} BEM 转入收款容器，用于社区运营与维护；容器后续支出由其当前持有人控制。',
+    'Each settled round in this pool sends {amount} BEM to the revenue container for community operations and maintenance. Its current holder controls subsequent spending.', { amount: meta.organizerAmount }));
   put('footer-rules', t('{price} BEM / 份 · 每期 10,000 份', '{price} BEM per ticket · 10,000 per round', { price: meta.unitPrice }));
   put('payout-burn', `${meta.blackholeAmount} BEM`); put('payout-container', `${meta.organizerAmount} BEM`); put('payout-winner', `${meta.winnerAmount} BEM`);
   put('round-label', t('{amount} BEM 场次', '{amount} BEM pool', { amount: rules.id }));
