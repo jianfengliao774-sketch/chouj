@@ -75,7 +75,7 @@ export function createWalletRegistry(target, onChange) {
 const COMMON_WALLETS = [
   { name: 'MetaMask', rdns: ['io.metamask'], icon: '/wallet-icons/metamask.svg', monogram: 'M' },
   { name: 'OKX Wallet', rdns: ['com.okex.wallet', 'com.okx.wallet'], icon: '/wallet-icons/okx.png', monogram: 'OK' },
-  { name: 'TokenPocket', rdns: ['pro.tokenpocket', 'com.tokenpocket'], icon: '/wallet-icons/tokenpocket.png', monogram: 'TP' },
+  { name: 'TokenPocket', rdns: ['pro.tokenpocket', 'com.tokenpocket'], icon: new URL('./assets/tokenpocket.png', import.meta.url).href, monogram: 'TP' },
   { name: 'Binance Wallet', rdns: ['com.binance.wallet', 'com.binance'], icon: '/wallet-icons/binance.svg', monogram: 'B' },
   { name: 'Trust Wallet', rdns: ['com.trustwallet.app', 'com.trustwallet'], icon: '/wallet-icons/trust.svg', monogram: 'T' },
   { name: 'Rabby Wallet', rdns: ['io.rabby'], icon: '/wallet-icons/rabby.png', monogram: 'R' },
