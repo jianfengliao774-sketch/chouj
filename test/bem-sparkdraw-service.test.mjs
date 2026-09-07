@@ -14,10 +14,13 @@ test('V5 service exposes only the five new pools, routes old pages away and reje
     throw Error('Unexpected '+method);
   };
   const secret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';
-  const service=await createSparkDrawService({rpc,directory,credential,vaultSecret:secret,verify:false,staticRoot:path.resolve('bem-production-site/web/public'),origin:'http://127.0.0.1:18991'});await new Promise(r=>service.server.listen(18991,'127.0.0.1',r));
+  const staticRoot=path.join(directory,'public');await fs.cp(path.resolve('bem-production-site/web/public'),staticRoot,{recursive:true});
+  const guide=await fs.readFile('bem-production-site/web/draw-guide.html','utf8');await fs.writeFile(path.join(staticRoot,'draw-guide.html'),guide);
+  const service=await createSparkDrawService({rpc,directory,credential,vaultSecret:secret,verify:false,staticRoot,origin:'http://127.0.0.1:18991'});await new Promise(r=>service.server.listen(18991,'127.0.0.1',r));
   t.after(async()=>{await new Promise(r=>service.server.close(r));assert.equal(path.dirname(directory),os.tmpdir());await fs.rm(directory,{recursive:true});});
   const request=(url,options)=>fetch('http://127.0.0.1:18991'+url,options);
   const health=await(await request('/api/health')).json();assert.equal(health.version,5);assert.deepEqual(health.pools,POOL_IDS);assert.equal(health.salesEnabled,true);
+  const publicGuide=await request('/draw-guide.html');assert.equal(publicGuide.status,200);assert.match(publicGuide.headers.get('content-type'),/^text\/html/);assert.equal(await publicGuide.text(),guide);
   for(const id of POOL_IDS){const state=await(await request('/api/sparkdraw/state?pool='+id)).json();assert.equal(state.address,profile(id).address);assert.equal(state.rounds[0].status,0);}
   assert.equal((await request('/legacy.html',{redirect:'manual'})).status,302);assert.equal((await request('/start-test.html',{redirect:'manual'})).headers.get('location'),'/?pool=0.1');
   const old=await(await request('/rpc',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'eth_call',params:[{to:'0xE7D8dF903050d875f09cE1BBcE20E837fB55bC0c',data:'0x'},'latest']})})).json();assert.equal(old.error.code,-32602);

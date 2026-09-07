@@ -46,7 +46,7 @@ html[lang="en-US"] .sparkdraw-wordmark strong { font-size: 26px; }
 .player-page .pool-choice strong { font-size: 27px; line-height: 1.5; padding-right: 30px; }
 .player-page .pool-choice span, .player-page .pool-choice small { font-size: 16px; line-height: 1.65; color: var(--spark-muted); }
 .player-page .pool-selection-status, .player-page .pool-selection-detail { font-size: 16px; line-height: 1.8; color: var(--spark-muted); }
-.player-page .tabs { gap: 32px; margin: 4px 0 24px; }
+.player-page .tabs { gap: 32px; margin: 4px 0 24px; flex-wrap: wrap; }
 .player-page .tabs button, .player-page .tabs a { font-size: 19px; font-weight: 650; line-height: 1.6; padding: 15px 2px; min-height: 56px; }
 .player-page .draw-layout { display: grid; grid-template-columns: minmax(0, 1fr) 380px; grid-template-areas: "reactor aside" "about aside"; gap: 24px; align-items: start; }
 .player-page .reactor { grid-area: reactor; }
