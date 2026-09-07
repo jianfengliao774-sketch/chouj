@@ -1,9 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createReadRpcBatcher } from '../bem-production-site/web/read-rpc-batcher.js';
+import { GAME } from '../bem-production-site/web/sparkdraw-transactions.js';
+import { profile } from '../bem-production-site/web/sparkdraw-profiles.js';
 
 const response = (rows, status = 200) => ({ ok: status === 200, status, headers: { get: () => 'application/json' }, json: async () => rows });
 const replies = options => JSON.parse(options.body).map(row => ({ jsonrpc: '2.0', id: row.id, result: row.params[0] ?? '0x38' }));
+
+test('5000-ticket estimates are intact and concurrent large requests split below 512 KiB', async () => {
+  const requests = [], tx = {to: profile('5').address, data: GAME.encodeFunctionData('buySelected', [1, Array.from({length: 5000}, (_, i) => i)])};
+  const rpc = createReadRpcBatcher({fetchImpl: async (_, options) => {
+    assert.ok(Buffer.byteLength(options.body) <= 524288);
+    const rows = JSON.parse(options.body); requests.push(rows);
+    return response(rows.map(r => ({jsonrpc:'2.0', id:r.id, result:'0x123'})));
+  }});
+  const values = await Promise.all([rpc('eth_estimateGas', [tx, 'latest']), rpc('eth_estimateGas', [tx, 'latest']), rpc('eth_gasPrice')]);
+  assert.deepEqual(values, ['0x123', '0x123', '0x123']); assert.equal(requests.length, 2);
+  assert.deepEqual(requests.map(r => r.length), [1, 2]);
+  for (const r of requests.flat().filter(r => r.method === 'eth_estimateGas')) assert.equal(GAME.decodeFunctionData('buySelected', r.params[0].data)[1].length, 5000);
+});
 
 test('60 concurrent reads use three HTTP requests of at most 25 and map unordered responses by ID', async () => {
   const requests = [], rpc = createReadRpcBatcher({ fetchImpl: async (_, options) => {

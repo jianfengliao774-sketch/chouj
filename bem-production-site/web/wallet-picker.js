@@ -15,7 +15,11 @@ export function createWalletRegistry(target, onChange) {
   };
   const entries = () => new Map([...announced.values(), ...[...legacy.values()]
     .filter(entry => !announced.has(entry.provider))].map(entry => [entry.id, entry]));
-  const publish = () => onChange(entries());
+  let published;
+  const publish = () => {
+    const next = entries(), signature = JSON.stringify([...next.values()].map(({id,name,rdns,icon}) => [id,name,rdns,icon]));
+    if (signature !== published) { published = signature; onChange(next); }
+  };
   target.addEventListener('eip6963:announceProvider', event => {
     const { info, provider } = event.detail ?? {};
     if (!isProvider(provider) || typeof info?.uuid !== 'string' || !info.uuid
@@ -30,16 +34,23 @@ export function createWalletRegistry(target, onChange) {
   });
   function discover() {
     const shared = target.ethereum;
-    const providers = [...(Array.isArray(shared?.providers) ? shared.providers.slice(0, 32) : []), shared];
+    // Binance exposes a dedicated provider; its mobile browser can instead use
+    // window.ethereum.isBinance. Metadata labels cards, never provider identity.
+    const providers = [target.binancew3w?.ethereum,
+      ...(Array.isArray(shared?.providers) ? shared.providers.slice(0, 32) : []), shared];
     legacy = new Map();
     for (const provider of providers) {
       if (!isProvider(provider) || legacy.has(provider) || legacy.size >= 32) continue;
       const id = providerId(provider);
-      legacy.set(provider, { id, provider, name: t('浏览器钱包', 'Browser wallet') + ` ${legacy.size + 1}`, rdns: '', icon: null });
+      const binance = provider === target.binancew3w?.ethereum || provider.isBinance === true;
+      legacy.set(provider, { id, provider, name: binance ? 'Binance Wallet' : t('浏览器钱包', 'Browser wallet') + ` ${legacy.size + 1}`,
+        rdns: binance ? 'com.binance.wallet' : '', icon: null });
     }
     target.dispatchEvent(new Event('eip6963:requestProvider'));
     publish();
   }
+  target.addEventListener('ethereum#initialized', discover);
+  target.addEventListener('focus', discover);
   return { discover, entries };
 }
 
@@ -61,6 +72,8 @@ const matches = (entry, wallet) => {
 export function createWalletPicker({ dialog, onSelect, onChange, target = window }) {
   const list = dialog.querySelector('#wallet-options');
   let wallets = new Map();
+  let discoveryTimers = [];
+  const stopDiscovery = () => { discoveryTimers.forEach(clearTimeout); discoveryTimers = []; };
   function render() {
     const focused = document.activeElement?.dataset.walletId;
     const cards = [...wallets.values()].map(entry => ({ entry, wallet: COMMON_WALLETS.find(wallet => matches(entry, wallet)) }));
@@ -97,11 +110,14 @@ export function createWalletPicker({ dialog, onSelect, onChange, target = window
     const bounds = dialog.getBoundingClientRect();
     if (event.target === dialog && (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom)) dialog.close();
   });
-  dialog.addEventListener('close', () => document.body.classList.remove('wallet-picker-open'));
+  dialog.addEventListener('close', () => { stopDiscovery(); document.body.classList.remove('wallet-picker-open'); });
   target.addEventListener('bem:languagechange', render);
   registry.discover();
   return { open() {
     registry.discover();
     if (!dialog.open) { dialog.showModal(); document.body.classList.add('wallet-picker-open'); }
+    // Some mobile bridges inject after page load without announcing EIP-6963.
+    stopDiscovery();
+    discoveryTimers = [250, 750, 1500, 3000].map(ms => setTimeout(() => { if (dialog.open) registry.discover(); }, ms));
   } };
 }

@@ -13,6 +13,38 @@ function announce(target, wallet, info = {}) {
 }
 const values = registry => [...registry.entries().values()];
 
+test('Binance dedicated injection and mobile shared injection are detected without requesting accounts', () => {
+  for (const dedicated of [true, false]) {
+    const target = new EventTarget(), binance = provider();
+    if (dedicated) target.binancew3w = {ethereum: binance};
+    else { binance.isBinance = true; target.ethereum = binance; }
+    const registry = createWalletRegistry(target, () => {}); registry.discover();
+    assert.equal(values(registry).length, 1);
+    assert.equal(values(registry)[0].provider, binance);
+    assert.equal(values(registry)[0].rdns, 'com.binance.wallet');
+    assert.equal(values(registry)[0].name, 'Binance Wallet');
+    assert.deepEqual(binance.requests, []);
+  }
+});
+
+test('Binance aliases deduplicate by object while other injected providers remain available', () => {
+  const target = new EventTarget(), binance = provider(), other = provider();
+  target.binancew3w = {ethereum: binance}; target.ethereum = binance; binance.providers = [other, binance];
+  const registry = createWalletRegistry(target, () => {}); registry.discover();
+  assert.equal(values(registry).length, 2);
+  assert.equal(values(registry).filter(e => e.provider === binance).length, 1);
+  assert.ok(values(registry).some(e => e.provider === other));
+});
+
+test('late native injection is discovered on initialization and focus without access requests', () => {
+  const target = new EventTarget(), binance = provider(); let changes = 0;
+  const registry = createWalletRegistry(target, () => { changes++; }); registry.discover();
+  target.binancew3w = {ethereum: binance}; target.dispatchEvent(new Event('ethereum#initialized'));
+  assert.equal(values(registry)[0].provider, binance);
+  target.dispatchEvent(new Event('focus')); assert.equal(changes, 2);
+  assert.deepEqual(binance.requests, []);
+});
+
 test('mixed EIP-6963 and legacy wallets stay independently selectable without requesting accounts', () => {
   const target = new EventTarget(), announced = provider(), legacy = provider();
   target.ethereum = legacy;
@@ -98,7 +130,7 @@ function fixture(t, wallets) {
   const originalDocument = globalThis.document;
   const document = { activeElement: null, createElement: tag => new Element(tag), body: new Element('body') };
   globalThis.document = document;
-  t.after(() => { if (originalDocument === undefined) delete globalThis.document;else globalThis.document = originalDocument; });
+  t.after(() => { dialog.close(); if (originalDocument === undefined) delete globalThis.document;else globalThis.document = originalDocument; });
   const dialog = new Element('dialog');
   const nodes = Object.fromEntries(['wallet-options','wallet-picker-hint','wallet-picker-close','wallet-picker-refresh'].map(id => [id, new Element()]));
   dialog.querySelector = selector => nodes[selector.slice(1)];
@@ -112,6 +144,18 @@ function fixture(t, wallets) {
 }
 const cardName = card => card.querySelectorAll('strong')[0].textContent;
 const cardIcon = card => card.querySelectorAll('img')[0]?.src;
+
+test('Binance injected after opening appears on its own card and clicks route to that provider', t => {
+  t.mock.timers.enable({apis: ['setTimeout']});
+  const ui = fixture(t, []), binance = provider(); ui.picker.open();
+  assert.ok(ui.cards().find(c => cardName(c) === 'Binance Wallet').disabled);
+  ui.target.binancew3w = {ethereum: binance}; t.mock.timers.tick(750);
+  const card = ui.cards().find(c => cardName(c) === 'Binance Wallet');
+  assert.equal(card.disabled, false); assert.equal(cardIcon(card), '/wallet-icons/binance.svg');
+  card.dispatchEvent(new Event('click'));
+  assert.equal(ui.selected[0].provider, binance); assert.equal(ui.dialog.open, false);
+  assert.deepEqual(binance.requests, []);
+});
 
 test('cards preserve separate same-brand providers and connect only the exact clicked provider', t => {
   const a = provider(), b = provider();
