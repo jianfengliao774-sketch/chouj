@@ -103,7 +103,7 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
       if(req.method!=='GET'&&req.method!=='HEAD')return respond(res,405,{error:'Method not allowed'});
       if(['/legacy.html','/start-test.html','/deploy-formal.html','/deploy-container.html'].includes(url.pathname)){res.writeHead(302,{location:'/?pool=0.1'});return res.end();}
       const name=url.pathname==='/'?'index.html':decodeURIComponent(url.pathname.slice(1));
-      const allowed=['index.html','burns.html','admin.html','deploy-sparkdraw.html'].includes(name)||/^assets\/[a-zA-Z0-9_.-]+$/.test(name)||/^sparkdraw\/(standard-input|deployed-contracts)\.json$/.test(name);
+      const allowed=['index.html','burns.html','admin.html','deploy-sparkdraw.html'].includes(name)||/^assets\/[a-zA-Z0-9_.-]+$/.test(name)||/^sparkdraw\/(standard-input|deployed-contracts)\.json$/.test(name)||/^wallet-icons\/(metamask\.svg|okx\.png|binance\.svg|trust\.svg|rabby\.png|coinbase\.svg)$/.test(name);
       if(!allowed)return respond(res,404,{error:'Not found'});
       const file=path.resolve(staticRoot,name);if(!file.startsWith(path.resolve(staticRoot)+path.sep))throw Error('Invalid path');
       let bytes;try{bytes=await fs.readFile(file);}catch{return respond(res,404,{error:'Not found'});}
