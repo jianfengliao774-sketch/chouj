@@ -11,7 +11,9 @@ export async function createSparkDrawDeployments({rpc,storagePath,artifacts}){
     const data=deploymentData(artifacts,kind,state.verifier?.address);
     const [tx,receipt,latest,chain]=await Promise.all([rpc('eth_getTransactionByHash',[hash]),rpc('eth_getTransactionReceipt',[hash]),rpc('eth_blockNumber',[]),rpc('eth_chainId',[])]);
     if(BigInt(chain)!==56n||!receipt?.contractAddress)throw Error('等待 BNB 主网部署成功');
-    const [block,code]=await Promise.all([rpc('eth_getBlockByNumber',[receipt.blockNumber,false]),rpc('eth_getCode',[receipt.contractAddress,receipt.blockNumber])]);
+    // Deployment receipts and creation input pin the original code and constructor.
+    // Check its current runtime without requiring pruned historical state from RPC.
+    const [block,code]=await Promise.all([rpc('eth_getBlockByNumber',[receipt.blockNumber,false]),rpc('eth_getCode',[receipt.contractAddress,'latest'])]);
     const address=verifyCreation({tx,receipt,block,latest,code,data,artifact:artifactFor(artifacts,kind)});
     return {kind,address,transactionHash:hash,blockNumber:Number(BigInt(receipt.blockNumber)),blockHash:receipt.blockHash,
       registeredAt:new Date().toISOString(),deployer:F.deployer,verifier:kind==='verifier'?null:state.verifier.address};

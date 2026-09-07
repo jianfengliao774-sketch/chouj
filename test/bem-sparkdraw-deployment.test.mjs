@@ -28,7 +28,10 @@ test('successful deployments persist across restart, reject replacement and neve
     if(method==='eth_getTransactionByHash')return all.find(x=>x.hash===args[0])?.tx;
     if(method==='eth_getTransactionReceipt')return all.find(x=>x.hash===args[0])?.receipt;
     if(method==='eth_getBlockByNumber')return verifier.block;
-    if(method==='eth_getCode')return all.find(x=>x.address===args[0])?.code;
+    if(method==='eth_getCode'){
+      assert.equal(args[1],'latest','restarts must not depend on pruned deployment-block state');
+      return all.find(x=>x.address===args[0])?.code;
+    }
     throw Error('Unexpected method '+method);
   }
   const options={rpc,artifacts,storagePath:path.join(dir,'deployments.json')};
