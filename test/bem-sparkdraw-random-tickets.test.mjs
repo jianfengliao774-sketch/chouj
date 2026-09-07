@@ -25,12 +25,13 @@ test('random integer rejects the modulo-bias tail rather than mapping it onto a 
   finally{globalThis.crypto.getRandomValues=original;}
 });
 const source=fs.readFileSync(new URL('../bem-production-site/web/sparkdraw-player.js',import.meta.url),'utf8');
-function flow({changeContext=false,changeRound=false}={}){
+function flow({changeContext=false,changeRound=false,readFailure=false,quota=4998n,balance=1000000n,chosen=null,allSold=false}={}){
   const sent=[],reads=[],failures=[],words=empty();occupy(words,0);
+  if(allSold)for(let n=0;n<10000;n++)occupy(words,n);
   let contextChanged=false;
   const c=vm.createContext({account:'wallet',pool:'0.1',flow:false,GAME:'game',TOKEN:'token',F:{bem:'bem'},
-    context:()=>({key:contextChanged?'changed':'same'}),selection:()=>({count:4,tickets:null}),profile:()=>({address:'game',ticketPrice:1000n}),
-    call:async(iface,to,method,args,block)=>{reads.push({method,block});if(method==='currentRoundId')return [block&&changeRound?2n:1n];if(method==='rounds')return [1n,100n];if(method==='ticketsOf')return [4998n];if(method==='balanceOf'||method==='allowance')return [1000000n];if(method==='ticketWords'){contextChanged=changeContext;return [words];}throw Error(method);},
+    context:()=>({key:contextChanged?'changed':'same'}),selection:()=>({count:chosen?.length||4,tickets:chosen}),profile:()=>({address:'game',ticketPrice:1000n}),
+    call:async(iface,to,method,args,block)=>{reads.push({method,block});if(method==='currentRoundId')return [block&&changeRound?2n:1n];if(method==='rounds')return [1n,100n];if(method==='ticketsOf')return [quota];if(method==='balanceOf')return [balance];if(method==='allowance')return [1000000n];if(method==='ticketWords'){if(readFailure)throw Error('RPC_UNAVAILABLE');contextChanged=changeContext;return [words];}throw Error(method);},
     rpc:async()=> '0x100',randomUnsoldTickets,manager:{execute:async args=>{sent.push(args);}},render(){},note(){},failure:e=>failures.push(e),t:zh=>zh,
   });
   vm.runInContext(source.slice(source.indexOf('async function buy()'),source.indexOf('async function action(')),c);
@@ -43,4 +44,12 @@ test('auto purchase reads one block after approval and sends random numbers thro
 });
 test('wallet context or round changes prevent the randomly prepared purchase from being sent',async()=>{
   for(const config of [{changeContext:true},{changeRound:true}]){const f=flow(config);await f.run();assert.equal(f.sent.length,0);assert.equal(f.failures.length,1);}
+});
+
+test('RPC failure, sold-out stock, wallet quota and insufficient BEM never fall back to sequential buying',async()=>{
+  for(const config of [{readFailure:true},{allSold:true},{quota:5000n},{balance:0n}]){const f=flow(config);await f.run();assert.equal(f.sent.length,0);assert.equal(f.failures.length,1);}
+});
+test('manual number selection remains the exact user selection without random replacement in the browser',async()=>{
+  const chosen=[17,5000,9999],f=flow({chosen,quota:0n});await f.run();assert.equal(f.failures.length,0);
+  assert.deepEqual(f.sent[0].args[1],chosen);assert.equal(f.reads.some(r=>r.method==='ticketWords'),false);
 });

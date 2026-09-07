@@ -32,3 +32,10 @@ test('aggregate claim recipient is the connected wallet and the target is always
   const s=setup();await assert.rejects(s.manager.execute({poolId:'0.1',method:'refundMany',args:[[1,2],other],kind:'refundMany'}),{code:'CONTEXT_CHANGED'});assert.equal(s.sent.length,0);
   await s.manager.execute({poolId:'0.1',method:'claimPrizes',args:[[1,2],account],kind:'claimPrizes'});const parsed=GAME.parseTransaction({data:s.sent[0].data});assert.equal(parsed.name,'claimPrizes');assert.equal(parsed.args[1],account);assert.equal(s.sent[0].to,p.address);
 });
+
+test('a purchase losing the last shares resolves as zero fill without blocking subsequent claims',async()=>{
+  const s=setup();await s.manager.execute({poolId:'0.1',method:'buySelected',args:[1,[0,17,9999]],kind:'buy',count:3,roundId:1});
+  s.mine({requested:3,filled:0});const r=await s.manager.check();
+  assert.equal(r.status,'confirmed');assert.equal(r.result.filled,0);assert.equal(r.result.paid,'0');assert.equal(r.result.unspent,String(3n*p.ticketPrice));assert.equal(s.manager.pending,null);
+  assert.equal(s.manager.blocked({method:'claimPrizes',args:[[1],account]}),false);
+});
