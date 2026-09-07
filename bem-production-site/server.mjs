@@ -5,7 +5,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { fileURLToPath } from 'node:url';
-import { Interface, keccak256 } from 'ethers';
+import { Interface, keccak256, getAddress } from 'ethers';
 import { SITE, ROOT, GAME, CODE_HASH, COORDINATOR, CONTAINER, loadManifest } from './config.mjs';
 import { createReadRpc, validateReadRequest } from './rpc.mjs';
 import { createAdminAuth } from './auth.mjs';
@@ -14,6 +14,7 @@ import { poolRegistry } from './pools.mjs';
 import { createPoolStatusReader } from './pool-status.mjs';
 import { POOL_DEPLOYMENTS } from './web/pool-deployments.js';
 import { createMarketPriceService } from './market-price.mjs';
+import { adminDayWindow } from './admin-analytics.mjs';
 
 const format = value => JSON.stringify(value, (_, x) => typeof x === 'bigint' ? x.toString() : x);
 const ABI = new Interface(['function getSubscription(uint256) view returns(uint96 balance,uint96 nativeBalance,uint64 reqCount,address owner,address[] consumers)']);
@@ -32,6 +33,14 @@ export async function createProductionServer({ port = 8788, rpc = createReadRpc(
   const iface = new Interface(manifest.gameAbi);
   const readPoolStatus = createPoolStatusReader({ rpc });
   const auth = createAdminAuth({ credential: adminCredential });
+  const adminPoolIds = ['1', '10', '50', '100', 'legacy100'];
+  const adminIndex = poolId => poolId === 'legacy100' ? history : poolHistories[poolId];
+  function adminSource(poolId) {
+    const index = adminIndex(poolId), status = index?.getStatus() ?? { state: 'awaiting_index' };
+    const { state, fromBlock, indexedThrough, targetBlock, confirmations, updatedAt } = status;
+    return { poolId, gameAddress: poolId === 'legacy100' ? GAME : POOL_DEPLOYMENTS[poolId].address,
+      index: { state, fromBlock, indexedThrough, targetBlock, confirmations, updatedAt } };
+  }
   let cached = null, reading = null;
   async function readStatus() {
     if (cached && Date.now() - cached.readAt < 8000) return cached.value;
@@ -149,6 +158,30 @@ export async function createProductionServer({ port = 8788, rpc = createReadRpc(
         const session = await auth.session(req.headers.cookie);
         if (!session) return json(res, 401, { error: '请使用管理员账号登录。' });
         if (req.method === 'GET' && url.pathname === '/api/admin/status') return json(res, 200, { session, ...(await readStatus()) });
+        if (req.method === 'GET' && url.pathname === '/api/admin/overview') {
+          const at = Date.now();
+          return json(res, 200, { schemaVersion: 1, chainId: 56, session, generatedAt: new Date(at).toISOString(), day: adminDayWindow(at),
+            pools: adminPoolIds.map(poolId => ({ ...adminSource(poolId),
+              summary: adminIndex(poolId)?.getAdminSummary?.({ now: at }) ?? null })) });
+        }
+        const adminRounds = /^\/api\/admin\/pools\/(1|10|50|100|legacy100)\/rounds(?:\/([1-9][0-9]{0,20}))?$/.exec(url.pathname);
+        if (req.method === 'GET' && adminRounds) {
+          const [, poolId, roundId] = adminRounds, index = adminIndex(poolId);
+          const page = Number(url.searchParams.get('page') || 1), pageSize = Number(url.searchParams.get('pageSize') || 10);
+          const walletPage = Number(url.searchParams.get('walletPage') || 1), transactionPage = Number(url.searchParams.get('transactionPage') || 1);
+          const wallet = url.searchParams.get('wallet');
+          if (![page, walletPage, transactionPage].every(value => Number.isSafeInteger(value) && value >= 1)
+              || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 50 || (wallet !== null && !/^0x[0-9a-f]{40}$/i.test(wallet))) {
+            return json(res, 400, { error: '无效分页或钱包地址' });
+          }
+          let checkedWallet = null;
+          try { if (wallet !== null) checkedWallet = getAddress(wallet); }
+          catch { return json(res, 400, { error: '钱包地址校验未通过' }); }
+          if (!index?.getAdminRound || !index?.listAdminRounds) return json(res, 503, { error: '本场次历史索引尚未就绪', ...adminSource(poolId) });
+          const data = roundId ? index.getAdminRound(roundId, { walletPage, transactionPage, pageSize, wallet: checkedWallet }) : index.listAdminRounds({ page, pageSize });
+          if (!data) return json(res, index.getStatus().state === 'ready' ? 404 : 503, { error: '该期已确认记录尚不可用', ...adminSource(poolId) });
+          return json(res, 200, { schemaVersion: 1, chainId: 56, ...adminSource(poolId), ...data });
+        }
         return json(res, 404, { error: '管理操作不存在' });
       }
       if (url.pathname.startsWith('/api/') || !['GET', 'HEAD'].includes(req.method)) return json(res, 404, { error: '接口不存在' });

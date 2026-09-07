@@ -7,6 +7,7 @@ import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Interface, getAddress, keccak256, toUtf8Bytes } from 'ethers';
 import { POOL_DEPLOYMENTS } from './web/pool-deployments.js';
+import { buildAdminRounds, adminRoundSummary, summarizeAdminRounds } from './admin-analytics.mjs';
 
 export const HISTORY_GAME = '0xBee0848D0c77d434A52d1D0236FcBFdCA0834343';
 export const HISTORY_DEPLOYMENT_BLOCK = 120311123;
@@ -100,6 +101,7 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
   } catch (error) { if (error.code !== 'ENOENT') throw error; }
   let state = 'syncing', targetBlock = null, lastError = null, inFlight = null;
   let roundsCache = null;
+  let adminCache = null, adminCursor = null, adminEvents = null;
 
   async function read(method, params) {
     assert.ok(READ_METHODS.has(method), 'History cannot write to the chain');
@@ -323,5 +325,26 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
         destination: '0x000000000000000000000000000000000000dEaD' }));
     return options.all === true ? { rows, total: rows.length } : paginate(rows, options);
   }
-  return { sync, getStatus, listRounds, getRound, listTransactions, listAnnouncements, listBurns };
+  function adminRounds() {
+    if (!adminCache || adminCursor !== db.cursor || adminEvents !== db.events) {
+      adminCache = buildAdminRounds(db.events); adminCursor = db.cursor; adminEvents = db.events;
+    }
+    return adminCache;
+  }
+  function getAdminSummary({ now = Date.now() } = {}) { return clone(summarizeAdminRounds(adminRounds(), now)); }
+  function listAdminRounds(options = {}) {
+    return clone(paginate(adminRounds().map(adminRoundSummary), options));
+  }
+  function getAdminRound(roundId, { walletPage = 1, transactionPage = 1, pageSize = 25, wallet = null } = {}) {
+    assert.match(String(roundId), /^[1-9][0-9]*$/, 'Invalid round ID');
+    const selected = wallet === null ? null : getAddress(wallet);
+    const row = adminRounds().find(item => item.roundId === String(roundId));
+    if (!row) return null;
+    return clone({ round: adminRoundSummary(row),
+      wallets: paginate(row.wallets, { page: walletPage, pageSize }),
+      purchases: { ...paginate(row.purchases.filter(item => selected === null || same(item.buyer, selected)),
+        { page: transactionPage, pageSize }), wallet: selected } });
+  }
+  return { sync, getStatus, listRounds, getRound, listTransactions, listAnnouncements, listBurns,
+    getAdminSummary, listAdminRounds, getAdminRound };
 }

@@ -94,6 +94,14 @@ test('each deployed denomination indexes its own complete lifecycle and publishe
     assert.equal(burn.amountBaseUnits, (s.pool * 4n / 100n).toString()); assert.equal(burn.kind, 'settlement');
     assert.equal(burn.gameAddress, s.profile.address); assert.equal(burn.destination, DEAD);
     assert.equal(s.history.listAnnouncements({ all: true }).total, 1);
+    const admin = s.history.getAdminSummary({ now: 1800000012000 });
+    assert.equal(admin.completedCount, 1); assert.equal(admin.todayCompletedCount, 1); assert.equal(admin.purchaseCount, 10); assert.equal(admin.walletCount, 2);
+    const purchases = s.history.getAdminRound('1', { wallet: BOB, pageSize: 3 });
+    assert.equal(purchases.round.fillSeconds, 10); assert.equal(purchases.round.purchaseCount, 10);
+    assert.equal(purchases.wallets.total, 2); assert.equal(purchases.wallets.rows.find(row => row.address === BOB).tickets, 5000);
+    assert.equal(purchases.purchases.total, 5); assert.equal(purchases.purchases.rows.length, 3);
+    assert.ok(purchases.purchases.rows.every(row => row.buyer === BOB && row.paidBaseUnits === (s.price * 1000n).toString()));
+    assert.equal(s.history.listAdminRounds({ pageSize: 1 }).rows[0].purchases, undefined);
     assert.ok(s.network.calls.every(call => ['eth_chainId', 'eth_getBlockByNumber', 'eth_getLogs', 'eth_getTransactionReceipt'].includes(call.method)));
     const restored = s.make(); await restored.sync(); assert.equal(restored.getRound('1').events.length, round.events.length);
     assert.equal(restored.listAnnouncements().rows[0].amountBaseUnits, announcement.amountBaseUnits);
@@ -158,6 +166,8 @@ test('reorg withdraws old payout and unclaimed-burn announcements and erases orp
   s.add(24, [['RefundsOpened', [2]]]);
   const oldUnclaimed = s.add(25, [['UnclaimedPrincipalBurned', [2, 100n * s.price]]]);
   await s.history.sync(); assert.equal(s.history.listBurns().total, 2);
+  assert.equal(s.history.getAdminSummary().roundCount, 2);
+  assert.equal(s.history.getAdminRound('2').round.purchaseCount, 1);
   s.network.branchAt = s.B + 12; s.network.branch = 1;
   s.network.txs = s.network.txs.filter(tx => tx.blockNumber < s.network.branchAt);
   const replacement = s.add(12, [['BlackholeTransfer', [1, s.pool * 4n / 100n]], ['Settled', [1, ALICE, 0]]]);
@@ -167,6 +177,9 @@ test('reorg withdraws old payout and unclaimed-burn announcements and erases orp
   const burns = s.history.listBurns({ all: true }).rows; assert.equal(burns.length, 1); assert.equal(burns[0].transactionHash, replacement);
   assert.ok(!burns.some(row => [oldSettlement, oldUnclaimed].includes(row.transactionHash)));
   assert.equal(s.history.getRound('2'), null);
+  assert.equal(s.history.getAdminRound('2'), null, 'An orphaned participation round must leave the admin cache');
+  assert.equal(s.history.getAdminSummary().roundCount, 1);
+  assert.equal(s.history.getAdminRound('1').round.settlementTxHash, replacement);
   const saved = JSON.parse(await fs.readFile(s.storagePath, 'utf8'));
   assert.equal(saved.receipts[oldSettlement], undefined); assert.equal(saved.receipts[oldUnclaimed], undefined);
   const restarted = s.make(); await restarted.sync(); assert.equal(restarted.listBurns().total, 1);
@@ -177,7 +190,9 @@ test('recent V2 burn and winner remain unpublished until the configured confirma
   const s = await fixture(t, '1');
   const tx = s.add(35, [['BlackholeTransfer', [1, 4000000]], ['Settled', [1, BOB, 9999]]]);
   await s.history.sync(); assert.equal(s.history.listBurns().total, 0); assert.equal(s.history.listAnnouncements().total, 0);
+  assert.equal(s.history.getAdminSummary().completedCount, 0);
   s.network.latest = s.B + 47; await s.history.sync();
   assert.equal(s.history.listBurns().rows[0].transactionHash, tx);
   assert.equal(s.history.listAnnouncements().rows[0].amountBaseUnits, '95000000');
+  assert.equal(s.history.getAdminSummary().completedCount, 1);
 });
