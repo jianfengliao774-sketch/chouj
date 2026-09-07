@@ -74,6 +74,9 @@ export function sparkDrawRecords(events, { pool, address }) {
         const trigger=r.drawDeadline||r.fundingDeadline, deadline=trigger+86400;
         const eligible=r.status!==5&&trigger>0&&now>=trigger&&now<deadline&&!r.principalBurned;
         return {...r,wallets:undefined,account,...w,refundTriggerAt:trigger,refundClaimDeadline:deadline,
+          burnedPrincipal:r.principalBurned?(BigInt(w.paid)-BigInt(w.refunded)).toString():'0',
+          burnedPrize:r.prize?.winner===account&&r.prize.burned?r.prize.amount:'0',
+          burns:burns.filter(b=>b.roundId===r.roundId&&(b.kind==='unclaimed_principal'&&BigInt(w.paid)>BigInt(w.refunded)||b.kind==='unclaimed_prize'&&r.prize?.winner===account)),
           refundPublicNoticeAt:trigger?trigger+SPARKDRAW.refundPublicNoticeDelay:0,
           refundablePrincipal:eligible?(BigInt(w.paid)-BigInt(w.refunded)).toString():'0',
           unclaimedPrincipal:(BigInt(w.paid)-BigInt(w.refunded)).toString(),

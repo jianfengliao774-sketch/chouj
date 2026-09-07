@@ -1,0 +1,7 @@
+#history-list article,#personal-list article,#burn-wallet-records article,#pending-prizes article,#pending-refunds article{padding:16px 0;border-bottom:1px solid #e8d7bc;overflow-wrap:anywhere;min-width:0}
+#transaction-list a,#history-list a,#personal-list a,#burn-wallet-records a,#burn-records a,#contract-links a,#reel-message a{overflow-wrap:anywhere;word-break:break-word}
+#winner-ticker{min-width:0;overflow:hidden}#winner-ticker>span{display:block;white-space:normal;overflow-wrap:anywhere}
+#draw-actions{display:flex;gap:8px;flex-wrap:wrap;margin:14px 0}#draw-actions button{white-space:normal}
+#burn-wallet-records>button,#personal-list>button{margin:8px 8px 8px 0;white-space:normal}
+.quick-picks{flex-wrap:wrap}.pool-selection-options{grid-template-columns:repeat(5,minmax(0,1fr))}
+@media(max-width:600px){.pool-selection-options{grid-template-columns:repeat(2,minmax(0,1fr))}.contract-links dd{margin-left:0;min-width:0}}

@@ -3,8 +3,8 @@
 <section class="panel" id="login-panel"><h2>管理员身份验证</h2><form id="login-form"><label for="admin-username">管理账号</label><input id="admin-username" name="username" autocomplete="username" maxlength="64" required><label for="admin-password">密码</label><input id="admin-password" name="password" type="password" autocomplete="current-password" maxlength="256" required><button id="login" type="submit">登录后台</button></form></section>
 <p id="admin-notice" role="status" aria-live="polite">请输入管理员账号和密码。</p>
 <div id="admin-content" hidden><div class="actions tools"><span id="admin-account"></span><button id="refresh" type="button">刷新主网数据</button><button id="logout" type="button">退出登录</button></div>
-<section class="activity-today" aria-label="今日运营概览"><div><p id="today-caption">今日已完成开奖</p><strong id="today-completed">—</strong><span>期</span></div><div><b id="activity-day">北京时间 · Asia/Shanghai</b><p id="activity-generated">正在读取已确认运营记录…</p><p>1 / 10 / 50 / 100 BEM 场分别统计，原合约单独列出。</p></div></section>
+<section class="activity-today" aria-label="今日运营概览"><div><p id="today-caption">今日已完成开奖</p><strong id="today-completed">—</strong><span>期</span></div><div><b id="activity-day">北京时间 · Asia/Shanghai</b><p id="activity-generated">正在读取已确认运营记录…</p><p>0.1 / 5 / 10 / 50 / 100 BEM 场分别统计。</p></div></section>
 <section id="activity-pools" aria-label="各场次参与明细"></section>
-<div id="legacy-status" hidden><h2 class="legacy-status-title">原 100 BEM 合约运行状态</h2><section class="metrics" id="metrics"></section><section class="panel"><h2>原合约运行准备</h2><dl id="readiness"></dl></section><section class="panel"><h2>原合约固定配置与链上证据</h2><dl id="identities"></dl></section></div>
-<section class="panel"><h2>统计口径与资金流程</h2><p>“今日完成”按北京时间的自然日统计已确认的 Settled 开奖记录；“售满用时”从本期开盘到累计购买满 10,000 份，时间记录缺失时不计算。</p><p>同一笔购买交易可能包含多个号码段，购买次数按同一期、同一钱包、同一交易哈希合并计算。退款不抹除已发生的购买记录。</p><p>新场次结算时，4% 转入黑洞销毁，1% 转入容器，95% 转入中奖钱包。退款由用户自行领取并承担 GAS。</p><p>当前后台仅查看状态和链上参与记录，不签署拨款、修改合约或启动售票。</p></section></div>
-<footer>链上事实按快照显示 · 运营操作需单独核对</footer></main><script type="module" src="/admin.js"></script></body></html>
+
+<section class="panel"><h2>统计口径与资金流程</h2><p>“今日完成”按北京时间的自然日统计已确认的 Settled 开奖记录；“售满用时”从本期开盘到累计购买满 10,000 份，时间记录缺失时不计算。</p><p>同一笔购买交易可能包含多个号码段，购买次数按同一期、同一钱包、同一交易哈希合并计算。退款不抹除已发生的购买记录。</p><p>各档销毁比例为 4%（0.1 测试）/ 3%（5）/ 4%（10）/ 5%（50）/ 6%（100），1% 进入容器；奖金和退款均有 24 小时领取期限。</p><p>当前后台仅查看状态和链上参与记录，不签署拨款、修改合约或启动售票。</p></section></div>
+<footer>链上事实按快照显示 · 运营操作需单独核对</footer></main><script type="module" src="/sparkdraw-admin.js"></script></body></html>

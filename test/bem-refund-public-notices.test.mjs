@@ -28,6 +28,10 @@ test('confirmed claim removes the wallet, late opening cannot restart clocks, an
   const burned=records([...claimed,event('UnclaimedPrincipalBurned',{amount:'50000'})]);
   assert.deepEqual(burned.refundNotices(trigger+86401),[]);
   assert.equal(burned.burns[0].amountBaseUnits,'50000');assert.equal(burned.burns[0].kind,'unclaimed_principal');
+  assert.equal(burned.wallet(A,trigger+86401)[0].burnedPrincipal,'0');
+  assert.deepEqual(burned.wallet(A,trigger+86401)[0].burns,[]);
+  assert.equal(burned.wallet(B,trigger+86401)[0].burnedPrincipal,'50000');
+  assert.equal(burned.wallet(B,trigger+86401)[0].burns[0].transactionHash,hash);
 });
 test('sealed failure uses the draw timeout, while settled prizes never become principal-refund notices',()=>{
   const drawDeadline=trigger+900;
@@ -37,4 +41,8 @@ test('sealed failure uses the draw timeout, while settled prizes never become pr
   const settled=records([...sealed,event('Settled',{winner:A,winningTicket:'10'}),event('PrizeAvailable',{winner:A,amount:'9500000',claimDeadline:String(drawDeadline+86400)})]);
   assert.deepEqual(settled.refundNotices(drawDeadline+43200),[]);
   assert.equal(settled.pendingPrizes.length,1);
+  const prizeBurned=records([...sealed,event('Settled',{winner:A,winningTicket:'10'}),event('PrizeAvailable',{winner:A,amount:'9500000',claimDeadline:String(drawDeadline+86400)}),event('UnclaimedPrizeBurned',{winner:A,amount:'9500000'})]);
+  assert.equal(prizeBurned.wallet(A,drawDeadline+86401)[0].burnedPrize,'9500000');
+  assert.equal(prizeBurned.wallet(B,drawDeadline+86401)[0].burnedPrize,'0');
+  assert.equal(prizeBurned.pendingPrizes.length,0);
 });

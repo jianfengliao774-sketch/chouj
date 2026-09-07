@@ -1,10 +1,10 @@
-import { GAME, BEM, CONTAINER, PROCESSOR, COORDINATOR, OPENER } from './config.mjs';
-import { POOL_DEPLOYMENTS } from './web/pool-deployments.js';
+import {SPARKDRAW as F} from './web/sparkdraw-config.js';
+import {POOLS,VERIFIER} from './web/sparkdraw-profiles.js';
 
 const READ_METHODS = new Set(['eth_chainId', 'eth_blockNumber', 'eth_getBlockByNumber', 'eth_getCode', 'eth_call',
   'eth_getBalance', 'eth_getTransactionCount', 'eth_getLogs', 'eth_getTransactionByHash', 'eth_getTransactionReceipt',
   'eth_estimateGas', 'eth_gasPrice', 'eth_feeHistory', 'eth_maxPriorityFeePerGas', 'net_version']);
-const TARGETS = new Set([GAME, BEM, CONTAINER, PROCESSOR, COORDINATOR, OPENER, ...Object.values(POOL_DEPLOYMENTS).map(d => d.address)].map(a => a.toLowerCase()));
+const TARGETS = new Set([F.bem,F.revenue,VERIFIER,'0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C',...Object.values(POOLS).map(d=>d.address)].map(a => a.toLowerCase()));
 const ADDRESS = /^0x[0-9a-f]{40}$/i, HASH = /^0x[0-9a-f]{64}$/i, HEX = /^0x[0-9a-f]*$/i;
 const validBlock = x => typeof x === 'string' && (['latest', 'pending', 'safe', 'finalized', 'earliest'].includes(x) || /^0x[0-9a-f]{1,64}$/i.test(x));
 const validAddress = a => typeof a === 'string' && ADDRESS.test(a);
@@ -30,7 +30,7 @@ export function validateReadRequest(request) {
     const allowed = new Set(['to', 'from', 'data', 'input', 'value', 'gas', 'gasLimit', 'gasPrice', 'maxFeePerGas', 'maxPriorityFeePerGas', 'nonce', 'chainId', 'type']);
     if (Object.keys(tx).some(k => !allowed.has(k))) error('Unsupported transaction field');
     if (Object.hasOwn(tx, 'from') && !validAddress(tx.from)) error('Invalid sender');
-    for (const key of ['data', 'input']) if (Object.hasOwn(tx, key) && (typeof tx[key] !== 'string' || !HEX.test(tx[key]) || tx[key].length > 131074 || tx[key].length % 2 !== 0)) error('Invalid call data');
+    for (const key of ['data', 'input']) if (Object.hasOwn(tx, key) && (typeof tx[key] !== 'string' || !HEX.test(tx[key]) || tx[key].length > 400000 || tx[key].length % 2 !== 0)) error('Invalid call data');
     for (const key of ['value', 'gas', 'gasLimit', 'gasPrice', 'maxFeePerGas', 'maxPriorityFeePerGas', 'nonce', 'chainId', 'type']) {
       if (Object.hasOwn(tx, key) && (typeof tx[key] !== 'string' || !/^0x[0-9a-f]{1,64}$/i.test(tx[key]))) error('Invalid transaction quantity');
     }
@@ -41,7 +41,7 @@ export function validateReadRequest(request) {
   if (m === 'eth_getLogs') {
     const filter = p[0];
     if (p.length !== 1 || !filter || typeof filter !== 'object' || Array.isArray(filter)
-      || !validAddress(filter.address) || ![GAME, ...Object.values(POOL_DEPLOYMENTS).map(d => d.address)].some(a => a.toLowerCase() === filter.address.toLowerCase())) error('Only game event queries are available');
+      || !validAddress(filter.address) || !Object.values(POOLS).map(d=>d.address).some(a => a.toLowerCase() === filter.address.toLowerCase())) error('Only game event queries are available');
     if (Object.hasOwn(filter, 'blockHash')) { if (!validHash(filter.blockHash) || Object.hasOwn(filter, 'fromBlock') || Object.hasOwn(filter, 'toBlock')) error('Invalid block hash filter'); }
     else if (typeof filter.fromBlock !== 'string' || typeof filter.toBlock !== 'string' || !/^0x[0-9a-f]{1,64}$/i.test(filter.fromBlock) || !/^0x[0-9a-f]{1,64}$/i.test(filter.toBlock)
       || BigInt(filter.toBlock) < BigInt(filter.fromBlock) || BigInt(filter.toBlock) - BigInt(filter.fromBlock) >= 1000n) error('Limit event queries to 1000 blocks');
