@@ -3,6 +3,12 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync(new URL('../bem-production-site/web/sparkdraw-player.js',import.meta.url),'utf8');
+test('public player cannot open a wallet to trigger a draw, while claims still connect',async()=>{
+  let connections=0;const context=vm.createContext({account:null,picker:{open(){connections++;}},manager:{execute(){throw Error('unexpected send');}},render(){}});
+  vm.runInContext(source.match(/async function action\(id,method,args\)\{[^\n]+/)[0],context);
+  for(const method of ['closeRound','fulfillRandomness','settle'])await assert.rejects(()=>context.action('0.1',method,[1]),/BACKEND_DRAW_ONLY/);
+  assert.equal(connections,0);await context.action('0.1','claimPrizes',[[1],null]);assert.equal(connections,1);
+});
 function fixture(reduced=false){
   const animations=[];
   const reels=Array.from({length:5},()=>{

@@ -8,7 +8,7 @@
   <link rel="icon" href="./assets/sparkdraw-mark.svg" type="image/svg+xml">
 </head>
 <body class="player-page">
-<div class="simulation-banner"><span class="status-dot"></span><b data-en="BNB MAINNET">BNB 主网</b><span id="launch-status">新场次待开放</span></div>
+<div class="simulation-banner"><span class="status-dot"></span><b data-en="BNB MAINNET">BNB 主网</b><span id="launch-status">新场次待开放</span><time id="site-time"></time></div>
 <div class="winner-broadcast-dock"><div class="shell"><section class="winner-broadcast" aria-label="中奖播报" data-en-aria-label="Winner announcements"><b data-en="WINNERS">中奖播报</b><div id="winner-ticker" class="ticker-window"><span data-en="Reading confirmed draws…">正在读取已确认开奖…</span></div><button type="button" id="ticker-pause" hidden aria-pressed="false" aria-controls="winner-ticker" data-en="Pause">暂停</button></section></div></div>
 <main class="shell">
   <header class="sparkdraw-masthead">
@@ -62,10 +62,9 @@
         <section class="card timing-card"><h3 data-en="Round rules">每期规则</h3><p id="rule-funding">售出 9,500 份启动一次性 30 分钟倒计时，满额提前封盘；到期按实售份额开奖，最晚不超过原 24 小时募集期限。</p><p id="rule-refunds">未封盘超过 24 小时，或封盘后 24 小时未完成开奖，开放 24 小时退款期。奖金也须在结算后 24 小时内领取，过期余额可通过链上交易销毁。</p><p data-en="Future drand randomness is verified onchain, then evaluated by processor 2075.">未来 drand 随机数先在链上验签，再由 2075 处理器计算。</p></section>
         <section class="card refund-card" id="refund-card" aria-labelledby="refund-title">
           <div class="eyebrow" data-en="CURRENT & PAST ROUNDS">本期与往期</div><h3 id="refund-title" data-en="Return principal">退回本金</h3>
-          <p class="fine-print" data-en="Check an eligible round and confirm your claim in your wallet. Principal returns to the connected wallet.">查询符合退款条件的期号，由您在钱包确认领取，本金退回当前连接的钱包。</p>
-          <label for="refund-round" data-en="Round number">查询期号</label><div class="refund-query"><input id="refund-round" type="text" inputmode="numeric" maxlength="78" placeholder="例如：1" data-en-placeholder="Example: 1"><button id="check-refund" type="button" disabled data-en="Check">查询</button></div>
-          <div class="purchase-summary"><span data-en="Refundable principal">可退本金</span><strong id="refund-amount">— BEM</strong></div><p id="refund-state" class="fine-print" aria-live="polite">连接钱包后，输入期号查询待退本金。</p>
-          <button id="refund" type="button" class="accent-outline" disabled data-en="Claim my principal">领取我的本金</button>
+          <p class="fine-print" data-en="Connect your wallet to find all refundable rounds in this pool automatically, then claim together. Principal returns to your connected wallet.">连接钱包后，自动查询当前场次全部可退本金，合并领取到当前钱包。</p>
+          <div class="purchase-summary"><span data-en="Refundable principal">可退本金</span><strong id="refund-amount">— BEM</strong></div><p id="refund-state" class="fine-print" aria-live="polite">连接钱包后自动查询，无需输入期号。</p>
+          <button id="refund" type="button" class="accent-outline">连接钱包查询退款</button>
         </section>
       </aside>
       <section class="card about-card" id="processor-details"><div class="eyebrow" data-en="ONCHAIN · VERIFIABLE">链上开奖 · 公开可验</div><h2 data-en="Every draw, publicly verifiable">每期开奖，公开可验</h2><p class="onchain-copy" data-en="Every draw is computed by an onchain circuit. The result of every round is publicly verifiable.">每次开奖都由链上执行电路计算，每期结果公开可验。</p></section>

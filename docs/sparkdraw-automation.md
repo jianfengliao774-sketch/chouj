@@ -2,7 +2,7 @@
 
 生产后台 `/admin.html` 的「自动开奖保险箱」用于绑定 Google Authenticator、启停服务和补充 Gas。初次绑定需要管理员在自己的手机输入设置密钥，并提交当前 6 位验证码。未绑定或暂停时，后台不签发新的交易。
 
-独立执行钱包：`0xb4856db6cd174D5E09b9B844a107cCB6Fdd3CCD8`。五档合约共用这个 Gas 钱包。它不持有 13061 NFT，也不拥有用户奖金或退款的领取权限。网页不提供私钥显示、下载或主钱包私钥导入。
+初始独立执行钱包：`0xb4856db6cd174D5E09b9B844a107cCB6Fdd3CCD8`。五档合约共用当前执行钱包；后台显示实际启用的地址。它不持有 13061 NFT，也不拥有用户奖金或退款的领取权限。后台支持导入指定私钥并替换执行钱包，不提供已保存私钥的显示或下载。
 
 后台只签发五个固定合约的 closeRound、fulfillRandomness、settle、openRefunds、burnUnclaimed 和 burnUnclaimedPrize，交易 value 必须为零。目标未来 drand 轮次由合约确定，证明仍由链上验证；后台负责送达，不能选择中奖号码。奖金与退款仍归原收款钱包领取。
 
@@ -32,6 +32,14 @@
 
 ## 前端协作
 
-后台 UI 位于 `web/sparkdraw-vault-ui.js` 和 `web/admin.html`。`automation-wallet.js` 仅含公开地址。业务签名约束位于 `sparkdraw-automation-core.mjs`，执行循环位于 `sparkdraw-automation.mjs`。页面修改不得添加任意目标、任意 calldata、私钥导入或自动拨款接口。
+后台 UI 位于 `web/sparkdraw-vault-ui.js` 和 `web/admin.html`。`automation-wallet.js` 仅含公开地址。业务签名约束位于 `sparkdraw-automation-core.mjs`，执行循环位于 `sparkdraw-automation.mjs`。页面修改不得添加任意目标、任意 calldata 或自动拨款接口。私钥导入必须保留管理员登录、同源检查、TOTP 和暂停后切换要求。
 
 运行 `node --test test/bem-sparkdraw-automation.test.mjs test/bem-sparkdraw-service.test.mjs test/bem-sparkdraw-replay.test.mjs` 验证维护白名单、TOTP、后台鉴权和卷轴回放。`node scripts/check_automation_funding.mjs` 只读核对容器费用及模拟拨款，不广播交易。
+
+## 指定私钥钱包（2026-09-07）
+
+登录后台，在「保存私钥并替换自动开奖钱包」输入私钥，页面先显示对应公开地址。核对地址并填写谷歌验证码，点击「验证、保存并自动开奖」。当前服务须已暂停、无待确认交易；切换完成后服务自动继续。指定钱包存在链上待确认交易时，等待处理完成后再启用。新钱包须有 BNB 支付 Gas。
+
+导入通过 HTTPS 同源管理员接口 `/api/admin/vault/key`，不会写入浏览器存储或日志。服务器以 AES-256-GCM 加密私钥，绑定记录编号、地址和时间，密文保存在 `/var/lib/sparkdraw-key-vault`（目录 app:sparkdraw-keeper 2750，文件 0640）。独立的 32 字节主密钥由 systemd-creds 主机密钥加密，网站与执行服务分别加载只读凭据。验证码用于授权保存操作，不是加密密钥。
+
+每份导入密文均保留，初始钱包凭据也保留。执行服务保存切换前的私有交易日志，继承全局 Gas 预算、历史和轮次进度。切换不会转移旧钱包余额；补充 Gas 的目标随当前执行钱包变化。此目录和凭据不得放入网站静态目录、Git 或对话。重启仍读取已保存的密文；缺少日志不会自动重建并继续花费。

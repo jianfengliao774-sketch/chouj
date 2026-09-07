@@ -8,12 +8,15 @@ import {POOL_IDS,POOLS,profile,VERIFIER,VERIFIER_HASH} from './web/sparkdraw-pro
 import {createReadRpc,validateReadRequest} from './rpc.mjs';
 import {createSparkDrawIndex} from './sparkdraw-index.mjs';
 import {createSparkDrawVault} from './sparkdraw-vault.mjs';
+import {createKeyStore} from './sparkdraw-key-store.mjs';
+import {walletClaimGroups} from './sparkdraw-claims.mjs';
+import {numberedRound,utcDay} from './web/round-display.js';
 import {createAdminAuth} from './auth.mjs';
 import {createMarketPriceService} from './market-price.mjs';
 const SITE=path.dirname(fileURLToPath(import.meta.url));
 const json=x=>JSON.stringify(x,(_,v)=>typeof v==='bigint'?v.toString():v);
 const int=x=>Number(BigInt(x));
-export async function createSparkDrawService({rpc=createReadRpc(),directory,credential,origin='http://127.0.0.1:8788',staticRoot=path.join(SITE,'dist'),verify=true,vaultSecret=null,automationStatusFile='/run/sparkdraw-keeper/status.json',automationControlFile=process.env.SPARKDRAW_CONTROL}={}){
+export async function createSparkDrawService({rpc=createReadRpc(),directory,credential,origin='http://127.0.0.1:8788',staticRoot=path.join(SITE,'dist'),verify=true,vaultSecret=null,keyStore=null,automationStatusFile='/run/sparkdraw-keeper/status.json',automationControlFile=process.env.SPARKDRAW_CONTROL}={}){
   const abi=JSON.parse(await fs.readFile(path.join(SITE,'web/sparkdraw-abi.json'),'utf8')),game=new Interface(abi);
   const call=async(id,name,args=[],block='latest')=>game.decodeFunctionResult(name,await rpc('eth_call',[{to:profile(id).address,data:game.encodeFunctionData(name,args)},block]));
   if(verify){
@@ -24,7 +27,7 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
     }
   }
   const index=await createSparkDrawIndex({rpc,abi,directory}),auth=createAdminAuth({credential}),market=createMarketPriceService();
-  const vault=await createSparkDrawVault({directory,secret:vaultSecret,statusFile:automationStatusFile,...(automationControlFile?{controlFile:automationControlFile}:{})});
+  const vault=await createSparkDrawVault({directory,secret:vaultSecret,keyStore,statusFile:automationStatusFile,...(automationControlFile?{controlFile:automationControlFile}:{})});
   const evidence=JSON.parse(await fs.readFile(path.join(SITE,'web/public/sparkdraw/deployed-contracts.json'),'utf8'));
   const registry={version:5,chainId:56,verifier:evidence.deployments[0],pools:Object.fromEntries(evidence.deployments.slice(1).map(x=>[x.kind,x]))};
   const cache=new Map();
@@ -36,10 +39,19 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
       earlyDrawDeadline:int(early[0]),sealedAt:int(sealed[0]),beaconRound:String(beacon[0]),beaconAvailableAt:beacon[0]?F.genesis+(int(beacon[0])-1)*F.beaconPeriod:0,
       prize:{amount:String(prize[0]),settledAt:int(prize[1]),claimDeadline:int(prize[2]),claimed:prize[3],burned:prize[4]},principalBurned:burned[0]};
   }
+  async function labelRound(id,round,block){
+    const started=round.fundingDeadline?round.fundingDeadline-F.fundingSeconds:int(block.timestamp),startOfDay=Math.floor(started/86400)*86400;
+    const first=await cached('first-daily-round:'+id+':'+utcDay(started),86400000,async()=>{
+      let lo=1n,hi=BigInt(round.roundId);
+      while(lo<hi){const mid=(lo+hi)/2n,r=await call(id,'rounds',[mid],block.number);if(Number(r[2])-F.fundingSeconds<startOfDay)lo=mid+1n;else hi=mid;}
+      return lo;
+    });
+    const sequence=BigInt(round.roundId)-first+1n;return{...round,dailySequence:String(sequence),displayRoundId:numberedRound(started,sequence)};
+  }
   const state=id=>cached('state:'+id,3000,async()=>{
     const b=await rpc('eth_getBlockByNumber',['latest',false]),current=(await call(id,'currentRoundId',[],b.number))[0];
     const ids=[current];if(current>1n)ids.push(current-1n);
-    const rounds=await Promise.all(ids.map(n=>readRound(id,n,b.number)));
+    const rounds=await Promise.all(ids.map(async n=>labelRound(id,await readRound(id,n,b.number),b)));
     return{version:5,chainId:56,poolId:id,address:profile(id).address,blockNumber:int(b.number),blockHash:b.hash,time:int(b.timestamp),currentRoundId:String(current),rounds,index:index.metadata(id),keeper:await vault.status()};
   });
   function selected(params){const id=params.get('pool')||'all';if(id==='all')return POOL_IDS;profile(id);return[id];}
@@ -83,11 +95,9 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
         else if(kind==='rounds')rows=ids.flatMap(id=>index.view(id).publicRounds);
         else if(kind==='winners')rows=ids.flatMap(id=>index.view(id).publicRounds).filter(r=>r.status===5);
         else throw Error('Invalid records kind');
-        const round=url.searchParams.get('round');if(round){if(!/^[1-9][0-9]{0,20}$/.test(round))throw Error('Invalid round');rows=rows.filter(x=>x.roundId===round);}
+        const round=url.searchParams.get('round');if(round){if(!/^[1-9][0-9]{0,20}$/.test(round))throw Error('Invalid round');rows=rows.filter(x=>x.roundId===round||x.displayRoundId===round);}
         rows.sort((a,b)=>Number(b.roundId)-Number(a.roundId));
-        const claims=kind==='wallet'?ids.map(poolId=>({poolId,
-          refunds:rows.filter(r=>r.poolId===poolId&&BigInt(r.refundablePrincipal)>0n).map(r=>r.roundId).sort((a,b)=>Number(a)-Number(b)).slice(0,64),
-          prizes:rows.filter(r=>r.poolId===poolId&&BigInt(r.claimablePrize)>0n).map(r=>r.roundId).sort((a,b)=>Number(a)-Number(b)).slice(0,64)})):undefined;
+        const claims=kind==='wallet'?walletClaimGroups(rows,ids):undefined;
         return respond(res,200,{version:5,...pageRows(rows,url.searchParams),claims,indexes:Object.fromEntries(ids.map(id=>[id,index.metadata(id)]))});
       }
       if(req.method==='GET'&&url.pathname==='/api/burns/summary')return respond(res,200,await cached('burn-summary',300000,()=>({totalBaseUnits:POOL_IDS.flatMap(id=>index.view(id).burns).reduce((a,b)=>a+BigInt(b.amountBaseUnits),0n).toString(),updatedAt:new Date().toISOString(),indexes:Object.fromEntries(POOL_IDS.map(id=>[id,index.metadata(id)]))})));
@@ -99,9 +109,10 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
         if(url.pathname==='/api/admin/vault'&&req.method==='GET')return respond(res,200,await vault.status());
         if(url.pathname==='/api/admin/vault/setup'&&req.method==='POST')return respond(res,200,await vault.setup(session.username));
         if(url.pathname==='/api/admin/vault/control'&&req.method==='POST'){const d=await body(req);return respond(res,200,await vault.update({code:d.code,enabled:d.enabled,enroll:d.enroll===true,username:session.username}));}
+        if(url.pathname==='/api/admin/vault/key'&&req.method==='POST'){const d=await body(req);try{return respond(res,200,await vault.importKey({code:d.code,privateKey:d.privateKey,expectedAddress:d.expectedAddress,username:session.username}));}finally{d.privateKey='';}}
         if(url.pathname==='/api/admin/overview'){
-          const day=new Date(Date.now()+8*3600000).toISOString().slice(0,10);
-          return respond(res,200,{session,day,pools:POOL_IDS.map(id=>{const rounds=index.view(id).publicRounds,events=index.events(id);return{poolId:id,address:profile(id).address,index:index.metadata(id),todayCompleted:events.filter(e=>e.name==='Settled'&&new Date(Date.parse(e.timeUtc)+8*3600000).toISOString().startsWith(day)).length,rounds:rounds.slice(0,100).map(r=>({...r,startedAt:events.find(e=>e.name==='RoundStarted'&&e.args.roundId===r.roundId)?.timeUtc,lockedAt:events.find(e=>e.name==='RoundLocked'&&e.args.roundId===r.roundId)?.timeUtc}))};})});
+          const day=new Date().toISOString().slice(0,10);
+          return respond(res,200,{session,day,timeZone:'UTC',pools:POOL_IDS.map(id=>{const rounds=index.view(id).publicRounds,events=index.events(id);return{poolId:id,address:profile(id).address,index:index.metadata(id),todayCompleted:events.filter(e=>e.name==='Settled'&&e.timeUtc.startsWith(day)).length,rounds:rounds.slice(0,100).map(r=>({...r,startedAt:events.find(e=>e.name==='RoundStarted'&&e.args.roundId===r.roundId)?.timeUtc,lockedAt:events.find(e=>e.name==='RoundLocked'&&e.args.roundId===r.roundId)?.timeUtc}))};})});
         }
         if(url.pathname==='/api/admin/round'){const id=url.searchParams.get('pool');profile(id);const rid=url.searchParams.get('round');return respond(res,200,{events:index.events(id).filter(e=>e.args.roundId===rid)});}
       }
@@ -124,7 +135,8 @@ export async function startSparkDraw(){
   const directory=process.env.BEM_DATA_DIR;if(!directory||!path.isAbsolute(directory))throw Error('Absolute data directory required');
   const credential=JSON.parse(await fs.readFile(process.env.BEM_ADMIN_CREDENTIALS_FILE,'utf8'));
   let vaultSecret=null;try{if(process.env.CREDENTIALS_DIRECTORY)vaultSecret=(await fs.readFile(path.join(process.env.CREDENTIALS_DIRECTORY,'sparkdraw-totp'),'utf8')).trim();}catch{throw Error('Vault credential unavailable');}
-  const {server}=await createSparkDrawService({directory,credential,vaultSecret,origin:process.env.BEM_PUBLIC_ORIGIN,rpc:createReadRpc({endpoint:process.env.BEM_RPC_URL,logsEndpoint:process.env.BEM_LOGS_RPC_URL})});
+  let keyStore=null;if(process.env.SPARKDRAW_VAULT_DIRECTORY){const master=Buffer.from((await fs.readFile(path.join(process.env.CREDENTIALS_DIRECTORY,'sparkdraw-vault-master'),'utf8')).trim(),'hex');keyStore=createKeyStore({directory:process.env.SPARKDRAW_VAULT_DIRECTORY,master});if(!keyStore)throw Error('VAULT_MASTER_REQUIRED');}
+  const {server}=await createSparkDrawService({directory,credential,vaultSecret,keyStore,origin:process.env.BEM_PUBLIC_ORIGIN,rpc:createReadRpc({endpoint:process.env.BEM_RPC_URL,logsEndpoint:process.env.BEM_LOGS_RPC_URL})});
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
   for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>server.close(()=>process.exit(0)));
   console.log('SparkDraw V5 serving five verified pools; signing remains in user wallets.');

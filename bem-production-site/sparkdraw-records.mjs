@@ -1,5 +1,6 @@
 import { getAddress } from 'ethers';
 import { SPARKDRAW } from './web/sparkdraw-config.js';
+import {utcDay,numberedRound} from './web/round-display.js';
 const add = (a, b) => (BigInt(a ?? '0') + BigInt(b ?? '0')).toString();
 
 // Derive public and personal records only from receipt-confirmed, persisted logs.
@@ -43,12 +44,18 @@ export function sparkDrawRecords(events, { pool, address }) {
         destination:'0x000000000000000000000000000000000000dEaD',transactionHash:event.transactionHash,logIndex:event.logIndex,timeUtc});
     }
   }
+  const counters=new Map();
+  for(const r of [...rounds.values()].sort((a,b)=>Number(a.roundId)-Number(b.roundId))){
+    if(!r.fundingDeadline)continue;const started=r.fundingDeadline-SPARKDRAW.fundingSeconds,day=utcDay(started),sequence=(counters.get(day)||0)+1;
+    counters.set(day,sequence);r.dailySequence=sequence;r.displayRoundId=numberedRound(started,sequence);
+  }
+  for(const burn of burns)burn.displayRoundId=rounds.get(burn.roundId)?.displayRoundId;
   const all=[...rounds.values()].reverse();
   return {
     // Wallet details are published only by refundNotices, after the 12-hour gate.
     publicRounds:all.map(({wallets,...r})=>r), burns:burns.reverse(),
     pendingPrizes:all.filter(r=>r.prize&&!r.prize.claimed&&!r.prize.burned).map(r=>({poolId:pool,roundId:r.roundId,
-      gameAddress:address,winner:r.prize.winner,amountBaseUnits:r.prize.amount,claimDeadline:r.prize.claimDeadline})),
+      gameAddress:address,displayRoundId:r.displayRoundId,winner:r.prize.winner,amountBaseUnits:r.prize.amount,claimDeadline:r.prize.claimDeadline})),
     refundNotices(now) {
       const notices=[];
       for(const r of all) {
@@ -59,7 +66,7 @@ export function sparkDrawRecords(events, { pool, address }) {
           const unclaimed=BigInt(w.paid)-BigInt(w.refunded);
           if(unclaimed<=0n)continue;
           const ticketPrice=BigInt(SPARKDRAW.pools[pool].units)/10000n;
-          notices.push({poolId:pool,roundId:r.roundId,gameAddress:address,account,
+          notices.push({poolId:pool,roundId:r.roundId,displayRoundId:r.displayRoundId,gameAddress:address,account,
             tickets:Number(unclaimed/ticketPrice),amountBaseUnits:unclaimed.toString(),
             refundTriggerAt:trigger,publicAt,claimDeadline:deadline,
             state:now<deadline?'claimable':'awaiting_burn'});

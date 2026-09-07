@@ -99,7 +99,7 @@ test('shared pages retain current transaction controls, drand and Vite-managed b
 test('community copy stays multiline without reverting new burn percentages or claim rules', () => {
   assert.match(player, /Tapeout 生态建设添一份力量。\\n每次成功开奖，实收金额的 \{burn\}%/);
   assert.match(player, /\{burn:p\.burnPercent\}/);
-  assert.match(player, /本期开奖（第\{round\}期）/);
+  assert.match(player, /\$\('round-label'\)\.textContent=roundName\(r\)/);
   assert.match(player, /奖金也须在结算后 24 小时内领取/);
   assert.match(read('sparkdraw.css'), /community-copy \{ white-space: pre-line/);
 });

@@ -29,10 +29,12 @@ test('V5 service exposes only the five new pools, routes old pages away and reje
   assert.equal((await request('/wallet-icons/unknown.svg')).status,404);
   assert.equal((await request('/api/admin/overview')).status,401);
   assert.equal((await request('/api/admin/vault')).status,401);
+  assert.equal((await request('/api/admin/vault/key',{method:'POST',headers:{origin:'http://127.0.0.1:18991'}})).status,401);
   assert.equal((await request('/api/admin/vault/setup',{method:'POST',headers:{origin:'http://127.0.0.1:18991'}})).status,401);
   const login=await request('/api/admin/login',{method:'POST',headers:{origin:'http://127.0.0.1:18991','content-type':'application/json'},body:JSON.stringify({username:'fixture-admin',password:'test-only-password'})});
   const headers={cookie:login.headers.get('set-cookie').split(';')[0],origin:'http://127.0.0.1:18991','content-type':'application/json'};
   assert.equal((await request('/api/admin/vault/setup',{method:'POST',headers:{...headers,origin:'https://other.invalid'}})).status,403);
+  assert.equal((await request('/api/admin/vault/key',{method:'POST',headers:{...headers,origin:'https://other.invalid'}})).status,403);
   assert.equal((await(await request('/api/admin/vault/setup',{method:'POST',headers})).json()).secret,secret);
   assert.equal((await request('/api/admin/vault/control',{method:'POST',headers,body:JSON.stringify({enabled:true,enroll:true,code:'bad'})})).status,403);
   assert.equal((await request('/api/admin/vault/control',{method:'POST',headers,body:JSON.stringify({enabled:true,enroll:true,code:totpCode(secret,Math.floor(Date.now()/30000))})})).status,200);
