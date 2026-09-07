@@ -31,6 +31,7 @@ const state = { wallet: null, wallets: new Map(), connecting: false, connectVers
 let pools = null;
 let testTransactions = null;
 let pendingPoller = null;
+let personalRecords = null;
 const purchaseFlow = createApprovalPurchaseFlow({
   getKey: () => purchaseContextKey(model.getState()),
   send: async (kind, input) => {
@@ -211,7 +212,7 @@ function render() {
     put('purchase-total', `${money(selection.amountBaseUnits)} BEM`);
     put('selection-note', t('预选 {count} 份 · 成交号码以链上实际分配为准', '{count} tickets previewed · Final assigned numbers are recorded onchain', { count: selection.quantity.toLocaleString(getLocale()) }));
   } catch (error) { put('purchase-total', '— BEM'); put('selection-note', errorCopy(error)); }
-  renderContractLinks(); renderTestControls(); publicDraw.render();
+  renderContractLinks(); renderTestControls(); publicDraw.render(); personalRecords?.syncAccount();
   if (!current.account) { disabled('approve', state.connecting); disabled('buy', state.connecting); }
   put('buy', purchaseFlow.busy ? t('正在授权并购买…', 'Approval and purchase in progress…') : t('授权并购买', 'Approve & buy'));
   if (purchaseFlow.busy) disabled('buy', true);
@@ -490,7 +491,7 @@ function selectTab(tab) {
   if (tab === 'mine') window.dispatchEvent(new Event('bem:personalshow'));
 }
 
-initPersonalRecords({ getAccount: () => model.getState().account });
+personalRecords = initPersonalRecords({ getAccount: () => model.getState().account });
 initLanguage();
 testTransactions = createTestPlayerTransactions({ wallet: () => state.wallet, getContext: () => model.getState(), readRpc: rpc, onUpdate: () => render() });
 for (const poolId of ['10', '50', '100']) formalTransactions.set(poolId,

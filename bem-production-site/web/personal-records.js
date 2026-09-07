@@ -4,7 +4,7 @@ import { t, getLocale } from './player-i18n.js';
 export function initPersonalRecords({ getAccount }) {
   const $ = id => document.getElementById(id);
   if (!$('personal-list')) return;
-  let data = null, page = 1, generation = 0, loading = false, failed = false;
+  let data = null, page = 1, generation = 0, loading = false, failed = false, lastAccount = null;
   const money = amount => formatUnits(amount, 8).replace(/\.0+$/, '');
   function render() {
     const status = $('personal-status');
@@ -44,14 +44,27 @@ export function initPersonalRecords({ getAccount }) {
     } catch { if (version === generation) failed = true; }
     finally { if (version === generation) { loading = false; render(); } }
   }
+  function syncAccount() {
+    const account = getAccount() || null;
+    if (account?.toLowerCase() === lastAccount?.toLowerCase()) return false;
+    lastAccount = account;
+    // Invalidate the previous wallet's pending response before starting another.
+    generation++; page = 1; data = null; loading = false; failed = false;
+    $('personal-wallet').value = account ?? '';
+    if (account) search(); else render();
+    return true;
+  }
   $('personal-search').addEventListener('click', () => search());
   $('personal-prev').addEventListener('click', () => search(Math.max(1, page-1)));
   $('personal-next').addEventListener('click', () => search(page+1));
   for (const id of ['personal-wallet','personal-round']) $(id).addEventListener('keydown', event => { if (event.key === 'Enter') search(); });
   window.addEventListener('bem:personalshow', () => {
+    if (syncAccount()) return;
     if (!$('personal-wallet').value) $('personal-wallet').value = getAccount() ?? new URLSearchParams(location.search).get('wallet') ?? '';
     if ($('personal-wallet').value) search(); else render();
   });
   window.addEventListener('bem:languagechange', render);
   render();
+  syncAccount();
+  return { syncAccount };
 }
