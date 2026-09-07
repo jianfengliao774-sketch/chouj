@@ -62,6 +62,13 @@ test('draw guide uses the same supplied masthead artwork and readable typography
   assert.match(css,/:root \{ font-size:18px/);assert.match(css,/\.hash,code \{ font-size:16px/);
 });
 
+test('each public navigation has one direct bilingual Telegram feedback link',()=>{
+  for(const html of [read('index.html'),read('draw-guide.html'),playerPageHtml(read('index.html'),read('burns.html'),true)]){
+    assert.equal((html.match(/href="https:\/\/t.me\/asas55862"/g)||[]).length,1);
+    assert.match(html,/<nav[^>]*>[\s\S]*?开奖说明<\/a><a class="telegram-support" href="https:\/\/t.me\/asas55862" target="_blank" rel="noopener noreferrer" data-en="Telegram support ↗">Telegram 反馈 ↗<\/a><\/nav>/);
+  }
+});
+
 test('requested display removals preserve application hooks and the site clock', () => {
   const html=read('index.html');
   assert.match(html, /class="simulation-banner" hidden/);

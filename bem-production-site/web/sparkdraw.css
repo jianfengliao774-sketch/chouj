@@ -418,6 +418,9 @@ html[lang="en-US"] .player-page .draw-hero:has(.prize-card) .hero-heading h1 { f
 .player-page .round-rules-list li { padding-left:8px; color:#303947; font-size:19px; line-height:1.9; }
 .player-page .round-rules-list li::marker { font-weight:750; color:#8f1729; }
 .player-page .round-rules-card .round-rules-list p { margin:0; font-size:19px; line-height:1.9; }
+.player-page .tabs .telegram-support { margin-left:auto; align-self:center; min-height:44px; padding:10px 16px; border:1px solid #cfb58f; border-radius:10px; background:#fff8e8; color:#8f1729; font-size:17px; line-height:1.6; text-decoration:none; }
+.player-page .tabs .telegram-support:hover { background:#f6ead4; border-color:#a37b48; }
+@media(max-width:760px) { .player-page .tabs .telegram-support { margin-left:0; } }
 @media(max-width:1100px) {
   .player-page .draw-layout { grid-template-areas:"reactor" "aside" "rules" "about"; }
 }
