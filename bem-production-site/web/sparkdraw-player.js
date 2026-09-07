@@ -49,13 +49,19 @@ const picker=createWalletPicker({dialog:$('wallet-picker'),onChange(entries){dis
 $('connect-wallet').onclick=()=>{walletSession.cancel();clearTimeout(restoreTimer);picker.open();};$('burn-connect').onclick=()=>account?refreshRecords():picker.open();
 $('switch-network').onclick=async()=>{try{await wallet.request({method:'wallet_switchEthereumChain',params:[{chainId:'0x38'}]});}catch(e){failure(e);}};
 $('copy-browser-url').onclick=()=>navigator.clipboard.writeText(location.href);
+$('copy-wallet-address').onclick=async()=>{
+  const address=account;if(!address)return;
+  try{await navigator.clipboard.writeText(address);note(t('钱包地址已复制。','Wallet address copied.'));}
+  catch{note(t('复制未成功，请选择钱包地址手动复制。','Copy failed. Select the wallet address and copy it manually.'));}
+};
 function selection(){return parseTickets(mode,$('ticket-count').value,$('selected-tickets').value);}
 function render(){
   $('site-time').textContent=formatSiteTime(chainNow(),getLanguage());
   const p=profile(pool),r=snapshot?.rounds.find(x=>x.roundId===snapshot.currentRoundId),gross=BigInt(p.units),prize=gross*(99n-BigInt(p.burnPercent))/100n;
   $('connect-wallet').textContent=account?t('切换钱包','Switch wallet'):t('连接钱包','Connect wallet');
   $('wallet-label').textContent=account?t('已连接钱包','Wallet connected'):t('连接钱包，查看余额与持票','Connect wallet to view balances and tickets');$('wallet-address').textContent=account||'';
-  $('wallet-balances').textContent=balance?`BEM ${formatWalletBalance3(balance.bem,8)} · BNB ${formatWalletBalance3(balance.bnb,18)}`:'BEM — · BNB —';$('switch-network').hidden=!wallet||chain===56;
+  $('copy-wallet-address').hidden=!account;$('copy-wallet-address').disabled=!account;
+  $('wallet-balances').textContent=t('您目前持有：BEM：{bem}，BNB：{bnb}','Your balances: BEM: {bem}, BNB: {bnb}',{bem:balance?formatWalletBalance3(balance.bem,8):'—',bnb:balance?formatWalletBalance3(balance.bnb,18):'—'});$('switch-network').hidden=!wallet||chain===56;
   $('wallet-balances').title=balance?t('完整余额：BEM {bem} · BNB {bnb}','Full balance: BEM {bem} · BNB {bnb}',{bem:money(balance.bem),bnb:formatEther(balance.bnb)}):'';
   $('launch-status').textContent=t('新五档合约已部署','Five new pools deployed');$('sale-note').textContent=p.test?t('0.1 BEM 测试场，使用 BNB 主网真实 BEM。','0.1 BEM test with real BEM on BNB mainnet.'):t('首次购买开始 24 小时募集。','The first purchase starts the 24-hour funding period.');
   $('prize-bem').textContent=money(prize);$('payout-burn').textContent=money(gross*BigInt(p.burnPercent)/100n)+' BEM';$('payout-container').textContent=money(gross/100n)+' BEM';$('payout-winner').textContent=money(prize)+' BEM';
@@ -112,7 +118,7 @@ function revealReels(win, replay=false){
   const reels=[...document.querySelectorAll('#reels .reel')];
   if(changed||replay||!win)for(const [i,reel] of reels.entries()){
     reel.querySelector('.placeholder').textContent=digits[i];reel.querySelector('.placeholder').hidden=false;
-    reel.querySelector('.reel-strip').replaceChildren();reel.classList.remove('rolling');
+    reel.querySelector('.reel-strip').replaceChildren();reel.classList.remove('rolling');reel.classList.remove('is-revealed');
   }
   $('reels').setAttribute('aria-label',win?t('中奖号码 {number}','Winning number {number}',{number:digits}):t('尚未开奖','Awaiting draw'));
   if(!win||reelRevealed||!$('reels').getClientRects().length||document.hidden)return;
@@ -122,20 +128,20 @@ function revealReels(win, replay=false){
   const generation=reelGeneration;
   for(const [i,reel] of reels.entries()){
     const strip=reel.querySelector('.reel-strip'),placeholder=reel.querySelector('.placeholder');
-    const steps=30+i*10+Number(digits[i]);
+    const steps=30*(i+1)+Number(digits[i]);
     strip.replaceChildren(...Array.from({length:steps+1},(_,n)=>el('span',String(n%10))));
     strip.setAttribute('aria-hidden','true');placeholder.hidden=true;reel.classList.add('rolling');
     const animation=strip.animate([{transform:'translateY(0)'},{transform:`translateY(-${steps*100}%)`}],
-      {duration:2200+i*380,easing:'cubic-bezier(.12,.64,.18,1)',fill:'forwards'});
+      {duration:5000*(i+1),easing:'linear',fill:'forwards'});
     reelAnimations.push(animation);
     animation.finished.then(()=>{
       if(generation!==reelGeneration)return;
-      placeholder.textContent=digits[i];placeholder.hidden=false;reel.classList.remove('rolling');
+      placeholder.textContent=digits[i];placeholder.hidden=false;reel.classList.remove('rolling');reel.classList.add('is-revealed');
       animation.cancel();strip.replaceChildren();if(i===reels.length-1)$('replay').textContent=t('回放卷轴','Replay reels');
     }).catch(()=>{});
   }
 }
-function renderSelector(){const list=$('pool-selection');list.className='pool-selection';list.replaceChildren(Object.assign(el('h3',t('选择场次（每个场次均为10,000份）','Choose a pool (10,000 tickets per pool)')),{className:'pool-selection-heading'}));const group=el('div','');group.className='pool-selection-options';for(const id of POOL_IDS){const b=button('',()=>{if(pool===id)return;pool=id;revision++;snapshot=null;held=0n;historyPage=1;url.searchParams.set('pool',id);history.replaceState(null,'',url);render();refresh();refreshRecords();});b.className='pool-choice';b.append(el('strong',`${id} BEM${id==='0.1'?t(' · 测试',' · Test'):''}`),el('span',t('每份 {price} BEM','{price} BEM per ticket',{price:money(profile(id).ticketPrice)})));b.setAttribute('aria-checked',String(id===pool));b.setAttribute('role','radio');group.append(b);}list.append(group);}
+function renderSelector(){const list=$('pool-selection');list.className='pool-selection';list.replaceChildren(Object.assign(el('h3',t('请选择场次（每个场次份额均为10,000份）','Please choose a pool (10,000 tickets per pool)')),{className:'pool-selection-heading'}));const group=el('div','');group.className='pool-selection-options';for(const id of POOL_IDS){const b=button('',()=>{if(pool===id)return;pool=id;revision++;snapshot=null;held=0n;historyPage=1;url.searchParams.set('pool',id);history.replaceState(null,'',url);render();refresh();refreshRecords();});b.className='pool-choice';b.append(el('strong',`${id} BEM${id==='0.1'?t(' · 测试',' · Test'):''}`),el('span',t('每份 {price} BEM','{price} BEM per ticket',{price:money(profile(id).ticketPrice)})));b.setAttribute('aria-checked',String(id===pool));b.setAttribute('role','radio');group.append(b);}list.append(group);}
 async function refresh(){if(loading)return;loading=true;const id=pool,rev=revision;
   try{const s=await api('/api/sparkdraw/state?pool='+id);if(s.version!==5||s.address.toLowerCase()!==profile(id).address.toLowerCase())throw Error('Contract mismatch');if(id!==pool||rev!==revision)return;snapshot={...s,receivedAt:Date.now()};
     if(account&&chain===56){const a=account,p=profile(id);const[b,al,native,tickets]=await Promise.all([call(TOKEN,F.bem,'balanceOf',[a]),call(TOKEN,F.bem,'allowance',[a,p.address]),rpc('eth_getBalance',[a,'latest']),call(GAME,p.address,'ticketsOf',[s.currentRoundId,a])]);if(id!==pool||rev!==revision)return;balance={bem:b[0],bnb:BigInt(native)};allowance=al[0];held=tickets[0];}

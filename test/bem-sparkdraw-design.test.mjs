@@ -38,6 +38,34 @@ test('personal participation is displayed before secondary contract details', ()
   const html = read('index.html');
   assert.ok(html.indexOf('id="panel-mine"') < html.indexOf('class="card verification-card"'));
 });
+
+test('requested display removals preserve application hooks and the site clock', () => {
+  const html=read('index.html');
+  assert.match(html, /class="simulation-banner" hidden/);
+  assert.match(html, /id="copy-browser-url" type="button" hidden/);
+  assert.doesNotMatch(html, />您的钱包</);
+  assert.match(html, /id="copy-wallet-address" type="button" hidden disabled/);
+  assert.match(html, /class="rank-feature" href="https:\/\/tapeout.net\/#" target="_blank" rel="noopener noreferrer"/);
+  assert.equal((html.match(/id="site-time"/g)||[]).length,1);
+  assert.match(html, /<time id="site-time" class="site-clock"/);
+  assert.match(player, /您目前持有：BEM：\{bem\}，BNB：\{bnb\}/);
+});
+
+test('copying a wallet address only writes the clipboard after an explicit click',async()=>{
+  const handler=player.slice(player.indexOf("$('copy-wallet-address').onclick=async()=>{"),player.indexOf('\nfunction selection()'));
+  const target={},writes=[],notes=[];
+  const ctx=vm.createContext({$:()=>target,account:'0x1111111111111111111111111111111111111111',navigator:{clipboard:{writeText:async text=>writes.push(text)}},note:text=>notes.push(text),t:zh=>zh});
+  vm.runInContext(handler,ctx);assert.equal(writes.length,0);
+  await target.onclick();assert.deepEqual(writes,['0x1111111111111111111111111111111111111111']);
+  ctx.account=null;await target.onclick();assert.equal(writes.length,1);
+  ctx.account='0x2222222222222222222222222222222222222222';ctx.navigator.clipboard.writeText=async()=>{throw Error('denied')};
+  await target.onclick();assert.match(notes.at(-1),/手动复制/);
+});
+
+test('market timestamps use the same language-specific clock as the rest of the player',()=>{
+  assert.match(read('prize-market.js'),/formatSiteTime\(new Date\(view.updatedAt\)\.toISOString\(\),getLanguage\(\)\)/);
+  assert.doesNotMatch(read('prize-market.js'),/toLocaleTimeString/);
+});
 class Node {
   constructor(tag, text = '') { this.tag = tag; this.text = text; this.children = []; this.attributes = {}; }
   get textContent() { return this.text + this.children.map(node => node.textContent).join(' '); }
@@ -63,7 +91,7 @@ function fixture(language) {
 test('both languages show the common 10000-ticket heading and current five-pool prices', () => {
   for (const language of ['zh', 'en']) {
     const { list } = fixture(language), [heading, group] = list.children;
-    assert.equal(heading.textContent, language === 'zh' ? '选择场次（每个场次均为10,000份）' : 'Choose a pool (10,000 tickets per pool)');
+    assert.equal(heading.textContent, language === 'zh' ? '请选择场次（每个场次份额均为10,000份）' : 'Please choose a pool (10,000 tickets per pool)');
     assert.equal(group.children.length, 5);
     group.children.forEach((button, index) => {
       const id = POOL_IDS[index], price = formatUnits(profile(id).ticketPrice, 8);
