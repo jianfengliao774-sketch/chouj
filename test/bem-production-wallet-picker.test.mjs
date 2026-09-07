@@ -1,0 +1,148 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { createWalletRegistry, createWalletPicker } from '../bem-production-site/web/wallet-picker.js';
+
+function provider() {
+  const instance = { requests: [], request(args) { instance.requests.push(args); throw new Error('Discovery must not request wallet access'); } };
+  return instance;
+}
+function announce(target, wallet, info = {}) {
+  const event = new Event('eip6963:announceProvider');
+  Object.defineProperty(event, 'detail', { value: { provider: wallet, info: { uuid: 'wallet-uuid', name: 'Wallet A', rdns: 'org.example.a', ...info } } });
+  target.dispatchEvent(event);
+}
+const values = registry => [...registry.entries().values()];
+
+test('mixed EIP-6963 and legacy wallets stay independently selectable without requesting accounts', () => {
+  const target = new EventTarget(), announced = provider(), legacy = provider();
+  target.ethereum = legacy;
+  target.addEventListener('eip6963:requestProvider', () => announce(target, announced));
+  const registry = createWalletRegistry(target, () => {});
+  registry.discover();
+  assert.deepEqual(new Set(values(registry).map(entry => entry.provider)), new Set([announced, legacy]));
+  assert.equal(values(registry).find(entry => entry.provider === announced).name, 'Wallet A');
+  assert.deepEqual([...announced.requests, ...legacy.requests], []);
+});
+
+test('same provider in shared injection, providers array and multiple announcements appears once', () => {
+  const target = new EventTarget(), a = provider(), b = provider();
+  a.providers = [a, b, a, b]; target.ethereum = a;
+  target.addEventListener('eip6963:requestProvider', () => {
+    announce(target, a, { uuid: 'a1', name: 'MetaMask', rdns: 'io.metamask' });
+    announce(target, a, { uuid: 'a2', name: 'A second announcement' });
+  });
+  const registry = createWalletRegistry(target, () => {});registry.discover();registry.discover();
+  assert.equal(values(registry).length, 2);
+  assert.equal(values(registry).filter(entry => entry.provider === a).length, 1);
+  assert.equal(values(registry).find(entry => entry.provider === a).name, 'MetaMask');
+  assert.deepEqual([...a.requests, ...b.requests], []);
+});
+
+test('late announcements upgrade metadata without removing other wallets or changing the provider id', () => {
+  const target = new EventTarget(), a = provider(), b = provider();
+  target.ethereum = { providers: [a, b] };
+  const registry = createWalletRegistry(target, () => {});registry.discover();
+  const originalId = values(registry).find(entry => entry.provider === a).id;
+  announce(target, a, { name: 'Rabby Wallet', rdns: 'io.rabby' });
+  assert.equal(values(registry).length, 2);
+  assert.equal(values(registry).find(entry => entry.provider === a).id, originalId);
+  assert.equal(values(registry).find(entry => entry.provider === a).name, 'Rabby Wallet');
+  target.ethereum.providers = [b, a];registry.discover();
+  assert.equal(values(registry).find(entry => entry.provider === a).id, originalId);
+  assert.ok(values(registry).some(entry => entry.provider === b));
+});
+
+test('distinct providers never merge merely because UUID, brand name or rdns match', () => {
+  const target = new EventTarget(), a = provider(), b = provider();
+  const registry = createWalletRegistry(target, () => {});
+  for (const wallet of [a, b]) announce(target, wallet, { uuid: 'same-uuid', name: 'MetaMask', rdns: 'io.metamask' });
+  assert.equal(values(registry).length, 2);
+  assert.equal(new Set(values(registry).map(entry => entry.id)).size, 2);
+  assert.deepEqual(new Set(values(registry).map(entry => entry.provider)), new Set([a, b]));
+});
+
+test('rediscovery drops removed legacy providers, preserves surviving ids and handles empty provider arrays', () => {
+  const target = new EventTarget(), a = provider(), b = provider();
+  target.ethereum = { providers: [a, b] };
+  const registry = createWalletRegistry(target, () => {});registry.discover();
+  const bId = values(registry).find(entry => entry.provider === b).id;
+  target.ethereum.providers = [b];registry.discover();
+  assert.equal(values(registry).length, 1);assert.equal(values(registry)[0].id, bId);
+  b.providers = [];target.ethereum = b;registry.discover();
+  assert.equal(values(registry).length, 1);assert.equal(values(registry)[0].provider, b);
+  target.ethereum = null;registry.discover();assert.equal(values(registry).length, 0);
+});
+
+test('malformed announcements and invalid injections do not break discovery or trigger a wallet request', () => {
+  const target = new EventTarget(), valid = provider();
+  target.ethereum = { providers: [undefined, null, {}, { request: true }, valid] };
+  const registry = createWalletRegistry(target, () => {});
+  announce(target, valid, { uuid: '', name: 'Ignored' });
+  announce(target, valid, { name: '   ' });
+  announce(target, { request: 'not callable' });
+  registry.discover();assert.equal(values(registry).length, 1);assert.equal(values(registry)[0].provider, valid);
+  registry.entries().clear();assert.equal(values(registry).length, 1);
+  assert.deepEqual(valid.requests, []);
+});
+
+// A small DOM fixture tests actual card rendering and click routing, without a browser or wallet.
+class Element extends EventTarget {
+  constructor(tag = 'div') { super();this.tagName = tag;this.children = [];this.dataset = {};this.textContent = '';this.attributes = {};this.classList = { add() {}, remove() {} }; }
+  append(...children) { this.children.push(...children); }
+  replaceChildren(...children) { this.children = children; }
+  setAttribute(key, value) { this.attributes[key] = value; }
+  querySelectorAll(tag) { return this.children.flatMap(child => [ ...(child.tagName === tag ? [child] : []), ...child.querySelectorAll(tag) ]); }
+  focus() { document.activeElement = this; }
+}
+function fixture(t, wallets) {
+  const originalDocument = globalThis.document;
+  const document = { activeElement: null, createElement: tag => new Element(tag), body: new Element('body') };
+  globalThis.document = document;
+  t.after(() => { if (originalDocument === undefined) delete globalThis.document;else globalThis.document = originalDocument; });
+  const dialog = new Element('dialog');
+  const nodes = Object.fromEntries(['wallet-options','wallet-picker-hint','wallet-picker-close','wallet-picker-refresh'].map(id => [id, new Element()]));
+  dialog.querySelector = selector => nodes[selector.slice(1)];
+  dialog.close = () => { dialog.open = false;dialog.dispatchEvent(new Event('close')); };
+  dialog.showModal = () => { dialog.open = true; };
+  const target = new EventTarget();
+  target.addEventListener('eip6963:requestProvider', () => wallets.forEach(({provider, info}) => announce(target, provider, info)));
+  const selected = [];
+  const picker = createWalletPicker({dialog, target, onChange() {}, onSelect: entry => selected.push(entry)});
+  return {nodes, dialog, target, selected, picker, cards: () => nodes['wallet-options'].children};
+}
+const cardName = card => card.querySelectorAll('strong')[0].textContent;
+const cardIcon = card => card.querySelectorAll('img')[0]?.src;
+
+test('cards preserve separate same-brand providers and connect only the exact clicked provider', t => {
+  const a = provider(), b = provider();
+  const ui = fixture(t, [{provider:a,info:{uuid:'a',name:'MetaMask',rdns:'io.metamask'}},{provider:b,info:{uuid:'b',name:'MetaMask',rdns:'io.metamask'}}]);
+  ui.picker.open();assert.equal(ui.dialog.open,true);
+  const active = ui.cards().filter(card => !card.disabled);
+  assert.equal(active.length,2);assert.deepEqual(ui.selected,[]);
+  active[1].dispatchEvent(new Event('click'));
+  assert.equal(ui.selected.length,1);assert.equal(ui.selected[0].provider,b);assert.equal(ui.dialog.open,false);
+  assert.deepEqual([...a.requests,...b.requests],[]);
+});
+
+test('partial or conflicting wallet names cannot adopt another wallet brand or hide its undetected card', t => {
+  const ui = fixture(t, [
+    {provider:provider(),info:{uuid:'compatible',name:'MetaMask Compatible',rdns:''}},
+    {provider:provider(),info:{uuid:'conflict',name:'MetaMask',rdns:'org.example.independent'}},
+    {provider:provider(),info:{uuid:'trust',name:'Distrust Wallet',rdns:''}},
+  ]);
+  const active = ui.cards().filter(card => !card.disabled);
+  assert.equal(active.length,3);
+  assert.ok(active.every(card => !cardIcon(card)));
+  assert.ok(ui.cards().some(card => card.disabled && cardName(card)==='MetaMask'));
+  assert.ok(ui.cards().some(card => card.disabled && cardName(card)==='Trust Wallet'));
+});
+
+test('known rdns takes precedence over a conflicting name, while unknown injected wallets remain usable', t => {
+  const rabby=provider(),unknown=provider();
+  const ui=fixture(t,[{provider:rabby,info:{uuid:'a',name:'MetaMask Compatible',rdns:'io.rabby'}},{provider:unknown,info:{uuid:'b',name:'Independent Wallet',rdns:'org.example.wallet'}}]);
+  const active=ui.cards().filter(card=>!card.disabled);
+  assert.equal(cardIcon(active[0]),'/wallet-icons/rabby.png');
+  assert.equal(cardName(active[1]),'Independent Wallet');
+  active[1].dispatchEvent(new Event('click'));assert.equal(ui.selected[0].provider,unknown);
+  assert.ok(ui.cards().some(card=>card.disabled&&cardName(card)==='MetaMask'));
+});

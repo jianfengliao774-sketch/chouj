@@ -1,39 +1,57 @@
-import { randomBytes } from 'node:crypto';
-import { getAddress, verifyMessage } from 'ethers';
+import { randomBytes, scrypt as scryptCallback, timingSafeEqual } from 'node:crypto';
+import { promisify } from 'node:util';
 
-export function createAdminAuth({ readOwner, now = Date.now }) {
-  const challenges = new Map(), sessions = new Map();
-  function prune() { for (const map of [challenges, sessions]) for (const [id, value] of map) if (value.expiresAt <= now()) map.delete(id); }
+const scrypt = promisify(scryptCallback);
+// OWASP scrypt profile: N=2^15, r=8, p=3 (32 MiB per verification).
+const SCRYPT = { N: 32768, r: 8, p: 3, maxmem: 64 * 1024 * 1024 };
+const WINDOW = 15 * 60 * 1000;
+const cookieToken = cookie => /(?:^|;\s*)bem2075_admin=([a-f0-9]{64})(?:;|$)/.exec(cookie || '')?.[1];
+const failure = (status, message) => Object.assign(new Error(message), { authStatus: status });
+
+export async function createAdminCredential(username, password) {
+  if (typeof username !== 'string' || !/^[a-zA-Z0-9_.-]{3,64}$/.test(username)
+    || typeof password !== 'string' || password.length < 8 || password.length > 256) throw new Error('Invalid admin account');
+  const salt = randomBytes(16);
+  const hash = await scrypt(password, salt, 64, SCRYPT);
+  return { schemaVersion: 1, username, algorithm: 'scrypt', N: SCRYPT.N, r: SCRYPT.r, p: SCRYPT.p, salt: salt.toString('hex'), hash: hash.toString('hex') };
+}
+
+export function createAdminAuth({ credential, now = Date.now }) {
+  if (!credential || credential.schemaVersion !== 1 || credential.algorithm !== 'scrypt'
+    || typeof credential.username !== 'string' || !/^[a-zA-Z0-9_.-]{3,64}$/.test(credential.username)
+    || credential.N !== SCRYPT.N || credential.r !== SCRYPT.r || credential.p !== SCRYPT.p
+    || typeof credential.salt !== 'string' || !/^[a-f0-9]{32}$/.test(credential.salt)
+    || typeof credential.hash !== 'string' || !/^[a-f0-9]{128}$/.test(credential.hash)) throw new Error('Invalid admin credential file');
+  const { username } = credential, salt = Buffer.from(credential.salt, 'hex'), expected = Buffer.from(credential.hash, 'hex');
+  const attempts = new Map(), sessions = new Map();
+  let active = 0, global = { until: 0, count: 0 };
+  function prune() {
+    for (const [id, item] of attempts) if (item.until <= now()) attempts.delete(id);
+    for (const [id, item] of sessions) if (item.expiresAt <= now()) sessions.delete(id);
+  }
   return {
-    async challenge({ address, origin }) {
+    async login({ username: account, password, ip }) {
       prune();
-      const owner = getAddress(await readOwner()), account = getAddress(address);
-      if (owner !== account) throw new Error('请使用当前持有 2075 的钱包登录管理后台。');
-      if (challenges.size >= 100) throw new Error('登录请求较多，请稍后再试。');
-      const id = randomBytes(16).toString('hex'), issuedAt = now(), expiresAt = issuedAt + 120000;
-      const url = new URL(origin);
-      const message = `${url.host} wants you to sign in with your Ethereum account:\n${account}\n\n查看 BEHEMOTH 2075 管理后台；此签名仅用于登录，不授权转账或合约交易。\n\nURI: ${url.origin}/admin.html\nVersion: 1\nChain ID: 56\nNonce: ${id}\nIssued At: ${new Date(issuedAt).toISOString()}\nExpiration Time: ${new Date(expiresAt).toISOString()}`;
-      challenges.set(id, { address: account, origin: url.origin, message, expiresAt });
-      return { id, message, expiresAt: new Date(expiresAt).toISOString() };
-    },
-    async login({ id, signature, origin }) {
-      prune(); const challenge = challenges.get(id); challenges.delete(id);
-      if (!challenge || challenge.origin !== origin || typeof signature !== 'string' || signature.length > 200) throw new Error('登录请求已失效，请重新连接并签名。');
-      if (getAddress(verifyMessage(challenge.message, signature)) !== challenge.address || getAddress(await readOwner()) !== challenge.address) throw new Error('签名与当前 2075 持有人不匹配。');
-      if (challenge.expiresAt <= now()) throw new Error('登录请求已过期，请重新签名。');
-      if (sessions.size >= 100) throw new Error('登录会话较多，请稍后再试。');
-      const token = randomBytes(32).toString('hex'), expiresAt = now() + 900000;
-      sessions.set(token, { address: challenge.address, expiresAt });
-      return { token, address: challenge.address, expiresAt };
+      if (global.until <= now()) global = { until: now() + WINDOW, count: 0 };
+      const id = ip || 'unknown', attempt = attempts.get(id) || { until: now() + WINDOW, count: 0 };
+      if (attempt.count >= 5 || global.count >= 100 || active >= 2 || (!attempts.has(id) && attempts.size >= 2000)) {
+        throw failure(429, '登录尝试过多，请 15 分钟后重试。');
+      }
+      attempts.set(id, attempt); attempt.count++; global.count++; active++;
+      try {
+        if (typeof account !== 'string' || account.length > 64 || typeof password !== 'string' || password.length > 256) throw failure(401, '账号或密码不正确。');
+        const hash = await scrypt(password, salt, 64, SCRYPT);
+        if (!timingSafeEqual(hash, expected) || account !== username) throw failure(401, '账号或密码不正确。');
+        if (sessions.size >= 100) throw failure(429, '登录会话较多，请稍后再试。');
+        const token = randomBytes(32).toString('hex'), expiresAt = now() + WINDOW;
+        sessions.set(token, { username, expiresAt }); attempts.delete(id);
+        return { token, username, expiresAt };
+      } finally { active--; }
     },
     async session(cookie) {
-      prune();
-      const token = /(?:^|;\s*)bem2075_admin=([a-f0-9]{64})(?:;|$)/.exec(cookie || '')?.[1];
-      const session = token && sessions.get(token);
-      if (!session) return null;
-      if (getAddress(await readOwner()) !== session.address || session.expiresAt <= now()) { sessions.delete(token); return null; }
-      return { address: session.address, expiresAt: session.expiresAt };
+      prune(); const value = sessions.get(cookieToken(cookie));
+      return value ? { ...value } : null;
     },
-    logout(cookie) { const token = /(?:^|;\s*)bem2075_admin=([a-f0-9]{64})(?:;|$)/.exec(cookie || '')?.[1]; if (token) sessions.delete(token); }
+    logout(cookie) { sessions.delete(cookieToken(cookie)); }
   };
 }

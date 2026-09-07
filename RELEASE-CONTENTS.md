@@ -8,7 +8,7 @@
 - `contracts/production/`：4 份生产合约；`Bem2075RaffleBSC` 是已部署的最终目标。
 - `scripts/`：固定源码编译、主网依赖只读核查、生产 keeper、部署准备和回执登记源码。
 - `outputs/bem-raffle-2075/production/`：最终合约 ABI 与编译证据、公开部署/订阅报告、发布配置与相关文档。
-- `test/`：7 份与当前正式站点、生产合约及 keeper 相关的本地测试。
+- `test/`：正式站点、生产合约及 keeper 的本地测试，包含钱包混合发现、交易替换、退款和实际页面事件回归。
 
 ## 保留的兼容依赖
 

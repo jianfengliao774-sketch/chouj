@@ -1,10 +1,15 @@
 import { Contract, JsonRpcProvider, formatUnits, getAddress, keccak256, toQuantity } from 'ethers';
 import { t, getLocale, translateKnown, initLanguage } from './player-i18n.js';
+import { createWalletPicker } from './wallet-picker.js';
+import { parseRefundRound, refundEligibility, createRefundIntent, assertRefundSnapshot } from './refund-guards.js';
+import { createTransactionTracker, createTransactionRecord, restoreTransactionRecords, isTransactionBlocking } from './transaction-tracker.js';
 import { PINNED, GuardError, same, validateManifest, createIntent, parseSelection, assertFixedSnapshot, assertPurchaseSnapshot, explorerLink } from './guards.js';
 
 const $ = id => document.getElementById(id);
-const state = {config:null, rpc:null, game:null, token:null, snapshot:null, fixed:false, account:null, wallet:null, walletChain:null, epoch:0, busy:false, refreshing:false, mode:'auto', wallets:new Map(), transactions:[], history:null, historyError:false, page:1, reveal:null, animating:false, receivedAt:0};
+const state = {config:null, rpc:null, game:null, token:null, snapshot:null, fixed:false, account:null, wallet:null, walletChain:null, epoch:0, busy:false, refreshing:false, mode:'auto', wallets:new Map(), transactions:[], history:null, historyError:false, page:1, reveal:null, animating:false, receivedAt:0, refund:null, refundLoading:false, refundVersion:0, refundReceivedAt:0, tracker:null, polling:false};
 const TX_KEY = 'bem2075-mainnet-public-transactions-v1';
+const reviewedTransactions=new Set();
+const transactionNeedsReview=record=>['unknown','unverified'].includes(record.status)||(['pending','confirming'].includes(record.status)&&!isTransactionBlocking(record,record.account));
 const amounts = value => Number(formatUnits(value ?? 0n,8)).toLocaleString(getLocale(),{maximumFractionDigits:8});
 const short = address => `${address.slice(0,8)}…${address.slice(-6)}`;
 const displayTicket = value => String(Number(value)+1).padStart(5,'0');
@@ -32,6 +37,11 @@ function explanation(error) {
     ALLOWANCE:['授权额度必须与本次金额一致，请先单独授权本次金额。','The allowance must exactly match this purchase. Approve this amount first.'],
     ALREADY_APPROVED:['本次金额已授权，您可以单独点击确认购买。','This amount is already approved. Click Confirm purchase separately to proceed.'],
     STALE:['链上状态尚未核实或已过期，请等待刷新。','Onchain state is unavailable or stale. Wait for a refresh.'],
+    REFUND_ROUND:['请输入有效期号，可查询本期及往期退款。','Enter a valid round number to check current or past refunds.'],
+    NOTHING_TO_REFUND:['本期没有待退本金：未持票或已经退款。','No principal remains to refund in this round: no tickets held, or already refunded.'],
+    REFUND_TOO_EARLY:['本期尚未达到合约退款期限。','This round has not reached its contract refund deadline.'],
+    REFUND_UNAVAILABLE:['本期不符合退款条件。请求随机数后须等待开奖结算。','This round is not refundable. Once randomness is requested, it must await settlement.'],
+    REFUND_CHANGED:['待退金额已变化，请重新查询后确认。','The refundable amount changed. Check again before confirming.'],
   };
   if(copy[error.code]) return t(...copy[error.code]);
   if(error.code===4001 || error.code==='ACTION_REJECTED') return t('您已取消钱包确认，没有提交本次交易。','You cancelled wallet confirmation. This transaction was not submitted.');
@@ -92,6 +102,7 @@ async function refresh() {
     state.config=config;state.snapshot=snapshot;state.fixed=true;state.readError=false;state.receivedAt=performance.now();
     $('connection-status').textContent=t('BNB 主网 · 区块 {block}','BNB Chain · Block {block}',{block:snapshot.block});
     render();
+    if(account && !state.refundLoading) await loadRefund();
     if(snapshot.status===5 && state.reveal?.roundId!==snapshot.roundId) reveal({roundId:snapshot.roundId,ticket:snapshot.winningTicket},true);
   } catch(error) {state.fixed=false;state.readError=true;notice(explanation(error),true);controls();$('connection-status').textContent=t('链上读取暂不可用','Onchain read unavailable');}
   finally {state.refreshing=false;}
@@ -111,21 +122,25 @@ function controls() {
     reason=BigInt(snapshot.allowance)===intent.amount?t('授权已就绪，请单独确认购买。','Exact allowance is ready. Confirm the purchase separately.'):t('请先授权本次金额，再单独确认购买。','Approve this exact amount, then confirm the purchase separately.');
   } catch(error) {reason=explanation(error);}
   if(state.config?.salesEnabled===false || snapshot?.seriesAuthorized===false) reason=explanation(new GuardError('NOT_LAUNCHED'));
-  const pending=state.transactions.some(tx=>tx.status==='pending'&&same(tx.account,state.account));
+  const pending=state.transactions.some(tx=>isTransactionBlocking(tx,state.account));
+  const review=state.transactions.some(tx=>same(tx.account,state.account)&&transactionNeedsReview(tx)&&!reviewedTransactions.has(tx.hash));
   if(pending) reason=t('上一笔交易正在确认，请等待链上回执。','Your previous transaction is pending. Wait for its onchain receipt.');
+  else if(review) reason=t('有交易结果尚未核实，请在下方交易记录核对钱包活动，再确认继续操作。','A transaction result is unverified. Review wallet activity in the records below, then confirm before continuing.');
   const amount=BigInt(Math.max(0,Number.isInteger(selectedQuantity())?selectedQuantity():0))*PINNED.ticketPrice;
-  $('approve').disabled=!valid||state.busy||pending||snapshot?.allowance===amount;
-  $('buy').disabled=!valid||state.busy||pending||snapshot?.allowance!==amount;
+  $('approve').disabled=!valid||state.busy||pending||review||snapshot?.allowance===amount;
+  $('buy').disabled=!valid||state.busy||pending||review||snapshot?.allowance!==amount;
   $('purchase-state').textContent=state.busy?t('请查看钱包请求…','Check your wallet request…'):reason;
-  $('connect-wallet').disabled=state.busy||state.wallets.size===0;
-  $('wallet-provider').hidden=state.wallets.size===0;
+  $('connect-wallet').disabled=state.busy;
   $('copy-browser-url').hidden=state.wallets.size>0;
   $('browser-help').hidden=state.wallets.size>0;
-  $('wallet-provider').disabled=state.busy;
   $('switch-network').hidden=!state.account||state.walletChain===56;
   $('switch-network').disabled=state.busy;
   for(const id of ['ticket-count','selected-tickets','mode-auto','mode-selected']) $(id).disabled=state.busy;
   $('replay').disabled=!state.reveal||state.animating;
+  const refundable=refundEligibility(state.refund);
+  $('refund').disabled=!state.fixed||!state.account||state.walletChain!==56||state.busy||pending||review||state.refundLoading||performance.now()-state.refundReceivedAt>45000||!same(state.refund?.account,state.account)||!refundable.eligible;
+  $('refund-round').disabled=state.busy;
+  $('check-refund').disabled=state.busy||state.refundLoading||!state.account||!state.rpc;
 }
 function render() {
   const s=state.snapshot;
@@ -135,7 +150,7 @@ function render() {
   $('sale-note').textContent=launched?t('BNB 主网正式版，参与前请核对期号与金额。','Live on BNB Chain. Review the round and amount before participating.'):t('正式合约已部署，当前待启动，暂不接受购买。','The contract is deployed and awaiting launch. Purchases are not yet open.');
   $('wallet-label').textContent=state.account?t('钱包已连接','Wallet connected'):state.wallets.size?t('连接钱包，查看余额与持票','Connect to view your balance and tickets'):t('未检测到浏览器钱包','No browser wallet detected');
   $('wallet-address').textContent=state.account??'';
-  $('connect-wallet').textContent=state.account?t('重新连接','Reconnect'):t('连接钱包','Connect wallet');
+  $('connect-wallet').textContent=state.account?t('切换钱包','Switch wallet'):t('连接钱包','Connect wallet');
   $('wallet-balances').textContent=state.account&&same(s?.account,state.account)?`${amounts(s.balance)} BEM · ${Number(formatUnits(s.nativeBalance,18)).toLocaleString(getLocale(),{maximumFractionDigits:6})} BNB`:'BEM — · BNB —';
   $('rank-scope').textContent=t('任务 260 最优槽位 · 快照','Task 260 best slot · Snapshot');
   $('round-label').textContent=!s||s.roundId==='0'?t('等待首期开盘','Awaiting the first round'):t('第 {round} 期','Round {round}',{round:s.roundId});
@@ -151,7 +166,7 @@ function render() {
   $('selection-note').textContent=quantity?t('已选 {count} 份 · 每份中奖概率相同','{count} tickets · Equal chance per ticket',{count:quantity}):t('请选择 1–500 份','Choose 1–500 tickets');
   $('snapshot-label').textContent=s?t('只读快照 · 区块 {block}','Read-only snapshot · Block {block}',{block:s.block}):'';
   const stepStatuses=[2,3,4,5];['lock','random','circuit','settle'].forEach((step,index)=>$('step-'+step).classList.toggle('active',(s?.status??0)>=stepStatuses[index]&&(s?.status??0)<=5));
-  renderContracts();renderCountdown();renderReelCopy();controls();renderTransactions();
+  renderContracts();renderCountdown();renderReelCopy();renderRefund();controls();renderTransactions();
 }
 function renderContracts() {
   const target=$('contract-links');target.replaceChildren();
@@ -167,32 +182,27 @@ function renderCountdown() {
   if(s.status===1){target=s.fundingDeadline;label=t('本期筹集剩余时间','Funding time remaining');note=t('72 小时未凑满，按合约规则开放退款。','Incomplete funding after 72 hours makes refunds available under the contract rules.');}
   else if(s.status>=2&&s.status<=4){target=Number(s.timing?.scheduledDrawAt||s.timing?.targetDrawBy||0);label=t('封盘后开奖倒计时','Draw countdown after closing');note=t('目标时间以链上记录为准，VRF 或网络延迟时继续等待，不会换用可预测随机数。','The target follows onchain timing. Delays wait for VRF or confirmations; no predictable random fallback is used.');}
   else if(s.status===5){target=Number(s.nextRoundOpensAt);label=t('下一期开放倒计时','Next-round countdown');note=t('冷却结束后由链上交易开盘。','A transaction opens the next round after the cooldown.');}
-  else {label=t('本期已开放退款','This round is refundable');note=t('请通过合约 refund(roundId, participant) 退回尚未退款的本金。','Unrefunded contributions can be returned through refund(roundId, participant).');}
+  else {label=t('本期已开放退款','This round is refundable');note=t('在「退回本金」中查询本期，确认后本金直接退回您的钱包。','Check this round under Return principal. Confirmation returns the principal directly to your wallet.');}
   const left=Math.max(0,target-now);
   $('countdown-label').textContent=label;
   $('countdown-value').textContent=target?(left?`${String(Math.floor(left/3600)).padStart(2,'0')}:${String(Math.floor(left%3600/60)).padStart(2,'0')}:${String(left%60).padStart(2,'0')}`:t('等待链上执行','Awaiting execution')):'—';
   $('countdown-note').textContent=note;
 }
 
-function registerWallet(provider,name,id) {
-  if(!provider?.request||state.wallets.has(id)||[...state.wallets.values()].some(entry=>entry.provider===provider)) return;
-  state.wallets.set(id,{provider,name:String(name).slice(0,50)});
-  const option=document.createElement('option');option.value=id;option.textContent=String(name).slice(0,50);$('wallet-provider').append(option);render();
-}
 function walletChanged() {
-  state.epoch++;state.account=null;state.walletChain=null;
+  state.epoch++;state.account=null;state.walletChain=null;state.refund=null;state.refundVersion++;state.refundLoading=false;
   notice(t('钱包或网络已改变。已提交交易仍保留，请重新连接后继续。','Your wallet or network changed. Submitted transactions are preserved. Reconnect to continue.'));
   render();refresh();
 }
 function detachWallet() {
   state.wallet?.removeListener?.('accountsChanged',walletChanged);state.wallet?.removeListener?.('chainChanged',walletChanged);state.wallet?.removeListener?.('disconnect',walletChanged);
 }
-async function connect() {
+async function connect(entry) {
   if(state.busy) return;
-  const entry=state.wallets.get($('wallet-provider').value);if(!entry) return;
+  if(!entry?.provider) return;
   state.busy=true;controls();
   try {
-    detachWallet();state.wallet=entry.provider;state.epoch++;state.account=null;
+    detachWallet();state.wallet=entry.provider;state.epoch++;state.account=null;state.walletChain=null;state.refund=null;state.refundVersion++;state.refundLoading=false;
     const epoch=state.epoch;
     const accounts=await state.wallet.request({method:'eth_requestAccounts'});
     const chain=Number(await state.wallet.request({method:'eth_chainId'}));
@@ -214,6 +224,65 @@ async function switchNetwork() {
 async function walletIdentity(wallet) {
   const [accounts,chainId]=await Promise.all([wallet.request({method:'eth_accounts'}),wallet.request({method:'eth_chainId'})]);
   return {walletAccount:accounts?.[0],walletChain:Number(chainId)};
+}
+async function readRefundSnapshot(roundId,account) {
+  const block=await state.rpc.getBlock('latest');
+  if(!block) throw new GuardError('STALE');
+  const [round,myCount]=await Promise.all([state.game.rounds(roundId,{blockTag:block.number}),state.game.ticketsOf(roundId,account,{blockTag:block.number})]);
+  return {account,roundId,block:block.number,timestamp:block.timestamp,status:Number(round.status),fundingDeadline:Number(round.fundingDeadline),drawDeadline:Number(round.drawDeadline),myCount};
+}
+async function loadRefund(roundId) {
+  if(!state.rpc||!state.account) return;
+  if(roundId!==undefined) $('refund-round').value=String(roundId);
+  if(!$('refund-round').value && state.snapshot?.roundId!=='0') $('refund-round').value=state.snapshot?.roundId??'1';
+  const version=++state.refundVersion,account=state.account;
+  state.refundLoading=true;state.refundError=null;controls();renderRefund();
+  try {
+    const id=parseRefundRound($('refund-round').value);
+    const snapshot=await readRefundSnapshot(id,account);
+    if(version!==state.refundVersion||!same(account,state.account)) return;
+    state.refund=snapshot;state.refundReceivedAt=performance.now();
+  } catch(error) {if(version===state.refundVersion){state.refund=null;state.refundError=explanation(error);}}
+  finally {if(version===state.refundVersion){state.refundLoading=false;renderRefund();controls();}}
+}
+function renderRefund() {
+  const snapshot=state.refund,eligibility=refundEligibility(snapshot);
+  $('refund-amount').textContent=state.account&&same(snapshot?.account,state.account)?`${amounts(eligibility.eligible?eligibility.amount:0n)} BEM`:'— BEM';
+  $('refund-state').textContent=!state.account?t('连接钱包后，输入期号查询待退本金。','Connect a wallet, then enter a round to check refundable principal.'):state.refundLoading?t('正在核对链上退款条件…','Checking onchain refund conditions…'):state.refundError??(!snapshot?t('可查询本期或任意往期期号。','Look up the current round or any past round.'):eligibility.eligible?t('第 {round} 期可退 {amount} BEM，将直接退回当前钱包。','Round {round}: {amount} BEM will be returned directly to this wallet.',{round:snapshot.roundId,amount:amounts(eligibility.amount)}):explanation(new GuardError(eligibility.reason)));
+}
+async function submitRefund() {
+  if(state.busy||!state.wallet||$('refund').disabled) return;
+  let intent;
+  try {intent=createRefundIntent({roundId:$('refund-round').value,account:state.account,epoch:state.epoch,snapshot:state.refund});}
+  catch(error){notice(explanation(error),true);return;}
+  const wallet=state.wallet;
+  state.busy=true;controls();
+  try {
+    const check=async()=>{
+      const config=validateManifest(await fetchJson('/api/config'));
+      const snapshot=await readRefundSnapshot(intent.roundId,intent.account);
+      await readFixed(snapshot.block);
+      const identity=await walletIdentity(wallet);
+      assertRefundSnapshot({config,snapshot,intent,...identity,epoch:state.epoch});
+      return snapshot;
+    };
+    await check();
+    const data=state.game.interface.encodeFunctionData('refund',[intent.roundId,intent.account]);
+    const tx={from:intent.account,to:PINNED.gameAddress,data,value:'0x0',chainId:'0x38'};
+    await state.rpc.send('eth_call',[tx,'latest']);
+    const gas=(BigInt(await state.rpc.send('eth_estimateGas',[tx]))*120n+99n)/100n;
+    if(gas>16777216n) throw new GuardError('STALE');
+    const snapshot=await check();
+    tx.gas=toQuantity(gas);
+    if(state.epoch!==intent.epoch||state.wallet!==wallet||!same(state.account,intent.account)||state.walletChain!==56) throw new GuardError('WALLET_CHANGED');
+    const hash=await wallet.request({method:'eth_sendTransaction',params:[tx]});
+    if(!explorerLink('tx',hash)) throw new Error(t('钱包未返回有效交易哈希，请查看钱包活动后再操作。','The wallet returned no valid transaction hash. Check wallet activity before proceeding.'));
+    state.transactions.unshift(createTransactionRecord({hash,account:intent.account,action:'refund',roundId:intent.roundId,to:tx.to,data,fromBlock:snapshot.block}));
+    state.transactions=state.transactions.slice(0,25);saveTransactions();
+    notice(t('退款已提交，等待链上确认。','Refund submitted. Awaiting onchain confirmation.'));
+    void pollTransactions();
+  } catch(error){notice(explanation(error),true);}
+  finally {state.busy=false;await loadRefund(intent.roundId);controls();renderTransactions();}
 }
 async function submit(action) {
   if(state.busy || !state.wallet || $(action).disabled) return;
@@ -243,32 +312,50 @@ async function submit(action) {
     // This is the only signing entry point, reached solely from an explicit button click.
     const hash=await wallet.request({method:'eth_sendTransaction',params:[tx]});
     if(!explorerLink('tx',hash)) throw new Error(t('钱包未返回有效交易哈希，请先检查钱包活动，勿重复提交。','No valid transaction hash was returned. Check wallet activity before trying again.'));
-    state.transactions.unshift({hash,account:intent.account,action,roundId:intent.roundId,to,data,status:'pending',submittedAt:new Date().toISOString()});
+    state.transactions.unshift(createTransactionRecord({hash,account:intent.account,action,roundId:intent.roundId,to,data,fromBlock:finalSnapshot.block}));
     state.transactions=state.transactions.slice(0,25);saveTransactions();
     notice(t('交易已提交，等待链上确认：{hash}','Transaction submitted; awaiting confirmation: {hash}',{hash}));
-    await pollTransactions();
+    void pollTransactions();
   } catch(error) {notice(explanation(error),true);}
   finally {state.busy=false;controls();renderTransactions();}
 }
 function saveTransactions(){try{localStorage.setItem(TX_KEY,JSON.stringify(state.transactions));}catch{/* Public transaction records remain visible in this tab. */}}
-function restoreTransactions(){try{const rows=JSON.parse(localStorage.getItem(TX_KEY)||'[]');if(Array.isArray(rows))state.transactions=rows.filter(row=>explorerLink('tx',row.hash)&&explorerLink('address',row.account)&&['approve','buy'].includes(row.action)&&['pending','confirmed','reverted','unverified'].includes(row.status)&&same(row.to,row.action==='approve'?PINNED.bemAddress:PINNED.gameAddress)&&/^0x[0-9a-f]*$/i.test(row.data??'')).slice(0,25);}catch{/* No wallet credentials are stored or restored. */}}
+function restoreTransactions(merge=false){try{const incoming=restoreTransactionRecords(localStorage.getItem(TX_KEY)||'[]');if(!merge){state.transactions=incoming;return;}const known=new Map(state.transactions.map(row=>[row.hash,row]));for(const row of incoming)if(!known.has(row.hash))known.set(row.hash,row);const terminal=row=>['confirmed','reverted','cancelled','replaced'].includes(row.status);state.transactions=[...known.values()].sort((a,b)=>Number(terminal(a))-Number(terminal(b))||(Date.parse(b.submittedAt)||0)-(Date.parse(a.submittedAt)||0)).slice(0,25);}catch{/* Another tab cannot erase this tab's unresolved transaction records. */}}
 async function pollTransactions(){
-  if(!state.rpc)return;
+  if(!state.tracker||state.polling)return;
+  state.polling=true;$('check-transactions').disabled=true;
   let changed=false;
-  for(const record of state.transactions.filter(row=>row.status==='pending')){
-    try{
-      const receipt=await state.rpc.getTransactionReceipt(record.hash);if(!receipt)continue;
-      const tx=await state.rpc.getTransaction(record.hash);
-      const matches=tx&&Number(tx.chainId)===56&&same(tx.from,record.account)&&same(tx.to,record.to)&&tx.data===record.data&&tx.value===0n;
-      record.status=!matches?'unverified':receipt.status===1?'confirmed':'reverted';record.block=receipt.blockNumber;changed=true;
-    }catch{/* A missing receipt stays pending; it is never treated as a failed transaction. */}
-  }
-  if(changed){saveTransactions();await refresh();}renderTransactions();controls();
+  try {
+    const candidates=state.transactions.filter(row=>!['confirmed','reverted','cancelled','replaced'].includes(row.status)).sort((a,b)=>(Date.parse(a.checkedAt)||0)-(Date.parse(b.checkedAt)||0)).slice(0,4);
+    await Promise.all(candidates.map(async record=>{
+      try{
+        const next=await state.tracker.poll(record);
+        const index=state.transactions.indexOf(record);
+        if(index<0)return;
+        if(JSON.stringify(record)!==JSON.stringify(next)){state.transactions[index]=next;changed=true;}
+      }catch{/* A failed read cannot prove that a transaction failed. */}
+    }));
+    if(changed){saveTransactions();await refresh();}
+  } finally {state.polling=false;$('check-transactions').disabled=false;renderTransactions();controls();}
 }
 function renderTransactions(){
   $('transactions').hidden=!state.transactions.length;$('transaction-list').replaceChildren();
-  const statusCopy={pending:t('等待链上确认','Awaiting confirmation'),confirmed:t('已确认','Confirmed'),reverted:t('执行失败 · 已回滚','Reverted'),unverified:t('交易详情不匹配 · 请核实','Transaction details do not match · Review needed')};
-  for(const record of state.transactions){const row=document.createElement('div');row.className='tx-entry';const title=document.createElement('b');title.textContent=`${record.action==='approve'?t('授权','Approval'):t('购买','Purchase')} · ${statusCopy[record.status]}`;const account=document.createElement('span');account.textContent=t('钱包 {account} · 第 {round} 期','Wallet {account} · Round {round}',{account:record.account,round:record.roundId});row.append(title,account,link('tx',record.hash));$('transaction-list').append(row);}
+  const statusCopy={pending:t('等待链上确认','Awaiting confirmation'),confirming:t('已上链 · 等待确认数','Mined · Awaiting confirmations'),confirmed:t('已确认','Confirmed'),reverted:t('执行失败 · 已回滚','Reverted'),cancelled:t('已被取消交易替换','Replaced by a cancellation'),replaced:t('已被其他交易替换','Replaced by a different transaction'),unknown:t('结果待核实','Result unknown'),unverified:t('交易详情尚未核实','Transaction details unverified')};
+  for(const record of state.transactions){
+    const row=document.createElement('div');row.className='tx-entry';const title=document.createElement('b');
+    const action=record.action==='approve'?t('授权','Approval'):record.action==='refund'?t('退款','Refund'):t('购买','Purchase');
+    title.textContent=`${action} · ${statusCopy[record.status]??statusCopy.unknown}`;
+    const account=document.createElement('span');account.textContent=t('钱包 {account} · 第 {round} 期','Wallet {account} · Round {round}',{account:record.account,round:record.roundId});
+    row.append(title,account,link('tx',record.hash));
+    if(record.replacementHash){const replacement=document.createElement('small');replacement.append(t('替换交易：','Replacement: '),link('tx',record.replacementHash));row.append(replacement);}
+    if(transactionNeedsReview(record)){
+      const note=document.createElement('small');note.textContent=t('尚不能确认此笔结果；它仍可能执行。请检查钱包活动及链上记录后再操作，避免重复购买。','The result is not yet verified; this transaction may still execute. Check wallet activity and onchain records before proceeding to avoid duplicate purchases.');row.append(note);
+      const form=document.createElement('form');form.className='tx-reconcile';const input=document.createElement('input');input.type='text';input.placeholder=t('粘贴加速或取消后的交易哈希','Paste the accelerated or cancellation transaction hash');input.setAttribute('aria-label',input.placeholder);input.maxLength=66;const button=document.createElement('button');button.type='submit';button.textContent=t('核对新交易','Check new transaction');form.append(input,button);
+      form.addEventListener('submit',async event=>{event.preventDefault();if(!state.tracker||!explorerLink('tx',input.value.trim())){notice(t('请输入完整的 0x 交易哈希。','Enter the complete 0x transaction hash.'),true);return;}button.disabled=true;try{const next=await state.tracker.reconcile(record,input.value.trim());const index=state.transactions.indexOf(record);if(index>=0){state.transactions[index]=next;saveTransactions();}await refresh();renderTransactions();}catch(error){notice(explanation(error),true);}finally{button.disabled=false;controls();}});row.append(form);
+      if(same(record.account,state.account)&&!reviewedTransactions.has(record.hash)){const checked=document.createElement('button');checked.type='button';checked.textContent=t('我已核对钱包，继续操作','I checked my wallet · Continue');checked.addEventListener('click',()=>{reviewedTransactions.add(record.hash);notice(t('您已确认核对钱包活动。原交易仍会继续查询，未标记为失败，也不会自动重发。','You confirmed reviewing wallet activity. The original transaction will still be checked; it has not been marked as failed or resent.'));renderTransactions();controls();});row.append(checked);}
+    }
+    $('transaction-list').append(row);
+  }
 }
 
 function link(kind,value,label=value){const href=explorerLink(kind,value);if(!href)return document.createTextNode('—');const anchor=document.createElement('a');anchor.href=href;anchor.textContent=label;anchor.target='_blank';anchor.rel='noopener noreferrer';return anchor;}
@@ -287,7 +374,7 @@ function renderHistory(){
   else $('history-summary').textContent=t('正在读取已确认历史…','Loading confirmed history…');
   if(!data?.rounds.length){const empty=document.createElement('p');empty.className='empty-state';empty.textContent=data?.index.state==='ready'&&!state.historyError?t('已确认的区块范围内，尚无往期记录。','No past rounds were found in the confirmed block range.'):t('等待历史索引，暂时无法确认往期记录。','Waiting for the history index; past records cannot yet be confirmed.');list.append(empty);}
   for(const record of data?.rounds??[]){
-    const row=document.createElement('article');row.className='history-entry';const heading=document.createElement('div');const round=document.createElement('small');round.textContent=t('第 {round} 期','Round {round}',{round:record.roundId});const number=document.createElement('strong');number.textContent=record.status===5&&Number.isInteger(record.winningTicket)?`#${displayTicket(record.winningTicket)}`:statuses()[record.status]??'—';heading.append(round,number);const wallet=document.createElement('div');wallet.className='mono';const label=document.createElement('small');label.textContent=record.status===5?t('中奖钱包 · 奖金 95 BEM','Winning wallet · 95 BEM prize'):t('本期状态','Round status');wallet.append(label,record.winner?link('address',record.winner):document.createTextNode('—'));if(record.settlementTxHash){const tx=document.createElement('div');tx.append(link('tx',record.settlementTxHash,t('开奖交易 ↗','Settlement transaction ↗')));wallet.append(tx);}const button=document.createElement('button');button.type='button';button.textContent=t('验算详情','Verification');button.addEventListener('click',()=>loadDetail(record.roundId));row.append(heading,wallet,button);list.append(row);
+    const row=document.createElement('article');row.className='history-entry';const heading=document.createElement('div');const round=document.createElement('small');round.textContent=t('第 {round} 期','Round {round}',{round:record.roundId});const number=document.createElement('strong');number.textContent=record.status===5&&Number.isInteger(record.winningTicket)?`#${displayTicket(record.winningTicket)}`:statuses()[record.status]??'—';heading.append(round,number);const wallet=document.createElement('div');wallet.className='mono';const label=document.createElement('small');label.textContent=record.status===5?t('中奖钱包 · 奖金 95 BEM','Winning wallet · 95 BEM prize'):t('本期状态','Round status');wallet.append(label,record.winner?link('address',record.winner):document.createTextNode('—'));if(record.settlementTxHash){const tx=document.createElement('div');tx.append(link('tx',record.settlementTxHash,t('开奖交易 ↗','Settlement transaction ↗')));wallet.append(tx);}const actions=document.createElement('div');const button=document.createElement('button');button.type='button';button.textContent=t('验算详情','Verification');button.addEventListener('click',()=>loadDetail(record.roundId));actions.append(button);if([1,2,6].includes(record.status)){const refund=document.createElement('button');refund.type='button';refund.textContent=t('查询退款','Check refund');refund.addEventListener('click',()=>{if(state.busy)return;selectTab('draw');state.epoch++;state.refund=null;$('refund-round').value=String(record.roundId);loadRefund();$('refund-card').scrollIntoView({behavior:'smooth',block:'start'});});actions.append(refund);}row.append(heading,wallet,actions);list.append(row);
   }
   $('history-page').textContent=data?`${data.page} / ${Math.max(1,data.totalPages||1)}`:'—';$('history-prev').disabled=!data||data.page<=1;$('history-next').disabled=!data||data.page>=data.totalPages;
 }
@@ -334,13 +421,13 @@ function selectTab(name){for(const tab of ['draw','proof']){$('panel-'+tab).hidd
 
 initLanguage();restoreTransactions();
 $('browser-url').value=new URL('/',location.href).href;
-window.addEventListener('eip6963:announceProvider',event=>{const detail=event.detail;if(detail?.info?.uuid)registerWallet(detail.provider,detail.info.name,`eip6963:${detail.info.uuid}`);});
-window.dispatchEvent(new Event('eip6963:requestProvider'));
-if(window.ethereum){for(const [index,provider] of (window.ethereum.providers??[window.ethereum]).entries())registerWallet(provider,provider.isMetaMask?'MetaMask':t('浏览器钱包','Browser wallet'),`legacy:${index}`);}
-$('connect-wallet').addEventListener('click',connect);$('switch-network').addEventListener('click',switchNetwork);
+const walletPicker=createWalletPicker({dialog:$('wallet-picker'),onSelect:connect,onChange:wallets=>{state.wallets=wallets;render();}});
+$('connect-wallet').addEventListener('click',()=>{if(!state.busy)walletPicker.open();});$('switch-network').addEventListener('click',switchNetwork);
 $('copy-browser-url').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('browser-url').value);notice(t('网址已复制，请粘贴到已安装 MetaMask 的 Chrome / Edge 地址栏。','URL copied. Paste it into Chrome or Edge with MetaMask installed.'));}catch{$('browser-url').focus();$('browser-url').select();notice(t('请复制已选中的网址，粘贴到已安装 MetaMask 的 Chrome / Edge。','Copy the selected URL and paste it into Chrome or Edge with MetaMask installed.'));}});
-$('wallet-provider').addEventListener('change',()=>{detachWallet();state.wallet=null;walletChanged();});
 $('approve').addEventListener('click',()=>submit('approve'));$('buy').addEventListener('click',()=>submit('buy'));
+$('refund').addEventListener('click',submitRefund);$('check-refund').addEventListener('click',()=>loadRefund());
+$('refund-round').addEventListener('input',()=>{state.epoch++;state.refundVersion++;state.refund=null;state.refundLoading=false;state.refundError=null;renderRefund();controls();});
+$('check-transactions').addEventListener('click',pollTransactions);
 for(const id of ['ticket-count','selected-tickets'])$(id).addEventListener('input',()=>{state.epoch++;render();});
 for(const mode of ['auto','selected'])$('mode-'+mode).addEventListener('click',()=>{if(state.busy)return;state.mode=mode;state.epoch++;$('auto-fields').hidden=mode!=='auto';$('selected-fields').hidden=mode!=='selected';for(const value of ['auto','selected'])$('mode-'+value).setAttribute('aria-pressed',String(mode===value));render();});
 document.querySelectorAll('[data-count]').forEach(button=>button.addEventListener('click',()=>{if(state.busy)return;$('ticket-count').value=button.dataset.count;state.epoch++;render();}));
@@ -348,12 +435,12 @@ document.querySelectorAll('[data-tab]').forEach(button=>button.addEventListener(
 $('replay').addEventListener('click',()=>{if(state.reveal)reveal(state.reveal,true);});
 $('refresh-history').addEventListener('click',()=>loadHistory());$('history-prev').addEventListener('click',()=>loadHistory(state.page-1));$('history-next').addEventListener('click',()=>loadHistory(state.page+1));
 window.addEventListener('bem:languagechange',()=>{$('notice').textContent=translateKnown($('notice').textContent);render();renderHistory();if(state.detailId&&!$('proof-detail').hidden)renderDetail();});
-window.addEventListener('storage',event=>{if(event.key===TX_KEY){restoreTransactions();renderTransactions();controls();}});
+window.addEventListener('storage',event=>{if(event.key===TX_KEY){restoreTransactions(true);renderTransactions();controls();}});
 window.addEventListener('resize',()=>{if(state.reveal&&!state.animating)reveal(state.reveal,false);});
 setInterval(()=>{renderCountdown();controls();},1000);
 setInterval(()=>{refresh();pollTransactions();},15000);
 async function boot(){
-  try{state.config=validateManifest(await fetchJson('/api/config'));state.rpc=new JsonRpcProvider(new URL('/rpc',location.origin).href,56,{staticNetwork:true,batchMaxCount:1});state.game=new Contract(PINNED.gameAddress,state.config.gameAbi,state.rpc);state.token=new Contract(PINNED.bemAddress,state.config.bemAbi,state.rpc);await refresh();if(state.fixed)notice(t('正式合约已核对。当前待启动，可连接真实钱包查看主网余额。','Production contract verified. Awaiting launch; connect your wallet to view mainnet balances.'),false,true);await pollTransactions();loadHistory();}
+  try{state.config=validateManifest(await fetchJson('/api/config'));state.rpc=new JsonRpcProvider(new URL('/rpc',location.origin).href,56,{staticNetwork:true,batchMaxCount:25});state.tracker=createTransactionTracker({rpc:(method,params)=>state.rpc.send(method,params)});state.game=new Contract(PINNED.gameAddress,state.config.gameAbi,state.rpc);state.token=new Contract(PINNED.bemAddress,state.config.bemAbi,state.rpc);await refresh();if(state.fixed)notice(t('正式合约已核对。当前待启动，可连接真实钱包查看主网余额。','Production contract verified. Awaiting launch; connect your wallet to view mainnet balances.'),false,true);await pollTransactions();loadHistory();}
   catch(error){state.readError=true;notice(explanation(error),true);}
   finally{if(!state.wallets.size&&state.fixed)notice(t('主网数据已连接，可查看公开记录。连接钱包后可查看持票。','Mainnet data is connected. Browse public records, or connect a wallet to view your tickets.'),false,true);render();}
 }

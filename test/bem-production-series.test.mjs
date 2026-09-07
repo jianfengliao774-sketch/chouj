@@ -241,3 +241,76 @@ check("expired partial funding has a 60-second next-round cooldown with old refu
   assert.equal(await g.ticketOwner(1, 5), s.addresses[1]); assert.equal(await g.ticketOwner(2, 5), s.addresses[2]);
   assert.equal(await g.nextRoundOpensAt(), opensAt); await fails(g.refund(1, s.addresses[1], GAS));
 });
+
+for (const purchase of [
+  { bem: "0.1", count: 10, amount: 10_000_000n, method: "buySelected" },
+  { bem: "1", count: 100, amount: 100_000_000n, method: "buy" }
+]) {
+  check(`local fixed 2075: ${purchase.bem} BEM purchase and exact refund preserve the 100 BEM pool rule`, async (t, row) => {
+    // This is a partial contribution to the unchanged 100 BEM pool, not a
+    // smaller-pool deployment. All transfers and time changes are local mocks.
+    const s = await setup(t, bindings[0], true), g = s.game, participant = s.addresses[1];
+    await sent(authorize(s));
+    assert.equal(await g.ROUND_POOL(), POOL);
+    assert.equal(await g.TICKET_PRICE(), PRICE);
+    assert.equal(await s.token.decimals(), 8n);
+    await sent(s.token.connect(s.alice).approve(g.target, purchase.amount));
+    const originalBalance = await s.token.balanceOf(participant);
+    const callerBalance = await s.token.balanceOf(s.addresses[3]);
+    const containerBalance = await s.token.balanceOf(s.binding.account);
+    const deadBalance = await s.token.balanceOf(A.dead);
+    const supply = await s.token.totalSupply();
+    const selected = Array.from({ length: purchase.count }, (_, i) => Math.floor(i * 9_999 / (purchase.count - 1)));
+    const receipt = await sent(purchase.method === "buySelected"
+      ? g.connect(s.alice).buySelected(1, selected, GAS)
+      : g.connect(s.alice).buy(1, purchase.count, GAS));
+    assert.equal(await s.token.balanceOf(participant), originalBalance - purchase.amount);
+    assert.equal(await s.token.allowance(participant, g.target), 0n);
+    assert.equal(await s.token.balanceOf(g.target), purchase.amount);
+    assert.equal(await g.totalLiability(), purchase.amount);
+    assert.equal(await g.ticketsOf(1, participant), BigInt(purchase.count));
+    assert.equal((await g.rounds(1)).sold, BigInt(purchase.count));
+    assert.equal((await g.rounds(1)).status, 1n);
+    assert.equal(events(g, receipt, "TicketsPurchased").reduce((sum, e) => sum + e.paid, 0n), purchase.amount);
+    const owned = purchase.method === "buySelected" ? selected : Array.from({ length: purchase.count }, (_, i) => i);
+    for (const ticket of owned) assert.equal(await g.ticketOwner(1, ticket), participant);
+
+    const deadline = (await g.rounds(1)).fundingDeadline;
+    await at(s, deadline - 1n);
+    await fails(g.connect(s.keeper).refund(1, participant, GAS));
+    assert.equal(await s.token.balanceOf(participant), originalBalance - purchase.amount);
+    assert.equal(await s.token.balanceOf(g.target), purchase.amount);
+    assert.equal(await g.totalLiability(), purchase.amount);
+    assert.equal(await g.ticketsOf(1, participant), BigInt(purchase.count));
+    assert.equal((await g.rounds(1)).status, 1n);
+
+    await at(s, deadline);
+    // refund() itself opens refunds; the sponsor pays gas but never receives principal.
+    const refundReceipt = await sent(g.connect(s.keeper).refund(1, participant, GAS));
+    assert.deepEqual(events(s.token, refundReceipt, "Transfer").map(e => [e.from, e.to, e.amount]), [[getAddress(g.target), participant, purchase.amount]]);
+    const refundEvent = events(g, refundReceipt, "Refunded")[0];
+    assert.deepEqual(Array.from(refundEvent), [1n, participant, purchase.amount]);
+    assert.equal(await s.token.balanceOf(participant), originalBalance);
+    assert.equal(await s.token.balanceOf(s.addresses[3]), callerBalance);
+    assert.equal(await s.token.balanceOf(g.target), 0n);
+    assert.equal(await g.totalLiability(), 0n);
+    assert.equal(await g.ticketsOf(1, participant), 0n);
+    assert.equal((await g.rounds(1)).status, 6n);
+    assert.equal(await g.currentRoundId(), 2n);
+    assert.equal(await g.nextRoundOpensAt(), deadline + 60n);
+    assert.equal(await s.token.balanceOf(s.binding.account), containerBalance);
+    assert.equal(await s.token.balanceOf(A.dead), deadBalance);
+    assert.equal(await s.token.totalSupply(), supply);
+    assert.equal(await s.coordinator.requestCount(), 0n);
+    assert.equal((await g.rounds(1)).winner, ZeroAddress);
+    await fails(g.connect(s.keeper).refund(1, participant, GAS));
+    assert.equal(await s.token.balanceOf(participant), originalBalance);
+    assert.equal(await g.totalLiability(), 0n);
+    assert.ok(receipt.gasUsed < BSC_TX_GAS_CAP);
+    assert.ok(refundReceipt.gasUsed < BSC_TX_GAS_CAP);
+    row.poolBem = "100"; row.purchaseBem = purchase.bem; row.purchaseMethod = purchase.method;
+    row.paidBaseUnits = String(purchase.amount); row.refundedBaseUnits = String(refundEvent.amount);
+    row.purchaseGas = String(receipt.gasUsed); row.refundGas = String(refundReceipt.gasUsed);
+    row.contractName = "Bem2075RaffleBSC";
+  });
+}

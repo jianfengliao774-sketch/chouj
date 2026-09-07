@@ -10,7 +10,7 @@
   "scripts": {
     "build": "node bem-production-site/build.mjs",
     "start": "node bem-production-site/server.mjs",
-    "test": "node --test test/bem-production-history.test.mjs test/bem-production-rpc.test.mjs test/bem-production-player-guards.test.mjs test/bem-production-keeper.test.mjs test/bem-raffle-keeper.test.mjs test/bem-production-selectable.test.mjs test/bem-production-series.test.mjs",
+    "test": "node --test test/bem-production-history.test.mjs test/bem-production-rpc.test.mjs test/bem-production-player-guards.test.mjs test/bem-production-keeper.test.mjs test/bem-raffle-keeper.test.mjs test/bem-production-selectable.test.mjs test/bem-production-series.test.mjs test/bem-production-wallet-picker.test.mjs test/bem-production-refund-guards.test.mjs test/bem-production-transaction-tracker.test.mjs test/bem-production-player-ui.test.mjs",
     "compile:contracts": "node scripts/compile_bem_production.mjs",
     "check:chain": "node scripts/check_bem_production_dependencies.mjs",
     "keeper:inspect": "node scripts/run_bem_production_keeper.mjs --rpc https://bsc-dataseed.bnbchain.org"

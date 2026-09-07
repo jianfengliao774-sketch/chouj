@@ -2,8 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { Interface, Wallet } from 'ethers';
-import { createAdminAuth } from '../bem-production-site/auth.mjs';
+import { Interface } from 'ethers';
+import { createAdminAuth, createAdminCredential } from '../bem-production-site/auth.mjs';
 import { createProductionServer } from '../bem-production-site/server.mjs';
 import { GAME, BEM, CONTAINER, PROCESSOR, COORDINATOR, OPENER, CODE_HASH, ROOT, loadManifest } from '../bem-production-site/config.mjs';
 import { createReadRpc, validateReadRequest } from '../bem-production-site/rpc.mjs';
@@ -211,67 +211,78 @@ test('manifest cannot skip source binding with an empty artifact source set', as
   await withManifest(r => { r['Bem2075RaffleBSC.artifact.json'].sourceSha256s = {}; }, async () => assert.rejects(loadManifest()));
 });
 
-// Deterministic public test-only bytes sign login messages offline. No environment
-// private key, wallet provider, chain transaction or key generation is involved.
-const ownerWallet = new Wallet('0x' + '11'.repeat(32));
-const otherWallet = new Wallet('0x' + '22'.repeat(32));
+// Synthetic test account created only in memory. Never read environment variables
+// or a credential file, and never connect to the running site's admin service.
+const ADMIN = { username: 'synthetic-admin', password: 'test-only-not-a-real-credential' };
+const credential = await createAdminCredential(ADMIN.username, ADMIN.password);
 const ORIGIN = 'http://127.0.0.1:8788';
 function authFixture() {
-  const state = { now: 0, owner: ownerWallet.address, delayTo: null };
-  const auth = createAdminAuth({ now: () => state.now, readOwner: async () => {
-    if (state.delayTo !== null) state.now = state.delayTo;
-    return state.owner;
-  } });
-  const challenge = () => auth.challenge({ address: ownerWallet.address, origin: ORIGIN });
-  const login = async () => { const c = await challenge(); return auth.login({ id: c.id, signature: await ownerWallet.signMessage(c.message), origin: ORIGIN }); };
-  return { state, auth, challenge, login };
+  const state = { now: 0 };
+  const auth = createAdminAuth({ credential, now: () => state.now });
+  const login = (overrides = {}) => auth.login({ ...ADMIN, ip: '203.0.113.10', ...overrides });
+  return { state, auth, login };
 }
 
-test('admin challenges bind the current holder, exact origin and a single-use nonce', async () => {
-  const f = authFixture();
-  await assert.rejects(f.auth.challenge({ address: otherWallet.address, origin: ORIGIN }));
-  const c = await f.challenge(), signature = await ownerWallet.signMessage(c.message);
-  assert.match(c.message, /Chain ID: 56/); assert.ok(c.message.includes(`${ORIGIN}/admin.html`));
-  const session = await f.auth.login({ id: c.id, signature, origin: ORIGIN }); assert.equal(session.address, ownerWallet.address);
-  await assert.rejects(f.auth.login({ id: c.id, signature, origin: ORIGIN }));
-  const d = await f.challenge();
-  await assert.rejects(f.auth.login({ id: d.id, signature: await ownerWallet.signMessage(d.message), origin: 'https://evil.invalid' }));
-  const e = await f.challenge();
-  await assert.rejects(f.auth.login({ id: e.id, signature: await otherWallet.signMessage(e.message), origin: ORIGIN }));
+test('password authentication requires the configured hash profile and does not retain plaintext credentials', () => {
+  assert.equal(credential.password, undefined); assert.equal(credential.algorithm, 'scrypt');
+  assert.match(credential.salt, /^[a-f0-9]{32}$/); assert.match(credential.hash, /^[a-f0-9]{128}$/);
+  for (const mutation of [{ N: 2 }, { r: 1 }, { p: 1 }, { algorithm: 'plaintext' }, { hash: 'invalid' }, { salt: '' }, { username: '../admin' }]) {
+    assert.throws(() => createAdminAuth({ credential: { ...credential, ...mutation } }));
+  }
+  assert.throws(() => createAdminAuth({}));
 });
 
-test('expired challenges and sessions, logout, and NFT transfer invalidate admin access', async () => {
-  const f = authFixture(), c = await f.challenge(); f.state.now = 120000;
-  await assert.rejects(f.auth.login({ id: c.id, signature: await ownerWallet.signMessage(c.message), origin: ORIGIN }));
+test('wrong account, wrong password and malformed login requests receive the same 401 response', async () => {
+  const f = authFixture();
+  const messages = [];
+  for (const overrides of [{ username: 'other-admin' }, { password: 'wrong-test-password' }, { username: null }, { password: null }]) {
+    await assert.rejects(f.login(overrides), error => { assert.equal(error.authStatus, 401); messages.push(error.message); return true; });
+  }
+  assert.equal(new Set(messages).size, 1);
+  const login = await f.login(); assert.equal(login.username, ADMIN.username);
+  assert.match(login.token, /^[a-f0-9]{64}$/); assert.equal(login.password, undefined);
+});
+
+test('password sessions expire at 15 minutes, logout invalidates them, and a restart cannot restore memory-only sessions', async () => {
+  const f = authFixture();
   const login = await f.login(), cookie = `bem2075_admin=${login.token}`;
-  assert.equal((await f.auth.session(cookie)).address, ownerWallet.address);
-  f.auth.logout(cookie); assert.equal(await f.auth.session(cookie), null);
-  const next = await f.login(); f.state.owner = otherWallet.address;
-  assert.equal(await f.auth.session(`bem2075_admin=${next.token}`), null);
-  f.state.owner = ownerWallet.address; const last = await f.login(); f.state.now = last.expiresAt;
+  assert.equal((await f.auth.session(cookie)).username, ADMIN.username);
+  assert.equal(await authFixture().auth.session(cookie), null);
+  f.state.now = login.expiresAt - 1; assert.ok(await f.auth.session(cookie));
+  f.state.now = login.expiresAt; assert.equal(await f.auth.session(cookie), null);
+  const last = await f.login(); f.auth.logout(`bem2075_admin=${last.token}`);
   assert.equal(await f.auth.session(`bem2075_admin=${last.token}`), null);
 });
 
-test('owner RPC latency cannot extend an expired login challenge or session', async () => {
-  const f = authFixture(), c = await f.challenge(); f.state.delayTo = 120001;
-  await assert.rejects(f.auth.login({ id: c.id, signature: await ownerWallet.signMessage(c.message), origin: ORIGIN }));
-  f.state.delayTo = null; const login = await f.login(); f.state.delayTo = login.expiresAt + 1;
-  assert.equal(await f.auth.session(`bem2075_admin=${login.token}`), null);
+test('five failed attempts lock only that IP until the 15-minute window ends, including otherwise valid credentials', async () => {
+  const f = authFixture();
+  for (let i = 0; i < 5; i++) await assert.rejects(f.login({ password: 'wrong-test-password' }), error => error.authStatus === 401);
+  await assert.rejects(f.login(), error => error.authStatus === 429);
+  assert.equal((await f.login({ ip: '203.0.113.11' })).username, ADMIN.username);
+  f.state.now = 900000; assert.equal((await f.login()).username, ADMIN.username);
 });
 
-async function httpFixture() {
+test('global login attempts and concurrent scrypt work are bounded', async () => {
+  const f = authFixture();
+  for (let i = 0; i < 100; i++) await assert.rejects(f.login({ ip: `test-ip-${i}`, username: null }), error => error.authStatus === 401);
+  await assert.rejects(f.login({ ip: 'fresh-ip' }), error => error.authStatus === 429);
+  f.state.now = 900000;
+  const outcomes = await Promise.allSettled([f.login({ ip: 'one' }), f.login({ ip: 'two' }), f.login({ ip: 'three' })]);
+  assert.equal(outcomes.filter(item => item.status === 'fulfilled').length, 2);
+  assert.equal(outcomes.find(item => item.status === 'rejected').reason.authStatus, 429);
+});
+
+async function httpFixture({ publicOrigin } = {}) {
   const forwarded = [], manifest = await loadManifest();
-  const ownerAbi = new Interface(['function ownerOf(uint256) view returns(address)']);
   const gameAbi = new Interface(manifest.gameAbi);
   const subAbi = new Interface(['function getSubscription(uint256) view returns(uint96 balance,uint96 nativeBalance,uint64 reqCount,address owner,address[] consumers)']);
   const rpc = async (method, params) => {
     forwarded.push({ method, params });
-    if (method === 'eth_call' && params[0].to === PROCESSOR) return ownerAbi.encodeFunctionResult('ownerOf', [ownerWallet.address]);
     if (method === 'eth_chainId') return '0x38';
     if (method === 'eth_getBlockByNumber') return { number: block(120311700), hash: HASH, timestamp: '0x6a9d6b85' };
     if (method === 'eth_getCode') return '0x60006000'; // Deliberately not the verified production runtime.
     if (method === 'eth_getBalance') return '0x0';
-    if (method === 'eth_call' && params[0].to === COORDINATOR) return subAbi.encodeFunctionResult('getSubscription', [0, 1, 0, ownerWallet.address, [GAME]]);
+    if (method === 'eth_call' && params[0].to === COORDINATOR) return subAbi.encodeFunctionResult('getSubscription', [0, 1, 0, WALLET, [GAME]]);
     if (method === 'eth_call' && params[0].to === GAME) {
       const name = gameAbi.parseTransaction({ data: params[0].data }).name;
       const results = { seriesAuthorized: [false], currentRoundId: [1], nextRoundOpensAt: [0] };
@@ -280,14 +291,15 @@ async function httpFixture() {
     throw new Error('Upstream secret must not appear in responses');
   };
   const history = { getStatus: () => ({ state: 'ready' }), listRounds: () => ({ rows: [] }) };
-  const { server } = await createProductionServer({ port: 8788, rpc, manifest, history });
+  const { server } = await createProductionServer({ port: 8788, rpc, manifest, history, publicOrigin, adminCredential: credential });
   // Dispatch directly through the HTTP request listener: no listen(), port,
   // socket connection or network request is created by these tests.
-  const send = ({ url = '/rpc', method = 'POST', body = request('eth_chainId'), host = '127.0.0.1:8788', origin = ORIGIN, cookie } = {}) => new Promise(resolve => {
-    const headers = { host, 'content-type': 'application/json' };
+  const send = ({ url = '/rpc', method = 'POST', body = request('eth_chainId'), host = new URL(publicOrigin ?? ORIGIN).host,
+    origin = publicOrigin ?? ORIGIN, cookie, extraHeaders = {}, peer = '127.0.0.1' } = {}) => new Promise(resolve => {
+    const headers = { host, 'content-type': 'application/json', ...extraHeaders };
     if (origin !== null) headers.origin = origin;
     if (cookie) headers.cookie = cookie;
-    const req = { url, method, headers, socket: { remoteAddress: 'mock-loopback' },
+    const req = { url, method, headers, socket: { remoteAddress: peer },
       async *[Symbol.asyncIterator]() { if (body !== null) yield Buffer.from(JSON.stringify(body)); } };
     const result = { status: null, headers: {} };
     const res = { setHeader(name, value) { result.headers[name.toLowerCase()] = value; },
@@ -311,19 +323,40 @@ test('HTTP envelope blocks foreign hosts/origins and refuses write methods insid
   assert.equal(f.forwarded.length, before);
 });
 
-test('admin HTTP requires same-origin login and holder signature, issues only an HttpOnly scoped cookie', async () => {
+test('admin HTTP requires same-origin credentials, rejects the removed wallet flow, and rotates the scoped cookie', async () => {
   const f = await httpFixture();
-  assert.equal((await f.send({ url: '/api/admin/challenge', origin: null, body: { address: ownerWallet.address } })).status, 403);
+  assert.equal((await f.send({ url: '/api/admin/login', origin: null, body: ADMIN })).status, 403);
+  assert.equal((await f.send({ url: '/api/admin/login', origin: 'https://evil.invalid', body: ADMIN })).status, 403);
   assert.equal((await f.send({ url: '/api/admin/status', method: 'GET', body: null })).status, 401);
-  const challenge = await f.send({ url: '/api/admin/challenge', body: { address: ownerWallet.address } }); assert.equal(challenge.status, 200);
-  const signed = await ownerWallet.signMessage(challenge.body.message);
-  const login = await f.send({ url: '/api/admin/login', body: { id: challenge.body.id, signature: signed } });
+  assert.equal((await f.send({ url: '/api/admin/challenge', body: { address: WALLET } })).status, 404);
+  assert.equal((await f.send({ url: '/api/admin/login', body: { id: 'removed', signature: '0xdead' } })).status, 401);
+  const login = await f.send({ url: '/api/admin/login', body: ADMIN });
   assert.equal(login.status, 200); assert.equal(login.body.token, undefined);
   const cookie = login.headers['set-cookie']; assert.match(cookie, /HttpOnly/); assert.match(cookie, /SameSite=Strict/); assert.match(cookie, /Path=\/api\/admin/);
+  assert.doesNotMatch(cookie, /; Secure/); assert.equal(login.body.username, ADMIN.username);
   const unknown = await f.send({ url: '/api/admin/withdraw', method: 'POST', cookie, body: {} });
-  assert.equal(unknown.status, 404); assert.ok(f.forwarded.every(call => call.method === 'eth_call'));
-  assert.equal((await f.send({ url: '/api/admin/logout', cookie, body: {} })).status, 200);
+  assert.equal(unknown.status, 404); assert.equal(f.forwarded.length, 0, 'account login must not call ownerOf or a wallet/chain provider');
+  const again = await f.send({ url: '/api/admin/login', cookie, body: ADMIN }); assert.equal(again.status, 200);
+  assert.notEqual(again.headers['set-cookie'], cookie);
   assert.equal((await f.send({ url: '/api/admin/status', method: 'GET', cookie, body: null })).status, 401);
+  const currentCookie = again.headers['set-cookie'];
+  assert.equal((await f.send({ url: '/api/admin/logout', cookie: currentCookie, body: {} })).status, 200);
+  assert.equal((await f.send({ url: '/api/admin/status', method: 'GET', cookie: currentCookie, body: null })).status, 401);
+});
+
+test('HTTPS admin uses Secure cookies and trusts X-Real-IP only from its local reverse proxy', async () => {
+  const f = await httpFixture({ publicOrigin: 'https://tapeout.cc.cd' });
+  assert.equal((await f.send({ url: '/api/health', method: 'GET', host: '127.0.0.1:8788', body: null })).status, 403);
+  const ip = { 'x-real-ip': '203.0.113.10' };
+  for (let i = 0; i < 5; i++) assert.equal((await f.send({ url: '/api/admin/login', body: { ...ADMIN, password: 'incorrect-test-password' }, extraHeaders: ip })).status, 401);
+  const locked = await f.send({ url: '/api/admin/login', body: ADMIN, extraHeaders: { ...ip, 'x-forwarded-for': '203.0.113.99' } });
+  assert.equal(locked.status, 429); assert.equal(locked.headers['retry-after'], '900');
+  const otherIp = await f.send({ url: '/api/admin/login', body: ADMIN, extraHeaders: { 'x-real-ip': '203.0.113.11' } });
+  assert.equal(otherIp.status, 200); assert.match(otherIp.headers['set-cookie'], /; Secure/);
+  for (let i = 0; i < 5; i++) assert.equal((await f.send({ url: '/api/admin/login', body: { ...ADMIN, password: 'incorrect-test-password' },
+    peer: '198.51.100.20', extraHeaders: { 'x-real-ip': `203.0.113.${20 + i}` } })).status, 401);
+  assert.equal((await f.send({ url: '/api/admin/login', body: ADMIN, peer: '198.51.100.20', extraHeaders: { 'x-real-ip': '203.0.113.90' } })).status, 429);
+  assert.equal(f.forwarded.length, 0);
 });
 
 test('HTTP status and RPC failures do not leak upstream messages or publish an unverified status', async () => {

@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "checkedAt": "2026-09-06T13:08:32.355Z",
+  "checkedAt": "2026-09-07T00:42:13.767Z",
   "scope": "local_mocks",
   "compilerVersion": "0.8.36+commit.8a079791.Emscripten.clang",
   "sourceSha256s": {
@@ -52,6 +52,30 @@
     {
       "name": "expired partial funding has a 60-second next-round cooldown with old refund funds reserved",
       "passed": true
+    },
+    {
+      "name": "local fixed 2075: 0.1 BEM purchase and exact refund preserve the 100 BEM pool rule",
+      "passed": true,
+      "poolBem": "100",
+      "purchaseBem": "0.1",
+      "purchaseMethod": "buySelected",
+      "paidBaseUnits": "10000000",
+      "refundedBaseUnits": "10000000",
+      "purchaseGas": "442942",
+      "refundGas": "62817",
+      "contractName": "Bem2075RaffleBSC"
+    },
+    {
+      "name": "local fixed 2075: 1 BEM purchase and exact refund preserve the 100 BEM pool rule",
+      "passed": true,
+      "poolBem": "100",
+      "purchaseBem": "1",
+      "purchaseMethod": "buy",
+      "paidBaseUnits": "100000000",
+      "refundedBaseUnits": "100000000",
+      "purchaseGas": "397031",
+      "refundGas": "62817",
+      "contractName": "Bem2075RaffleBSC"
     }
   ],
   "mainnetTransactionsSent": 0

@@ -1,31 +1,11 @@
 {
   "schemaVersion": 1,
-  "preparedAt": "2026-09-06T14:31:53.08831Z",
+  "preparedAt": "2026-09-07T01:19:54.459Z",
   "copiedFiles": [
     {
-      "path": "bem-production-site/server.mjs",
-      "sha256": "c4b3ac9cc65b25a8ef7a8b3fde713226b8dcd09864700cca21e7301edad5ee6c",
-      "bytes": 13496
-    },
-    {
-      "path": "bem-production-site/rpc.mjs",
-      "sha256": "46d7c89a82ec92ce117e55e27305e0fe91effbd6bc15a8195542af44ab28da3f",
-      "bytes": 6919
-    },
-    {
       "path": "bem-production-site/auth.mjs",
-      "sha256": "06265f9b7468eff3a243dbde6a780694e04915f37f0e9a6f7da027521abd8fe8",
-      "bytes": 2901
-    },
-    {
-      "path": "bem-production-site/config.mjs",
-      "sha256": "3626988a3749500bc80b5c439cdffd55ed8e102af224f7da1a118596472ebadc",
-      "bytes": 3930
-    },
-    {
-      "path": "bem-production-site/chain-history.mjs",
-      "sha256": "a0ca07f0e27c0ccdbd8958d201ec767e53c4b4333e7b0362b6cf477a2326b26b",
-      "bytes": 19920
+      "sha256": "90b7ee87bea6e6a8caa1924b159e635f9d999f8a1b889403bc8ea2d6c4089b65",
+      "bytes": 3514
     },
     {
       "path": "bem-production-site/build.mjs",
@@ -33,29 +13,44 @@
       "bytes": 492
     },
     {
-      "path": "bem-production-site/web/index.html",
-      "sha256": "59ca92a84e470d556a5000808c3ede67f16677bd5e0a3dfd45e789492a0d434f",
-      "bytes": 22485
+      "path": "bem-production-site/chain-history.mjs",
+      "sha256": "a0ca07f0e27c0ccdbd8958d201ec767e53c4b4333e7b0362b6cf477a2326b26b",
+      "bytes": 19920
+    },
+    {
+      "path": "bem-production-site/config.mjs",
+      "sha256": "3626988a3749500bc80b5c439cdffd55ed8e102af224f7da1a118596472ebadc",
+      "bytes": 3930
+    },
+    {
+      "path": "bem-production-site/rpc.mjs",
+      "sha256": "46d7c89a82ec92ce117e55e27305e0fe91effbd6bc15a8195542af44ab28da3f",
+      "bytes": 6919
+    },
+    {
+      "path": "bem-production-site/server.mjs",
+      "sha256": "68682bac975bb3d9c0fca1d4e569cdb69d0345d2f0aea4b2db846e1a09b26b5a",
+      "bytes": 15162
+    },
+    {
+      "path": "bem-production-site/web/admin.css",
+      "sha256": "ee72338d2b7b4fdf134e70b4c01111fc49d529d58e412f47e91b72f435191f9d",
+      "bytes": 2755
+    },
+    {
+      "path": "bem-production-site/web/admin.html",
+      "sha256": "787fa12e88b6d62a757d48f007a0cf74190ea7a13a39c3073af94010ffa6f852",
+      "bytes": 2167
+    },
+    {
+      "path": "bem-production-site/web/admin.js",
+      "sha256": "30ccdf7c020634cfd99fd72c025e1ba26e567717963c073748877f54ef29515a",
+      "bytes": 4903
     },
     {
       "path": "bem-production-site/web/app.js",
-      "sha256": "6e3ba90f3d9e0aff75f91a3587beaafcb50857dc297cce5b7ed0e04b12cc6445",
-      "bytes": 38885
-    },
-    {
-      "path": "bem-production-site/web/guards.js",
-      "sha256": "1e5a89fad8ced3313848fbe8359e6ebf31cdaeb9a4fcdde5062dc13a2f5ad242",
-      "bytes": 6262
-    },
-    {
-      "path": "bem-production-site/web/player-i18n.js",
-      "sha256": "66b8f36af4f220ba22fa8bae9c90896983f27a920976f7c7e0779e9f4ffff551",
-      "bytes": 3797
-    },
-    {
-      "path": "bem-production-site/web/styles.css",
-      "sha256": "d8f55cf7cbb381ee4e894cb97a2c85a419fc8bb2b389b8d7c40a4dee19f9d49c",
-      "bytes": 32306
+      "sha256": "05d6faece4b2acbe7d49efa708861c8b8e02b55fdb59560462dc17eba9a04ad7",
+      "bytes": 48816
     },
     {
       "path": "bem-production-site/web/festive.css",
@@ -63,9 +58,19 @@
       "bytes": 15478
     },
     {
-      "path": "bem-production-site/web/production.css",
-      "sha256": "e5345010c71a00e2407599485e162af7293d501e01dd3ca32acb62bbd4d180cf",
-      "bytes": 6685
+      "path": "bem-production-site/web/guards.js",
+      "sha256": "1e5a89fad8ced3313848fbe8359e6ebf31cdaeb9a4fcdde5062dc13a2f5ad242",
+      "bytes": 6262
+    },
+    {
+      "path": "bem-production-site/web/index.html",
+      "sha256": "498294a8358416c1739978abd64e4628dd421ed1e82a379e7b207c3284be8dfb",
+      "bytes": 24608
+    },
+    {
+      "path": "bem-production-site/web/player-i18n.js",
+      "sha256": "66b8f36af4f220ba22fa8bae9c90896983f27a920976f7c7e0779e9f4ffff551",
+      "bytes": 3797
     },
     {
       "path": "bem-production-site/web/processor-2075.json",
@@ -73,39 +78,34 @@
       "bytes": 6076
     },
     {
-      "path": "bem-production-site/web/admin.html",
-      "sha256": "a523657d8ac7fc8d8d6c92f548d278af64442336230fa9e5d97ee852da84c60f",
-      "bytes": 2023
+      "path": "bem-production-site/web/production.css",
+      "sha256": "855de0de2a051cbec1d651173e1090b3a47a340a597788ac211d409736c99182",
+      "bytes": 7304
     },
     {
-      "path": "bem-production-site/web/admin.js",
-      "sha256": "4ce7247af881fffe203e43c0d46fbea83fd471c7941d810f2ea1badacb9e303c",
-      "bytes": 6614
+      "path": "bem-production-site/web/refund-guards.js",
+      "sha256": "9266a5ef0621c05789a05f0e06db88bb2051d1d02047d57da0fada1fc38a42c5",
+      "bytes": 2173
     },
     {
-      "path": "bem-production-site/web/admin.css",
-      "sha256": "44c32677970a07941fed015ff2b0737c7e5ad829dfaecf433ffa0dd024f53205",
-      "bytes": 2346
+      "path": "bem-production-site/web/styles.css",
+      "sha256": "d8f55cf7cbb381ee4e894cb97a2c85a419fc8bb2b389b8d7c40a4dee19f9d49c",
+      "bytes": 32306
     },
     {
-      "path": "contracts/production/BemSelectableRaffle.sol",
-      "sha256": "b6b7812a0eaf54d3e7b2f307bd4a552fd343952378f4615f590b1faa06fabb44",
-      "bytes": 25656
+      "path": "bem-production-site/web/transaction-tracker.js",
+      "sha256": "427750adebfd79abb302e711800f96d9c23333b11a134033ecbf2e85ebd4dcc6",
+      "bytes": 18543
     },
     {
-      "path": "contracts/production/BemSelectableRaffleBSC.sol",
-      "sha256": "a338742191c63affd11f779c2f724299e87c9950dcf75614651612e004938be2",
-      "bytes": 1691
+      "path": "bem-production-site/web/wallet-picker.css",
+      "sha256": "879768eee314b2db8f0b404697a0754852db2fcb962df875ba3205429e64f574",
+      "bytes": 2883
     },
     {
-      "path": "contracts/production/BemContainerSeriesBSC.sol",
-      "sha256": "ef1bc76983c30480bdb3afabec59622cca8d6d1c76a725ed63e0bde542743b40",
-      "bytes": 7800
-    },
-    {
-      "path": "contracts/production/Bem2075RaffleBSC.sol",
-      "sha256": "75f24090ae026a7edb44df44c1a008ffe30dc974e2a4393d523fe907599040d8",
-      "bytes": 704
+      "path": "bem-production-site/web/wallet-picker.js",
+      "sha256": "bd8c1650bf692e745531e703a43760ef879edff16cc2c2de125611a4111af7ae",
+      "bytes": 6671
     },
     {
       "path": "contracts/BemCircuitRaffle.sol",
@@ -123,74 +123,24 @@
       "bytes": 3698
     },
     {
-      "path": "scripts/run_bem_production_keeper.mjs",
-      "sha256": "643a560431bede685d855f3ff4ab2ad99bf9da5673fee4bd68dd148ccd41fc1d",
-      "bytes": 7062
+      "path": "contracts/production/Bem2075RaffleBSC.sol",
+      "sha256": "75f24090ae026a7edb44df44c1a008ffe30dc974e2a4393d523fe907599040d8",
+      "bytes": 704
     },
     {
-      "path": "scripts/bem_production_keeper_core.mjs",
-      "sha256": "700bc34350c159195ceec81252e5cf4b88eaf989bbb4fab66034de5a173856b6",
-      "bytes": 20588
+      "path": "contracts/production/BemContainerSeriesBSC.sol",
+      "sha256": "ef1bc76983c30480bdb3afabec59622cca8d6d1c76a725ed63e0bde542743b40",
+      "bytes": 7800
     },
     {
-      "path": "scripts/run_bem_raffle_keeper.mjs",
-      "sha256": "0934a4ff40e02d1d6a9b14b6c44e6b6bc9fd5550bdf2fdcec9e50ffec1cb5393",
-      "bytes": 10304
+      "path": "contracts/production/BemSelectableRaffle.sol",
+      "sha256": "b6b7812a0eaf54d3e7b2f307bd4a552fd343952378f4615f590b1faa06fabb44",
+      "bytes": 25656
     },
     {
-      "path": "scripts/compile_bem_production.mjs",
-      "sha256": "3f24888fed7e3d604bd6f4c85c83f1f48c3d1c433c11a9b3b264efbb0022be09",
-      "bytes": 5231
-    },
-    {
-      "path": "scripts/prepare_bem_production_deployment.mjs",
-      "sha256": "81304b8b228532ef6694b580f245d7d3b65ca2579372620290800189f8e176c5",
-      "bytes": 12849
-    },
-    {
-      "path": "scripts/record_bem_production_deployment.mjs",
-      "sha256": "cffe5127ea805c0573b7c7e95e755602d7da742928b420424cdc997e8a499355",
-      "bytes": 8369
-    },
-    {
-      "path": "scripts/check_bem_production_dependencies.mjs",
-      "sha256": "ad3e61747b4cf62db2999b44ecadad09a1d8c408b10a2ba8f0350c5bba051c0d",
-      "bytes": 14318
-    },
-    {
-      "path": "test/bem-production-history.test.mjs",
-      "sha256": "f39c658621a12d4a6d7fcc5ec75a60f7035b86e3c0c783136c3d4df80b296a0e",
-      "bytes": 10185
-    },
-    {
-      "path": "test/bem-production-rpc.test.mjs",
-      "sha256": "f9d061d2cf811ae605be12e7bf795caa7990760636b8f8f429b92c9e515d9b96",
-      "bytes": 21589
-    },
-    {
-      "path": "test/bem-production-player-guards.test.mjs",
-      "sha256": "e6755d2a167647508f94eafeddfa3ce44f8d1b96604ecbf2cf9afd1bf41f5305",
-      "bytes": 6569
-    },
-    {
-      "path": "test/bem-production-keeper.test.mjs",
-      "sha256": "17d3fcd5d5313c2733d5754c913ea6e425763cb42390a8b21ab1997e2c29b9f7",
-      "bytes": 16984
-    },
-    {
-      "path": "test/bem-raffle-keeper.test.mjs",
-      "sha256": "ce14ec7404871117af5c29fbcf25fa8bdbd28ca6167a3249c78e1f02af560320",
-      "bytes": 2096
-    },
-    {
-      "path": "test/bem-production-selectable.test.mjs",
-      "sha256": "93bb944b3cafd63cc368f587bd97869d1041921b4cc2f1355d92063a10d3a613",
-      "bytes": 21090
-    },
-    {
-      "path": "test/bem-production-series.test.mjs",
-      "sha256": "b2ac49895ca56e359e369cffa149904198d4a25f338b6a88311ed9dbbeff0141",
-      "bytes": 18990
+      "path": "contracts/production/BemSelectableRaffleBSC.sol",
+      "sha256": "a338742191c63affd11f779c2f724299e87c9950dcf75614651612e004938be2",
+      "bytes": 1691
     },
     {
       "path": "outputs/bem-raffle-2075/BemContainerRaffleBSC.abi.json",
@@ -198,39 +148,14 @@
       "bytes": 27089
     },
     {
-      "path": "outputs/bem-raffle-2075/deployment-preferences.json",
-      "sha256": "0ba7af48b8f3eecfa79799a5f48c37bacf24fc1cf920602124a8c2964f90dcdd",
-      "bytes": 3045
-    },
-    {
-      "path": "outputs/bem-raffle-2075/subscription-readonly.json",
-      "sha256": "43de8c57d7de567800b9b0985f3d217ff721e8d17cd6fa19b238dbe096a5f6dd",
-      "bytes": 6446
-    },
-    {
       "path": "outputs/bem-raffle-2075/circuit-2075.json",
       "sha256": "27bb9844bf683342331ba41b82f7f27172b35c1bd7eec1d84f7ca80f3e50047d",
       "bytes": 1923
     },
     {
-      "path": "outputs/bem-raffle-2075/production/release-plan.json",
-      "sha256": "2b1308d563be3ac31bef481c5592eec4eb4f491a622f724b67e5cf6bb7936913",
-      "bytes": 5941
-    },
-    {
-      "path": "outputs/bem-raffle-2075/production/deployment-verified.json",
-      "sha256": "4977170d7259d98b9ecb3a29034c537e7d5051ef2f5f6934561f755fdc52f25a",
-      "bytes": 42498
-    },
-    {
-      "path": "outputs/bem-raffle-2075/production/deployment-review.json",
-      "sha256": "a581acf899af83355035f15855d69ad182a3749db3c636438b61c938fc7663a5",
-      "bytes": 110937
-    },
-    {
-      "path": "outputs/bem-raffle-2075/production/Bem2075RaffleBSC.artifact.json",
-      "sha256": "fd8351cf0346b6333ab6b1fb1b5ab051cd1738ce3ced5e45305a5352314586fb",
-      "bytes": 151229
+      "path": "outputs/bem-raffle-2075/deployment-preferences.json",
+      "sha256": "0ba7af48b8f3eecfa79799a5f48c37bacf24fc1cf920602124a8c2964f90dcdd",
+      "bytes": 3045
     },
     {
       "path": "outputs/bem-raffle-2075/production/Bem2075RaffleBSC.abi.json",
@@ -238,9 +163,9 @@
       "bytes": 30555
     },
     {
-      "path": "outputs/bem-raffle-2075/production/Bem2075RaffleBSC.compile-input.json",
-      "sha256": "e69e09bff7e5d06db8256d46c9181c7e4256f49949a10f2042f00c22b4d79e3c",
-      "bytes": 37414
+      "path": "outputs/bem-raffle-2075/production/Bem2075RaffleBSC.artifact.json",
+      "sha256": "fd8351cf0346b6333ab6b1fb1b5ab051cd1738ce3ced5e45305a5352314586fb",
+      "bytes": 151229
     },
     {
       "path": "outputs/bem-raffle-2075/production/Bem2075RaffleBSC.build-info.json",
@@ -251,6 +176,11 @@
       "path": "outputs/bem-raffle-2075/production/Bem2075RaffleBSC.bytecode.txt",
       "sha256": "53deaa49cda82cb501984e5fa25dbc0a5cfa4d92c9206c238b0efe095aa29c7d",
       "bytes": 37045
+    },
+    {
+      "path": "outputs/bem-raffle-2075/production/Bem2075RaffleBSC.compile-input.json",
+      "sha256": "e69e09bff7e5d06db8256d46c9181c7e4256f49949a10f2042f00c22b4d79e3c",
+      "bytes": 37414
     },
     {
       "path": "outputs/bem-raffle-2075/production/Bem2075RaffleBSC.deployed-bytecode.txt",
@@ -268,19 +198,14 @@
       "bytes": 110029
     },
     {
-      "path": "outputs/bem-raffle-2075/production/verification-keeper.json",
-      "sha256": "1c33e36edac3b6cef06ff56de89f10d2dedecadc447bfefbdc67d8b02044d4a5",
-      "bytes": 3354
+      "path": "outputs/bem-raffle-2075/production/deployment-review.json",
+      "sha256": "a581acf899af83355035f15855d69ad182a3749db3c636438b61c938fc7663a5",
+      "bytes": 110937
     },
     {
-      "path": "outputs/bem-raffle-2075/production/verification-selectable.json",
-      "sha256": "4b2060fc1deb61f8597b12fbb68cede81cde13f398da9e3808c00fbc18e17dd5",
-      "bytes": 2829
-    },
-    {
-      "path": "outputs/bem-raffle-2075/production/verification-series.json",
-      "sha256": "142275883346fd784409ec695350b6359e4fa03c24496e0b26059f217a689125",
-      "bytes": 2512
+      "path": "outputs/bem-raffle-2075/production/deployment-verified.json",
+      "sha256": "4977170d7259d98b9ecb3a29034c537e7d5051ef2f5f6934561f755fdc52f25a",
+      "bytes": 42498
     },
     {
       "path": "outputs/bem-raffle-2075/production/OPERATIONS.md",
@@ -293,9 +218,154 @@
       "bytes": 6953
     },
     {
+      "path": "outputs/bem-raffle-2075/production/release-plan.json",
+      "sha256": "2b1308d563be3ac31bef481c5592eec4eb4f491a622f724b67e5cf6bb7936913",
+      "bytes": 5941
+    },
+    {
+      "path": "outputs/bem-raffle-2075/production/verification-keeper.json",
+      "sha256": "3259183b28693451a78519c2706b9914768d29408762424fb501ed381b9b7ddc",
+      "bytes": 3354
+    },
+    {
+      "path": "outputs/bem-raffle-2075/production/verification-selectable.json",
+      "sha256": "cbcad22bf1a86ea78af65e37b6da984e43ba106317b11012f3caabab171a8556",
+      "bytes": 2829
+    },
+    {
+      "path": "outputs/bem-raffle-2075/production/verification-series.json",
+      "sha256": "61be90de8c0b5a300c969adb3689c14f4eb507f8aa39c9c4fa05561ba35fbdc6",
+      "bytes": 3302
+    },
+    {
       "path": "outputs/bem-raffle-2075/production/WEBSITE-VERIFICATION.md",
       "sha256": "bd5fbedddfd38d51596ad11ded8e72dd3badd70311120d2012d5cf94f78be4b1",
       "bytes": 2181
+    },
+    {
+      "path": "outputs/bem-raffle-2075/subscription-readonly.json",
+      "sha256": "43de8c57d7de567800b9b0985f3d217ff721e8d17cd6fa19b238dbe096a5f6dd",
+      "bytes": 6446
+    },
+    {
+      "path": "scripts/bem_production_keeper_core.mjs",
+      "sha256": "700bc34350c159195ceec81252e5cf4b88eaf989bbb4fab66034de5a173856b6",
+      "bytes": 20588
+    },
+    {
+      "path": "scripts/check_bem_production_dependencies.mjs",
+      "sha256": "ad3e61747b4cf62db2999b44ecadad09a1d8c408b10a2ba8f0350c5bba051c0d",
+      "bytes": 14318
+    },
+    {
+      "path": "scripts/compile_bem_production.mjs",
+      "sha256": "3f24888fed7e3d604bd6f4c85c83f1f48c3d1c433c11a9b3b264efbb0022be09",
+      "bytes": 5231
+    },
+    {
+      "path": "scripts/prepare_bem_production_deployment.mjs",
+      "sha256": "81304b8b228532ef6694b580f245d7d3b65ca2579372620290800189f8e176c5",
+      "bytes": 12849
+    },
+    {
+      "path": "scripts/record_bem_production_deployment.mjs",
+      "sha256": "cffe5127ea805c0573b7c7e95e755602d7da742928b420424cdc997e8a499355",
+      "bytes": 8369
+    },
+    {
+      "path": "scripts/run_bem_production_keeper.mjs",
+      "sha256": "643a560431bede685d855f3ff4ab2ad99bf9da5673fee4bd68dd148ccd41fc1d",
+      "bytes": 7062
+    },
+    {
+      "path": "scripts/run_bem_raffle_keeper.mjs",
+      "sha256": "0934a4ff40e02d1d6a9b14b6c44e6b6bc9fd5550bdf2fdcec9e50ffec1cb5393",
+      "bytes": 10304
+    },
+    {
+      "path": "test/bem-production-history.test.mjs",
+      "sha256": "f39c658621a12d4a6d7fcc5ec75a60f7035b86e3c0c783136c3d4df80b296a0e",
+      "bytes": 10185
+    },
+    {
+      "path": "test/bem-production-keeper.test.mjs",
+      "sha256": "17d3fcd5d5313c2733d5754c913ea6e425763cb42390a8b21ab1997e2c29b9f7",
+      "bytes": 16984
+    },
+    {
+      "path": "test/bem-production-player-guards.test.mjs",
+      "sha256": "e6755d2a167647508f94eafeddfa3ce44f8d1b96604ecbf2cf9afd1bf41f5305",
+      "bytes": 6569
+    },
+    {
+      "path": "test/bem-production-player-ui.test.mjs",
+      "sha256": "9beb8146ea82dc3ef109ae3effd06d6fe283eb374a1aa9e054df9e8f1545da80",
+      "bytes": 17452
+    },
+    {
+      "path": "test/bem-production-refund-guards.test.mjs",
+      "sha256": "b9d8cc90ad054633c6ce62fd527872af296e5a93662ccc4902b4a62fa139488a",
+      "bytes": 2647
+    },
+    {
+      "path": "test/bem-production-rpc.test.mjs",
+      "sha256": "c15207440789692a71cffc76b5d6ae48dfa27625d607bee5c31796e6997a4f3b",
+      "bytes": 24101
+    },
+    {
+      "path": "test/bem-production-selectable.test.mjs",
+      "sha256": "93bb944b3cafd63cc368f587bd97869d1041921b4cc2f1355d92063a10d3a613",
+      "bytes": 21090
+    },
+    {
+      "path": "test/bem-production-series.test.mjs",
+      "sha256": "629169c5222273c93c9a5f0a99b07dd5bf597249ef27ecd7fa024cf68c3521bf",
+      "bytes": 23627
+    },
+    {
+      "path": "test/bem-production-transaction-tracker.test.mjs",
+      "sha256": "f3a19ec682780df256138936f572cd0420718f871baec63f233a8de3fbf7d1e0",
+      "bytes": 13805
+    },
+    {
+      "path": "test/bem-production-wallet-picker.test.mjs",
+      "sha256": "9acba306ddbffc59d846be127ca4f1d3a9648415cb01d44b92183f14bc14a254",
+      "bytes": 9205
+    },
+    {
+      "path": "test/bem-raffle-keeper.test.mjs",
+      "sha256": "ce14ec7404871117af5c29fbcf25fa8bdbd28ca6167a3249c78e1f02af560320",
+      "bytes": 2096
+    },
+    {
+      "path": "bem-production-site/web/public/wallet-icons/trust.svg",
+      "sha256": "c3729a732e44aec8b096f4b888d211efe395566452e3eccc7c6743467158b148",
+      "bytes": 854
+    },
+    {
+      "path": "bem-production-site/web/public/wallet-icons/rabby.png",
+      "sha256": "fe1bfe73c2d61a22475c7a4c25d04cfb8af7a5a0930710a960606c679cca51ec",
+      "bytes": 1101
+    },
+    {
+      "path": "bem-production-site/web/public/wallet-icons/okx.png",
+      "sha256": "1d3983b221758ace5cce1223c36197127e166e580fd69b62394d48fb1df3b249",
+      "bytes": 1069
+    },
+    {
+      "path": "bem-production-site/web/public/wallet-icons/metamask.svg",
+      "sha256": "163dd1be1558ee648c266f4a533b6e10d40b737f838bbe40739d9637017cd35f",
+      "bytes": 2635
+    },
+    {
+      "path": "bem-production-site/web/public/wallet-icons/coinbase.svg",
+      "sha256": "074538717858bb72c64d5b4b9d14fe82f0ec368da886c010cfcf9786779c98c4",
+      "bytes": 517
+    },
+    {
+      "path": "bem-production-site/web/public/wallet-icons/binance.svg",
+      "sha256": "529e0e10307851f1e3ab4b0ee31d85ef046bad62feb011246f734c2e02751ed1",
+      "bytes": 570
     }
   ],
   "sourceFilesModified": false,
@@ -323,5 +393,5 @@
     "legacy demo pages",
     "legacy deployment and status page tests"
   ],
-  "verification": "All copied file SHA-256 values match the source export. Isolated pnpm frozen-lockfile offline install, production build and 80 tests passed; see PACKAGE-VERIFICATION.md."
+  "verification": "2026-09-07: running server application baseline reconciled; production build and 127 local tests passed; see PACKAGE-VERIFICATION.md. Four deployed Solidity source hashes preserved."
 }
