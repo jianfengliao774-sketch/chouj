@@ -3,9 +3,28 @@ import assert from 'node:assert/strict';
 import { createReadRpcBatcher } from '../bem-production-site/web/read-rpc-batcher.js';
 import { GAME } from '../bem-production-site/web/sparkdraw-transactions.js';
 import { profile } from '../bem-production-site/web/sparkdraw-profiles.js';
+import {withRequestTimeout} from '../bem-production-site/web/request-timeout.js';
 
 const response = (rows, status = 200) => ({ ok: status === 200, status, headers: { get: () => 'application/json' }, json: async () => rows });
 const replies = options => JSON.parse(options.body).map(row => ({ jsonrpc: '2.0', id: row.id, result: row.params[0] ?? '0x38' }));
+
+test('older wallet browsers without AbortSignal.timeout can load chain data', async t => {
+  const descriptor=Object.getOwnPropertyDescriptor(AbortSignal,'timeout');
+  Object.defineProperty(AbortSignal,'timeout',{value:undefined,configurable:true});
+  t.after(()=>Object.defineProperty(AbortSignal,'timeout',descriptor));
+  const rpc=createReadRpcBatcher({fetchImpl:async(_,options)=>response(replies(options))});
+  assert.equal(await rpc('eth_chainId'),'0x38');
+});
+
+test('request deadlines cover body reads and clear after completion', async t => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  let completedSignal,bodySignal;
+  assert.equal(await withRequestTimeout(50,async signal=>{completedSignal=signal;return 'done';}),'done');
+  t.mock.timers.tick(100);assert.equal(completedSignal.aborted,false);
+  const pending=withRequestTimeout(50,signal=>{bodySignal=signal;return new Promise((resolve,reject)=>signal.addEventListener('abort',()=>reject(Object.assign(Error('aborted'),{name:'AbortError'}))));});
+  const rejected=assert.rejects(pending,{name:'AbortError'});
+  t.mock.timers.tick(50);await rejected;assert.equal(bodySignal.aborted,true);
+});
 
 test('5000-ticket estimates are intact and concurrent large requests split below 512 KiB', async () => {
   const requests = [], tx = {to: profile('5').address, data: GAME.encodeFunctionData('buySelected', [1, Array.from({length: 5000}, (_, i) => i)])};

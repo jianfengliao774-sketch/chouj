@@ -34,23 +34,27 @@ export function createWalletRegistry(target, onChange) {
   });
   function discover() {
     const shared = target.ethereum;
-    // Binance exposes a dedicated provider; its mobile browser can instead use
-    // window.ethereum.isBinance. Metadata labels cards, never provider identity.
-    const providers = [target.binancew3w?.ethereum,
+    // Mobile wallets may expose a dedicated EVM bridge without window.ethereum
+    // or an EIP-6963 announcement. Preserve the exact selected provider object.
+    const okx = target.okxwallet, binance = target.binancew3w?.ethereum;
+    const providers = [okx, okx?.ethereum, binance,
       ...(Array.isArray(shared?.providers) ? shared.providers.slice(0, 32) : []), shared];
     legacy = new Map();
     for (const provider of providers) {
       if (!isProvider(provider) || legacy.has(provider) || legacy.size >= 32) continue;
       const id = providerId(provider);
-      const binance = provider === target.binancew3w?.ethereum || provider.isBinance === true;
-      legacy.set(provider, { id, provider, name: binance ? 'Binance Wallet' : t('浏览器钱包', 'Browser wallet') + ` ${legacy.size + 1}`,
-        rdns: binance ? 'com.binance.wallet' : '', icon: null });
+      const isOkx = provider === okx || provider === okx?.ethereum || provider.isOkxWallet === true || provider.isOKExWallet === true;
+      const isBinance = provider === binance || provider.isBinance === true;
+      legacy.set(provider, { id, provider, name: isOkx ? 'OKX Wallet' : isBinance ? 'Binance Wallet' : t('浏览器钱包', 'Browser wallet') + ` ${legacy.size + 1}`,
+        rdns: isOkx ? 'com.okx.wallet' : isBinance ? 'com.binance.wallet' : '', icon: null });
     }
     target.dispatchEvent(new Event('eip6963:requestProvider'));
     publish();
   }
   target.addEventListener('ethereum#initialized', discover);
   target.addEventListener('focus', discover);
+  target.addEventListener('pageshow', discover);
+  target.document?.addEventListener('visibilitychange', () => { if (!target.document.hidden) discover(); });
   return { discover, entries };
 }
 
@@ -72,8 +76,13 @@ const matches = (entry, wallet) => {
 export function createWalletPicker({ dialog, onSelect, onChange, target = window }) {
   const list = dialog.querySelector('#wallet-options');
   let wallets = new Map();
-  let discoveryTimers = [];
-  const stopDiscovery = () => { discoveryTimers.forEach(clearTimeout); discoveryTimers = []; };
+  let discoveryTimer;
+  const stopDiscovery = () => clearTimeout(discoveryTimer);
+  function scanWhileOpen() {
+    if (!dialog.open) return;
+    registry.discover();
+    discoveryTimer = setTimeout(scanWhileOpen, 1000);
+  }
   function render() {
     const focused = document.activeElement?.dataset.walletId;
     const cards = [...wallets.values()].map(entry => ({ entry, wallet: COMMON_WALLETS.find(wallet => matches(entry, wallet)) }));
@@ -118,6 +127,6 @@ export function createWalletPicker({ dialog, onSelect, onChange, target = window
     if (!dialog.open) { dialog.showModal(); document.body.classList.add('wallet-picker-open'); }
     // Some mobile bridges inject after page load without announcing EIP-6963.
     stopDiscovery();
-    discoveryTimers = [250, 750, 1500, 3000].map(ms => setTimeout(() => { if (dialog.open) registry.discover(); }, ms));
+    discoveryTimer = setTimeout(scanWhileOpen, 250);
   } };
 }

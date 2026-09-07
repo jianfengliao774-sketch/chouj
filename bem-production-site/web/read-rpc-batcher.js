@@ -1,3 +1,4 @@
+import {withRequestTimeout} from './request-timeout.js';
 const METHODS = new Set(['eth_chainId', 'eth_blockNumber', 'eth_getBlockByNumber', 'eth_getCode', 'eth_getBalance',
   'eth_call', 'eth_estimateGas', 'eth_gasPrice', 'eth_getTransactionCount', 'eth_getTransactionByHash', 'eth_getTransactionReceipt']);
 
@@ -11,14 +12,16 @@ export function createReadRpcBatcher({ fetchImpl = globalThis.fetch, endpoint = 
     items = items.filter(item => !item.finished);
     if (!items.length) return;
     try {
-      let response;
-      try {
-        response = await fetchImpl(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(items.map(item => item.request)), signal: AbortSignal.timeout(20000) });
-      } catch { throw Object.assign(unavailable(), { retryable: true }); }
-      if ([429, 502, 503, 504].includes(response.status)) throw Object.assign(unavailable(), { retryable: true });
-      if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw unavailable();
-      const rows = await response.json(), expected = new Set(items.map(item => item.request.id));
+      const rows = await withRequestTimeout(20000, async signal => {
+        let response;
+        try {
+          response = await fetchImpl(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(items.map(item => item.request)), signal });
+        } catch { throw Object.assign(unavailable(), { retryable: true }); }
+        if ([429, 502, 503, 504].includes(response.status)) throw Object.assign(unavailable(), { retryable: true });
+        if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw unavailable();
+        return response.json();
+      }), expected = new Set(items.map(item => item.request.id));
       if (!Array.isArray(rows) || rows.length !== items.length || rows.some(row => !row || row.jsonrpc !== '2.0' || !expected.has(row.id)) ||
         new Set(rows.map(row => row.id)).size !== rows.length) throw unavailable();
       const byId = new Map(rows.map(row => [row.id, row]));

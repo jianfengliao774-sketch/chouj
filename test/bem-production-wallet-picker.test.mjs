@@ -13,6 +13,31 @@ function announce(target, wallet, info = {}) {
 }
 const values = registry => [...registry.entries().values()];
 
+test('OKX dedicated, nested and shared mobile providers expose the OKX card without account requests', () => {
+  for (const injection of ['dedicated','nested','shared','legacyFlag']) {
+    const target = new EventTarget(), okx = provider();
+    if(injection==='dedicated')target.okxwallet=okx;
+    else if(injection==='nested')target.okxwallet={ethereum:okx};
+    else {okx[injection==='legacyFlag'?'isOKExWallet':'isOkxWallet']=true;target.ethereum=okx;}
+    const registry=createWalletRegistry(target,()=>{});registry.discover();
+    assert.equal(values(registry).length,1,injection);
+    assert.equal(values(registry)[0].provider,okx);
+    assert.equal(values(registry)[0].name,'OKX Wallet',injection);
+    assert.equal(values(registry)[0].rdns,'com.okx.wallet');
+    assert.deepEqual(okx.requests,[]);
+  }
+});
+
+test('OKX aliases deduplicate by identity and do not take over another shared provider', () => {
+  const target=new EventTarget(),okx=provider(),other=provider();
+  target.okxwallet=okx;target.ethereum=other;other.providers=[other,okx];
+  const registry=createWalletRegistry(target,()=>{});registry.discover();
+  assert.equal(values(registry).length,2);
+  assert.equal(values(registry).filter(e=>e.provider===okx).length,1);
+  assert.equal(values(registry).find(e=>e.provider===okx).name,'OKX Wallet');
+  assert.equal(values(registry).find(e=>e.provider===other).rdns,'');
+});
+
 test('Binance dedicated injection and mobile shared injection are detected without requesting accounts', () => {
   for (const dedicated of [true, false]) {
     const target = new EventTarget(), binance = provider();
@@ -144,6 +169,19 @@ function fixture(t, wallets) {
 }
 const cardName = card => card.querySelectorAll('strong')[0].textContent;
 const cardIcon = card => card.querySelectorAll('img')[0]?.src;
+
+test('OKX injected after the original three-second window remains discoverable until the picker closes', t => {
+  t.mock.timers.enable({apis:['setTimeout']});
+  const ui=fixture(t,[]),okx=provider();ui.picker.open();
+  t.mock.timers.tick(5000);
+  assert.equal(ui.cards().find(c=>cardName(c)==='OKX Wallet').disabled,true);
+  ui.target.okxwallet=okx;t.mock.timers.tick(1000);
+  const card=ui.cards().find(c=>cardName(c)==='OKX Wallet');
+  assert.equal(card.disabled,false);assert.equal(cardIcon(card),'/wallet-icons/okx.png');
+  card.dispatchEvent(new Event('click'));assert.equal(ui.selected[0].provider,okx);
+  ui.target.okxwallet=null;t.mock.timers.tick(5000);
+  assert.equal(ui.cards().find(c=>cardName(c)==='OKX Wallet').disabled,false,'Closing stops periodic discovery');
+});
 
 test('Binance injected after opening appears on its own card and clicks route to that provider', t => {
   t.mock.timers.enable({apis: ['setTimeout']});
