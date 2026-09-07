@@ -68,6 +68,11 @@
 .player-page .burn-intro .record-note{font-size:14px}
 .player-page .burn-intro .burn-address{font-size:14px;line-height:1.8;margin-bottom:0}
 .player-page .burn-list{margin-top:20px}
+.player-page .burn-summary{padding:26px;margin-bottom:20px;border-top:2px solid #bd2932}
+.player-page .burn-summary h2{font-size:18px;margin:0 0 12px}
+.player-page .burn-summary-amount{color:#bd2932;font-weight:700;overflow-wrap:anywhere;margin:0 0 12px}
+.player-page .burn-summary-amount strong{font-size:clamp(32px,5vw,52px);line-height:1.2;font-variant-numeric:tabular-nums}
+.player-page .burn-summary .record-note{font-size:14px;line-height:1.7;margin:6px 0 0}
 .player-page .burn-toolbar{margin:0 0 20px;gap:12px}
 .player-page .burn-toolbar label{margin:0;flex:none}
 .player-page .burn-toolbar select{min-width:0;max-width:100%;font-size:14px}

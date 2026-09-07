@@ -1,4 +1,5 @@
 import { participationQuery } from './participation.mjs';
+import { createBurnSummary } from './burn-summary.mjs';
 // Mainnet website: chain reads only. Wallets sign and broadcast directly in the browser.
 import { createServer } from 'node:http';
 import { isIP } from 'node:net';
@@ -34,6 +35,7 @@ export async function createProductionServer({ port = 8788, rpc = createReadRpc(
   const iface = new Interface(manifest.gameAbi);
   const readPoolStatus = createPoolStatusReader({ rpc });
   const auth = createAdminAuth({ credential: adminCredential });
+  const readBurnSummary = createBurnSummary({ sources: () => [history, ...Object.keys(POOL_DEPLOYMENTS).map(id => poolHistories[id])] });
   const adminPoolIds = ['1', '10', '50', '100', 'legacy100'];
   const adminIndex = poolId => poolId === 'legacy100' ? history : poolHistories[poolId];
   function adminSource(poolId) {
@@ -122,6 +124,7 @@ export async function createProductionServer({ port = 8788, rpc = createReadRpc(
       const poolStatus = /^\/api\/pools\/(1|10|50|100)\/status$/.exec(url.pathname);
       if (req.method === 'GET' && poolStatus) return json(res, 200, await readPoolStatus(poolStatus[1]));
       if (req.method === 'GET' && url.pathname === '/api/market') return json(res, 200, await market.getQuote());
+      if (req.method === 'GET' && url.pathname === '/api/burns/summary') return json(res, 200, readBurnSummary());
       if (req.method === 'GET' && ['/api/announcements', '/api/burns'].includes(url.pathname)) {
         const pool = url.searchParams.get('pool') || 'all';
         const page = Number(url.searchParams.get('page') || 1), pageSize = Number(url.searchParams.get('pageSize') || 20);
