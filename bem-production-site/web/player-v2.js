@@ -160,16 +160,16 @@ function render() {
       'Sold numbers are skipped. New production pools allocate remaining tickets in onchain order and charge only filled tickets. Unspent BEM remains in your wallet.'));
   put('rule-funding', t('凑满 {amount} BEM 封盘，目标在一分钟内开奖；VRF 与网络确认可能延迟。',
     'Sales close at {amount} BEM. The draw targets one minute after closing; VRF and network confirmations can take longer.', { amount: meta.poolTotal }));
-  put('rule-refunds', t('24 小时未凑满可退款，须在随后 24 小时内自行领取；截止后未领本金可销毁。每地址每期最多 5,000 份。',
-    'Unfilled rounds become refundable after 24 hours. Claim within the next 24 hours; unclaimed principal can then be burned. At most 5,000 tickets per address per round.'));
-  put('community-copy', t('您的每一份参与，都在为 Tapeout 生态建设添一份力量。每轮成功开奖，{burn} BEM 转入黑洞销毁，{container} BEM 转入容器，支持社区运营与维护。',
-    'Every entry supports the Tapeout ecosystem. Each settled round sends {burn} BEM to the dead address and {container} BEM to the container for community operations.',
+  put('rule-refunds', t('24 小时未凑满，开放 24 小时本金领取期。用户自行领取；到期未领取的本金统一转入黑洞销毁地址。结算后 60 秒后开下一期。',
+    'If a pool is not filled within 24 hours, a 24-hour principal claim period opens. Users must claim their own principal; any unclaimed principal is sent to the dead address for burning after the deadline. The next round opens 60 seconds after settlement.'));
+  put('community-copy', t('您的每一份参与，都在为 Tapeout 生态建设添一份力量。\n每轮成功开奖，{burn} BEM 转入黑洞销毁，{container} BEM 进入容器，支持社区运营与维护。',
+    'Every entry contributes to the Tapeout ecosystem.\nEach settled round sends {burn} BEM to the dead address and {container} BEM to the container for community operations and maintenance.',
     { burn: meta.blackholeAmount, container: meta.organizerAmount }));
   put('community-allocation', t('社区运营是项目用途承诺。本场次每轮成功开奖，{amount} BEM 转入容器，后续支出由该容器所属电路的当前持有人控制。开奖计算使用 2075，抽奖合约不托管 2075。',
     'Community operations are a project commitment. Each settled round in this pool sends {amount} BEM to the container; its circuit’s current holder controls later spending. Draws use 2075 for computation, and the raffle does not hold 2075.', { amount: meta.organizerAmount }));
   put('footer-rules', t('{price} BEM / 份 · 每期 10,000 份', '{price} BEM per ticket · 10,000 per round', { price: meta.unitPrice }));
   put('payout-burn', `${meta.blackholeAmount} BEM`); put('payout-container', `${meta.organizerAmount} BEM`); put('payout-winner', `${meta.winnerAmount} BEM`);
-  put('round-label', t('{amount} BEM 场次', '{amount} BEM pool', { amount: rules.id }));
+  put('round-label', t('本期开奖（第{round}期）', 'This draw (Round {round})', { round: launch?.currentRoundId ?? '—' }));
   put('round-phase', rules.testOnly && !launch ? state.poolStatusError ? t('状态读取暂不可用', 'State temporarily unavailable') : t('读取中', 'Loading')
     : configured ? t('已启动', 'Started') : deployment ? t('已部署 · 待启动', 'Deployed · Awaiting start') : t('读取中', 'Loading'));
   const sold = launch ? Number(launch.currentRound.sold) : null;
@@ -319,8 +319,7 @@ function renderTestControls() {
     put('snapshot-label', t('链上已核验 · 区块 {block}', 'Onchain state verified · Block {block}', { block: view.blockNumber.toLocaleString(getLocale()) }));
     put('my-count', view.myCount.toLocaleString(getLocale()));
     put('my-numbers', t('第 {round} 期 · 已持有 {count} 份。具体号码可查看已确认购买交易。', 'Round {round} · You hold {count} tickets. Check confirmed purchase transactions for their numbers.', { round: view.roundId.toString(), count: view.myCount.toString() }));
-    put('round-label', internal ? t('1 BEM 测试 · 第 {round} 期', '1 BEM test · Round {round}', { round: view.roundId.toString() })
-      : t('{amount} BEM · 第 {round} 期', '{amount} BEM · Round {round}', { amount: context.poolId, round: view.roundId.toString() }));
+    put('round-label', t('本期开奖（第{round}期）', 'This draw (Round {round})', { round: view.roundId.toString() }));
     if (view.seriesAuthorized && view.consumerAuthorized && view.round.status === 1 && view.timestamp < view.round.fundingDeadline) {
       put('launch-status', internal ? t('1 BEM 测试已开放', '1 BEM test open') : t('{amount} BEM 场次已开放', '{amount} BEM pool open', { amount: context.poolId }));
       put('round-phase', t('购买中', 'Funding'));

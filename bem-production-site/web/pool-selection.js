@@ -113,7 +113,7 @@ export function createPoolSelection({ mount, onChange = () => {}, metadataTarget
   let destroyed = false, generation = 0, abort = null;
   const controller = createPoolController({ initialPool, allowInternal, onChange: selection => { render(); onChange(selection); } });
   mount.classList.add('pool-selection');
-  const title = doc.createElement('div'); title.className = 'pool-selection-heading'; title.textContent = '选择场次';
+  const title = doc.createElement('div'); title.className = 'pool-selection-heading'; title.textContent = '选择场次（每个场次均为10,000份）';
   const list = doc.createElement('div'); list.className = 'pool-selection-options'; list.setAttribute('role', 'radiogroup'); list.setAttribute('aria-label', '选择开奖场次');
   const status = doc.createElement('p'); status.className = 'pool-selection-status'; status.setAttribute('role', 'status'); status.setAttribute('aria-live', 'polite');
   const detail = doc.createElement('p'); detail.className = 'pool-selection-detail';
@@ -122,7 +122,7 @@ export function createPoolSelection({ mount, onChange = () => {}, metadataTarget
     const rules = getPoolRules(id), button = doc.createElement('button'); button.type = 'button'; button.className = 'pool-choice';
     button.setAttribute('role', 'radio'); button.dataset.pool = id;
     const amount = doc.createElement('strong'), price = doc.createElement('span'), stateLabel = doc.createElement('small');
-    amount.textContent = `${id} BEM${rules.testOnly ? ' · 内部测试' : ''}`; price.textContent = `每份 ${money(rules.ticketPriceBaseUnits)} BEM`;
+    amount.textContent = `${id} BEM${rules.testOnly ? ' · 内部测试' : ''}`; price.textContent = `每份${money(rules.ticketPriceBaseUnits)}BEM`;
     button.append(amount, price, stateLabel);
     button.addEventListener('click', () => { if (!destroyed && !button.disabled) controller.select(id); });
     button.addEventListener('keydown', event => {
@@ -137,20 +137,20 @@ export function createPoolSelection({ mount, onChange = () => {}, metadataTarget
   mount.replaceChildren(title, list, status, detail);
   function render() {
     if (destroyed) return; const selection = controller.getState(), metadata = poolMetadata(selection);
-    title.textContent = t('选择场次', 'Choose a pool'); list.setAttribute('aria-label', t('选择开奖场次', 'Choose a draw pool'));
+    title.textContent = t('选择场次（每个场次均为10,000份）', 'Choose a pool (10,000 tickets per pool)'); list.setAttribute('aria-label', t('选择开奖场次', 'Choose a draw pool'));
     for (const [id, button] of buttons) {
       const active = id === selection.id, row = controller.getPool(id);
       button.setAttribute('aria-checked', String(active)); button.tabIndex = active ? 0 : -1;
       // Until deployment registration is loaded, every slot is explicitly marked unopened.
       button.children[0].textContent = row.testOnly ? t('1 BEM · 内部测试', '1 BEM · Internal test') : `${id} BEM`;
-      button.children[1].textContent = t('每份 {price} BEM', '{price} BEM per ticket', { price: money(row.ticketPriceBaseUnits) });
+      button.children[1].textContent = t('每份{price}BEM', '{price} BEM per ticket', { price: money(row.ticketPriceBaseUnits) });
       button.lastElementChild.textContent = row.available ? t('已开放', 'Open') : t('暂未开放', 'Not open yet');
       button.disabled = disableUnavailable && !row.available;
     }
     status.textContent = selection.error ? `${selection.message} · ${selection.error}` : selection.message;
     status.classList.toggle('is-open', selection.available);
-    detail.textContent = t('每期 10,000 份，单笔最多 1,000 份，每地址每期最多 5,000 份。24 小时未凑满可退款，领取期 24 小时，截止后未领本金可销毁。',
-      '10,000 tickets per round. Up to 1,000 per purchase and 5,000 per address. Unfilled rounds allow refunds after 24 hours. Claim within 24 hours; unclaimed principal can then be burned.');
+    detail.textContent = t('场次24 小时未凑满开奖可退款，领取期 24 小时，截止后未领本金黑洞销毁。',
+      'If a pool remains unfilled after 24 hours, refunds become available. Claim within 24 hours; any principal left unclaimed after the deadline is sent to the dead address for burning.');
     for (const [key, target] of Object.entries(metadataTargets)) {
       const node = typeof target === 'string' ? doc.querySelector(target) : target;
       if (node && Object.hasOwn(metadata, key) && typeof metadata[key] !== 'boolean') node.textContent = metadata[key];

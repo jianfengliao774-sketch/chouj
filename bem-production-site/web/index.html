@@ -3,12 +3,20 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#fbf7ed"><title>Tapeout 芯火夺宝 · BNB 主网</title>
-  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/festive.css"><link rel="stylesheet" href="/production.css"><link rel="stylesheet" href="/wallet-picker.css"><link rel="stylesheet" href="/pool-selection.css"><link rel="stylesheet" href="/lobby.css"><link rel="stylesheet" href="/player-readability.css"><link rel="stylesheet" href="/draft-layout.css"><link rel="stylesheet" href="/partial-fill-result.css">
+  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/festive.css"><link rel="stylesheet" href="/production.css"><link rel="stylesheet" href="/wallet-picker.css"><link rel="stylesheet" href="/pool-selection.css"><link rel="stylesheet" href="/lobby.css"><link rel="stylesheet" href="/player-readability.css"><link rel="stylesheet" href="/draft-layout.css"><link rel="stylesheet" href="/partial-fill-result.css"><link rel="stylesheet" href="/sparkdraw.css">
+  <link rel="icon" href="/sparkdraw-mark.svg" type="image/svg+xml">
 </head>
 <body class="player-page">
 <div class="simulation-banner"><span class="status-dot"></span><b data-en="BNB MAINNET">BNB 主网</b><span id="launch-status">新场次待开放</span></div>
 <div class="winner-broadcast-dock"><div class="shell"><section class="winner-broadcast" aria-label="中奖播报" data-en-aria-label="Winner announcements"><b data-en="WINNERS">中奖播报</b><div id="winner-ticker" class="ticker-window"><span data-en="Reading confirmed draws…">正在读取已确认开奖…</span></div><button type="button" id="ticker-pause" hidden aria-pressed="false" aria-controls="winner-ticker" data-en="Pause">暂停</button></section></div></div>
 <main class="shell">
+  <header class="sparkdraw-masthead">
+    <a class="sparkdraw-wordmark" href="/" aria-label="芯火夺宝 首页" data-en-aria-label="Tapeout SparkDraw home">
+      <img src="/sparkdraw-mark.svg" alt="" width="48" height="48">
+      <span><strong data-en="Tapeout SparkDraw">芯火夺宝</strong></span>
+    </a>
+    <span class="sparkdraw-tagline" data-en="A little spark. A shared adventure.">一点芯火，一起期待。</span>
+  </header>
   <div hidden aria-hidden="true"><span class="status-dot" id="connection-dot"></span><span id="connection-status">核对链上状态…</span></div>
   <section class="wallet-bar" aria-label="钱包" data-en-aria-label="Wallet">
     <div><span class="eyebrow" data-en="YOUR WALLET">您的钱包</span><div id="wallet-label">连接钱包，查看余额与持票</div><div id="wallet-address" class="mono wallet-address"></div></div>
@@ -22,72 +30,21 @@
     <div class="draw-layout">
       <section class="reactor card">
         <div class="hero">
-            <div class="processor-chip" role="img" aria-label="BEHEMOTH 2075 处理器封装示意，12 输入、9 输出、71 NAND 门" data-en-aria-label="Illustration of the BEHEMOTH 2075 processor package: 12 inputs, 9 outputs, 71 NAND gates">
-              <div class="processor-chip-halo" aria-hidden="true"></div>
-              <svg class="processor-chip-art" viewBox="0 0 240 240" fill="none" aria-hidden="true" focusable="false">
-                <defs>
-                  <linearGradient id="bem-metal-frame" x1="24" y1="20" x2="222" y2="221" gradientUnits="userSpaceOnUse"><stop stop-color="#fff2ce"/><stop offset=".12" stop-color="#c7a778"/><stop offset=".29" stop-color="#745a3e"/><stop offset=".48" stop-color="#e1c39a"/><stop offset=".53" stop-color="#5b4634"/><stop offset=".79" stop-color="#2e2420"/><stop offset="1" stop-color="#bea071"/></linearGradient>
-                  <linearGradient id="bem-inner-bevel" x1="45" y1="42" x2="198" y2="202" gradientUnits="userSpaceOnUse"><stop stop-color="#090b10"/><stop offset=".46" stop-color="#242026"/><stop offset=".55" stop-color="#74634c"/><stop offset="1" stop-color="#d3b788"/></linearGradient>
-                  <linearGradient id="bem-pin-metal" x1="0" y1="7" x2="0" y2="37" gradientUnits="userSpaceOnUse"><stop stop-color="#695440"/><stop offset=".3" stop-color="#f5ddb0"/><stop offset=".52" stop-color="#b29568"/><stop offset=".56" stop-color="#fff0ce"/><stop offset="1" stop-color="#4a382a"/></linearGradient>
-                  <linearGradient id="bem-die-surface" x1="48" y1="48" x2="194" y2="200" gradientUnits="userSpaceOnUse"><stop stop-color="#432b2b"/><stop offset=".25" stop-color="#201921"/><stop offset=".64" stop-color="#100f16"/><stop offset="1" stop-color="#3b1e23"/></linearGradient>
-                  <linearGradient id="bem-edge-light" x1="43" y1="45" x2="193" y2="199" gradientUnits="userSpaceOnUse"><stop stop-color="#fff1c2"/><stop offset=".28" stop-color="#eeae60"/><stop offset=".55" stop-color="#dc4650"/><stop offset=".8" stop-color="#71353a"/><stop offset="1" stop-color="#ffd79b"/></linearGradient>
-                  <linearGradient id="bem-number-light" x1="120" y1="97" x2="120" y2="148" gradientUnits="userSpaceOnUse"><stop stop-color="#fffdf1"/><stop offset=".45" stop-color="#fff2cc"/><stop offset="1" stop-color="#edc17a"/></linearGradient>
-                  <linearGradient id="bem-scan-light"><stop stop-color="#ff5b48" stop-opacity="0"/><stop offset=".5" stop-color="#fff0c0"/><stop offset="1" stop-color="#ff5b48" stop-opacity="0"/></linearGradient>
-                  <radialGradient id="bem-die-glow"><stop stop-color="#ff6d513b"/><stop offset=".6" stop-color="#bf38351a"/><stop offset="1" stop-color="#130f1700"/></radialGradient>
-                  <pattern id="bem-silicon-grid" width="7" height="7" patternUnits="userSpaceOnUse"><path d="M7 0H0V7" stroke="#eec69e" stroke-opacity=".065" stroke-width=".55"/></pattern>
-                  <filter id="bem-package-shadow" x="-25%" y="-20%" width="150%" height="155%"><feDropShadow dx="0" dy="7" stdDeviation="5" flood-color="#02040a" flood-opacity=".9"/></filter>
-                  <filter id="bem-trace-glow" x="-25%" y="-25%" width="150%" height="150%"><feGaussianBlur stdDeviation="1.3"/></filter>
-                  <clipPath id="bem-die-clip"><path d="M62 46H178L194 62V178L178 194H62L46 178V62Z"/></clipPath>
-                  <g id="bem-chip-pins" stroke="url(#bem-pin-metal)" stroke-width="4.5"><path d="M48 8V33M56 8V33M64 8V33M72 8V33M80 8V33M88 8V33M96 8V33M104 8V33M112 8V33M120 8V33M128 8V33M136 8V33M144 8V33M152 8V33M160 8V33M168 8V33M176 8V33M184 8V33M192 8V33"/></g>
-                  <path id="bem-chip-energy" d="M57 32H183L208 57V183L183 208H57L32 183V57Z"/>
-                  <g id="bem-silicon-traces"><path d="M48 71H66L79 84H96M48 79H61L75 93H84M48 169H65L79 155H91M192 71H172L160 83H147M192 79H177L165 91H156M192 169H176L162 155H151M70 47V61L81 72H105M78 47V58L88 67H107M170 47V63L158 75H141M163 193V179L151 168H133M70 193V181L81 170H108"/><path d="M49 102H61V138H49M191 102H180V139H191M54 112H58M54 119H58M54 126H58M183 112H187M183 119H187M183 126H187"/></g>
-                </defs>
-                <use href="#bem-chip-pins"/><use href="#bem-chip-pins" transform="rotate(90 120 120)"/><use href="#bem-chip-pins" transform="rotate(180 120 120)"/><use href="#bem-chip-pins" transform="rotate(270 120 120)"/>
-                <g filter="url(#bem-package-shadow)">
-                  <path d="M42 29H198L221 52V199L199 223H43L21 201V53Z" fill="#070910" stroke="#07070b" stroke-width="2"/>
-                  <path d="M43 22H197L219 44V196L197 218H43L21 196V44Z" fill="url(#bem-metal-frame)"/>
-                  <path d="M44 25H195L215 45V194L195 214H45L25 194V46Z" fill="#18171d" stroke="#edce9c" stroke-opacity=".52" stroke-width=".8"/>
-                  <path d="M44 23H196L217 44M23 48V195L44 216" stroke="#fff2d1" stroke-width="1.5" stroke-opacity=".8"/>
-                  <path d="M49 217H195L218 194V50" stroke="#05070c" stroke-width="2.5"/>
-                  <path d="M50 31H190L209 50V188L189 209H51L31 190V51Z" fill="url(#bem-inner-bevel)" stroke="#31282a" stroke-width=".7"/>
-                  <path d="M55 35H185L205 55V185L185 205H55L35 185V55Z" fill="#0b0d14" stroke="#d6b685" stroke-opacity=".46" stroke-width=".85"/>
-                  <use href="#bem-chip-energy" stroke="#7e3540" stroke-opacity=".7" stroke-width="1.1"/>
-                  <use href="#bem-chip-energy" class="chip-active-signal" stroke="#ffc77e" stroke-width="1.8"/>
-                  <path d="M65 42H177L198 63V177L177 198H63L42 177V64Z" stroke="#090a10" stroke-width="5"/>
-                  <path d="M63 44H177L196 63V177L177 196H63L44 177V63Z" stroke="url(#bem-edge-light)" stroke-opacity=".35" stroke-width="3.5" filter="url(#bem-trace-glow)"/>
-                  <path d="M63 44H177L196 63V177L177 196H63L44 177V63Z" fill="url(#bem-die-surface)" stroke="url(#bem-edge-light)" stroke-width="1.35"/>
-                  <path d="M64 48H175L192 65V175L175 192H65L48 175V64Z" stroke="#bd8d7440" stroke-width=".6"/>
-                  <g clip-path="url(#bem-die-clip)">
-                    <rect x="46" y="46" width="148" height="148" fill="url(#bem-silicon-grid)"/>
-                    <rect class="chip-die-light" x="46" y="46" width="148" height="148" fill="url(#bem-die-glow)"/>
-                    <use href="#bem-silicon-traces" stroke="#cfa370" stroke-opacity=".38" stroke-width=".85"/>
-                    <use href="#bem-silicon-traces" class="chip-active-signal" stroke="#f5bc7d" stroke-width="1.2"/>
-                    <path d="M70 56H113M127 56H168M70 184H109M134 184H169" stroke="#ffae7059" stroke-width="1"/>
-                    <g class="chip-scan-line"><path d="M48 120H192" stroke="url(#bem-scan-light)" stroke-width="7" opacity=".15" filter="url(#bem-trace-glow)"/><path d="M48 120H192" stroke="url(#bem-scan-light)" stroke-width="1"/></g>
-                  </g>
-                  <g fill="#f5cf8d"><path d="M46 37H58L37 58V46Z"/><path d="M182 37H194L203 46V58Z"/><path d="M203 182V194L194 203H182Z"/><path d="M58 203H46L37 194V182Z"/></g>
-                  <g class="chip-via-lights" fill="#ff5f4f"><path d="M49 36H64L36 64V49Z"/><path d="M176 204H191L204 191V176Z"/></g>
-                  <g stroke="#665849" stroke-width="1.2"><path d="M90 28H99M105 28H114M120 28H129M135 28H144M90 212H99M105 212H114M120 212H129M135 212H144M28 91V101M28 109V119M28 127V137M212 91V101M212 109V119M212 127V137"/></g>
-                  <g font-family="Consolas, 'SFMono-Regular', monospace" text-anchor="middle">
-                    <text x="120" y="89" font-size="12.5" font-weight="500" letter-spacing="1.25" fill="#d1ae82">BEHEMOTH</text>
-                    <text class="chip-model-number" x="120" y="146" font-size="61" font-weight="700" letter-spacing="-2.4" fill="url(#bem-number-light)">2075</text>
-                    <text x="120" y="167" font-size="8.7" letter-spacing="1.3" fill="#af8b73">12 IN / 9 OUT</text>
-                    <text x="120" y="188" font-size="6.2" letter-spacing="1.9" fill="#b59168">71 NAND</text>
-                  </g>
-                </g>
-              </svg>
-              <span class="processor-chip-caption" aria-hidden="true"><i></i> BNB · ONCHAIN</span>
+            <div class="processor-chip sparkdraw-art" role="img" aria-label="芯火夺宝品牌图案：芯片中的火花与 BEM 票券" data-en-aria-label="SparkDraw illustration: a spark inside a chip with BEM tickets">
+              <img class="processor-chip-art" src="/sparkdraw-emblem.svg" alt="" width="280" height="280">
+              <span class="processor-chip-caption" aria-hidden="true">BEM · SPARKDRAW</span>
             </div>
 
-          <div class="hero-content"><div class="hero-heading"><div class="eyebrow" data-en="ONCHAIN PROCESSOR · DRAW TERMINAL">链上处理器 · 开奖终端</div><h1 data-en="Tapeout SparkDraw">Tapeout 芯火夺宝</h1><p class="community-slogan" data-en="Burn BEM. Build the Tapeout ecosystem together.">销毁 BEM，共建 Tapeout 生态。</p></div></div>
-          <div class="hero-awards"><a class="rank-feature" href="#processor-details"><span class="rank-medal" aria-hidden="true">Ⅰ</span><span><b data-en="HASHPOWER LEADERBOARD">算力榜第一</b><small id="rank-scope" data-en="Task 260 best slot · Snapshot">任务 260 最优槽位 · 快照</small></span></a><section class="prize prize-card" aria-label="单期奖金与参考市值" data-en-aria-label="Prize and estimated market value">
+          <div class="hero-content"><div class="hero-heading"><div class="eyebrow brand-kicker">TAPEOUT SPARKDRAW</div><h1 data-en="SparkDraw">芯火夺宝</h1><p class="community-slogan" data-en="BEM in. Let the spark begin.">BEM 入池，芯火开奖。</p></div></div>
+          <div class="hero-awards"><a class="rank-feature" href="#processor-details"><span class="rank-medal" aria-hidden="true">✦</span><span><b data-en="Built with the community">一起点亮 Tapeout</b><small id="rank-scope" data-en="BEM · Community-powered">BEM 参与 · 社区共建</small></span></a><section class="prize prize-card" aria-label="单期奖金与参考市值" data-en-aria-label="Prize and estimated market value">
   <div class="prize-card-label" data-en="PRIZE PER ROUND">单期中奖金额</div><div class="prize-main"><strong id="prize-bem">95</strong><span>BEM</span></div>
   <div class="prize-equivalents"><div><small data-en="Estimated USDT">约合 USDT</small><b id="prize-usdt">— U</b></div><div><small data-en="Estimated BNB">约合 BNB</small><b id="prize-bnb">— BNB</b></div></div>
   <div class="market-unit" id="bem-unit-price">1 BEM ≈ — U · — BNB</div><div class="market-footer"><span id="market-time">读取币价…</span><span id="market-sources"></span></div>
 </section></div>
-          <div class="hero-message"><p class="community-copy" id="community-copy">您的每一份参与，都在为 Tapeout 生态建设添一份力量。每轮成功开奖，4 BEM 转入黑洞销毁，1 BEM 进入容器，支持社区运营与维护。</p><p class="local-mode-note" id="sale-note">新场次正在准备，部署核验完成后开放。</p></div>
+          <div class="hero-message"><p class="community-copy" id="community-copy">您的每一份参与，都在为 Tapeout 生态建设添一份力量。
+每轮成功开奖，4 BEM 转入黑洞销毁，1 BEM 进入容器，支持社区运营与维护。</p><p class="local-mode-note" id="sale-note">新场次正在准备，部署核验完成后开放。</p></div>
         </div>
-        <div class="round-heading"><strong id="round-label">等待首期开盘</strong><span class="phase" id="round-phase">待启动</span></div>
+        <div class="round-heading"><strong id="round-label">本期开奖（第—期）</strong><span class="phase" id="round-phase">待启动</span></div>
         <div class="progress-label"><span id="funding-amount">— / 100 BEM</span><span id="funding-tickets">— / 10,000 份</span></div><div class="progress" id="funding-progress"><i></i></div>
         <div class="draw-countdown-panel" id="countdown-panel" hidden><span id="countdown-label">开奖进度</span><strong id="countdown-value">—</strong><small id="countdown-note"></small></div>
         <div class="machine" id="machine"><div class="machine-heading"><span data-en="Winning number · Reel reveal">中奖号码 · 卷轴揭晓</span><span id="reel-caption">等待本期开奖</span></div><div id="reels" class="reels" aria-label="尚未开奖"><div class="reel"><div class="reel-strip"></div><span class="placeholder">—</span></div><div class="reel"><div class="reel-strip"></div><span class="placeholder">—</span></div><div class="reel"><div class="reel-strip"></div><span class="placeholder">—</span></div><div class="reel"><div class="reel-strip"></div><span class="placeholder">—</span></div><div class="reel"><div class="reel-strip"></div><span class="placeholder">—</span></div></div><div class="reel-message" id="reel-message" aria-live="polite">等待链上确认中奖号码。</div><div class="steps"><span id="step-lock" data-en="01 Sales close">01 封盘</span><span id="step-random" data-en="02 Verified randomness">02 可验证随机数</span><span id="step-circuit" data-en="03 Circuit evaluation">03 电路计算</span><span id="step-settle" data-en="04 Settlement">04 转账结算</span></div><button id="settle-test" type="button" hidden disabled>结算测试场次</button><button id="replay" class="quiet" type="button" disabled data-en="Replay reels">回放卷轴</button><small class="animation-note" data-en="The reels reveal an already public onchain result; they never generate or change it.">卷轴展示已经公开的链上结果，不生成或改变中奖号码。</small></div>
@@ -102,7 +59,7 @@
           <button id="approve" type="button" hidden class="accent-outline" disabled data-en="1 · Approve exact amount">1 · 授权本次金额</button><button id="buy" type="button" class="primary" disabled data-en="Approve & buy">授权并购买</button><p id="purchase-state" class="fine-print">待正式启动</p><p class="fine-print" data-en="One button. If allowance is insufficient, confirm approval, then purchase in your wallet. Sufficient allowance skips approval.">一个按钮完成操作；额度不足时，钱包先确认授权，再确认购买。已有足够额度则直接购买。</p>
           <div class="my-tickets"><span data-en="My tickets this round">我的本期持票</span><strong id="my-count">—</strong></div><p id="my-numbers" class="mono muted"></p>
         </section>
-        <section class="card timing-card"><h3 data-en="Round rules">每期规则</h3><p id="rule-funding">凑满 100 BEM 封盘，目标在一分钟内开奖；VRF 与网络确认可能延迟。</p><p id="rule-refunds">24 小时未凑满，开放 24 小时本金领取期。用户自行领取；到期未领取的本金可统一转入销毁地址。结算后冷却 60 秒可开下一期。</p><p data-en="Anyone can verify the outcome. 2075 computes every draw using Chainlink VRF inputs.">每次开奖都由 2075 执行电路计算，输入来自 Chainlink VRF，结果公开可验。</p></section>
+        <section class="card timing-card"><h3 data-en="Round rules">每期规则</h3><p id="rule-funding">凑满 100 BEM 封盘，目标在一分钟内开奖；VRF 与网络确认可能延迟。</p><p id="rule-refunds">24 小时未凑满，开放 24 小时本金领取期。用户自行领取；到期未领取的本金统一转入黑洞销毁地址。结算后 60 秒后开下一期。</p><p data-en="Every draw is computed by an onchain circuit. The result of every round is publicly verifiable.">每次开奖都由链上执行电路计算，每期结果公开可验。</p></section>
         <section class="card refund-card" id="refund-card" aria-labelledby="refund-title">
           <div class="eyebrow" data-en="CURRENT & PAST ROUNDS">本期与往期</div><h3 id="refund-title" data-en="Return principal">退回本金</h3>
           <p class="fine-print" data-en="Check an eligible round and confirm your claim in your wallet. Principal returns to the connected wallet.">查询符合退款条件的期号，由您在钱包确认领取，本金退回当前连接的钱包。</p>
@@ -111,12 +68,12 @@
           <button id="refund" type="button" class="accent-outline" disabled data-en="Claim my principal">领取我的本金</button>
         </section>
       </aside>
-      <section class="card about-card" id="processor-details"><div class="section-heading"><div><div class="eyebrow">BEHEMOTH #2075</div><h2 data-en="A processor for the community">社区的链上处理器</h2></div><a href="https://tapeout.net/pod/#mine" target="_blank" rel="noopener noreferrer" data-en="Official data ↗">官方资料 ↗</a></div><div class="processor-stats"><div><span data-en="Verified PoD weight">PoD 已验证算力</span><strong>22,938</strong></div><div><span data-en="Estimated mining output">快照估算日产出</span><strong>129.20 <small data-en="BEM / day">BEM / 天</small></strong></div><div><span data-en="Circuit size">电路规模</span><strong>71 <small>NAND</small></strong></div></div><p class="fine-print" data-en="Snapshot: block 120277183 · 2026-09-06 09:18:15 UTC. #2075 held the best slot for task 260; the overall live ranking has not been verified. PoD weight is a relative mining weight, not H/s. Output is an estimate, separate from raffle prizes.">资料快照：区块 120277183 · 2026-09-06 09:18:15 UTC。2075 占据任务 260 最优槽位，全网实时总榜尚未核实。PoD 算力是挖矿相对权重，并非 H/s；日产出为估算，与抽奖奖金无关。</p><a href="https://bscscan.com/block/120277183" target="_blank" rel="noopener noreferrer" data-en="Verify snapshot block ↗">查看快照区块 ↗</a></section>
+      <section class="card about-card" id="processor-details"><div class="eyebrow" data-en="ONCHAIN · VERIFIABLE">链上开奖 · 公开可验</div><h2 data-en="Every draw, publicly verifiable">每期开奖，公开可验</h2><p class="onchain-copy" data-en="Every draw is computed by an onchain circuit. The result of every round is publicly verifiable.">每次开奖都由链上执行电路计算，每期结果公开可验。</p></section>
     </div>
   </section>
   <section id="panel-proof" role="tabpanel" aria-labelledby="tab-proof" hidden><div class="card history-card"><div class="section-heading"><div><div class="eyebrow" data-en="ONCHAIN HISTORY">链上历史</div><h2 data-en="Past draws">往期开奖</h2><p id="history-summary" class="muted">读取已确认记录…</p></div><button id="refresh-history" type="button" data-en="Refresh">刷新记录</button></div><div id="history-list"></div><div class="history-pagination"><button id="history-prev" type="button" disabled data-en="Previous">上一页</button><span id="history-page"></span><button id="history-next" type="button" disabled data-en="Next">下一页</button></div></div><div id="proof-detail" class="card" hidden></div></section>
   <!-- burn-panel -->
-  <section class="card verification-card"><div class="section-heading"><h3 data-en="Public contract details">合约公开资料</h3><span id="snapshot-label" class="muted"></span></div><dl class="contract-links" id="contract-links"></dl><details><summary data-en="How fairness and settlement work">开奖与结算如何验证</summary><p data-en="Chainlink VRF supplies verifiable randomness. The fixed 2075 circuit evaluates inputs, and rejection sampling maps outputs to 10,000 equally eligible ticket numbers. Contract code, input/output events, transactions and winning wallets are public.">Chainlink VRF 提供可验证随机数，固定的 2075 电路执行输入计算，再通过拒绝采样映射至 10,000 个票号。合约源码、输入输出事件、交易和中奖钱包均可公开查询。</p><p id="community-allocation">每期成功开奖，1% 进入容器，用于社区运营与维护。后续支出由容器对应电路的当前持有人控制。</p></details></section>
+  <section class="card verification-card"><div class="section-heading"><h3 data-en="Public contract details">合约公开资料</h3><span id="snapshot-label" class="muted"></span></div><dl class="contract-links" id="contract-links"></dl><details><summary data-en="How fairness and settlement work">开奖与结算如何验证</summary><p data-en="Chainlink VRF supplies verifiable randomness. An onchain circuit evaluates inputs, and rejection sampling maps outputs to 10,000 equally eligible ticket numbers. Contract code, input/output events, transactions and winning wallets are public.">Chainlink VRF 提供可验证随机数，链上电路执行输入计算，再通过拒绝采样映射至 10,000 个票号。合约源码、输入输出事件、交易和中奖钱包均可公开查询。</p><p id="community-allocation">每期成功开奖，1% 进入容器，用于社区运营与维护。后续支出由容器对应电路的当前持有人控制。</p></details></section>
   <section id="transactions" class="card" hidden><div class="section-heading"><h3 data-en="Your submitted transactions">您已提交的交易</h3><button id="check-transactions" type="button" data-en="Check transactions">重新核查</button></div><div id="transaction-list"></div><div id="unknown-test-transaction" hidden><label for="unknown-test-hash" data-en="Transaction hash from your wallet">钱包中的交易哈希</label><input id="unknown-test-hash" type="text" maxlength="66" placeholder="0x…"><button id="attach-test-hash" type="button" data-en="Verify transaction">核验交易</button></div></section>
 
   <section id="panel-mine" role="tabpanel" aria-labelledby="tab-mine" hidden><div class="card history-card">

@@ -16,7 +16,7 @@ export function createPublicDrawDisplay({ getSnapshot, getPoolId }) {
     if (draw) {
       const phases = [t('等待下一期', 'Awaiting next round'), t('购买中', 'Funding'), t('已封盘', 'Sales closed'),
         t('等待 VRF', 'Awaiting VRF'), t('等待结算', 'Awaiting settlement'), t('已结算', 'Settled'), t('退款中', 'Refunding')];
-      put('round-label', t('{pool} BEM · 第 {round} 期', '{pool} BEM · Round {round}', { pool: poolId, round: draw.roundId }));
+      put('round-label', t('本期开奖（第{round}期）', 'This draw (Round {round})', { round: draw.roundId }));
       put('round-phase', phases[draw.status]);
       put('funding-tickets', t('{count} / 10,000 份', '{count} / 10,000 tickets', { count: draw.sold.toLocaleString() }));
       put('funding-amount', `${(draw.sold * Number(poolId) / 10000).toFixed(4).replace(/\.?0+$/, '') || '0'} / ${poolId} BEM`);
