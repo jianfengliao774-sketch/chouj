@@ -1,0 +1,29 @@
+[Unit]
+Description=Tapeout SparkDraw automatic onchain maintenance
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sparkdraw-keeper
+Group=sparkdraw-keeper
+SupplementaryGroups=app
+WorkingDirectory=/srv/crowdfund/current
+StateDirectory=sparkdraw-keeper
+StateDirectoryMode=0700
+RuntimeDirectory=sparkdraw-keeper
+RuntimeDirectoryMode=0755
+LoadCredentialEncrypted=sparkdraw-key:/etc/credstore.encrypted/sparkdraw-key
+Environment=SPARKDRAW_CONTROL=/var/lib/sparkdraw-control/control.json
+ExecStart=/usr/bin/flock -n /var/lib/sparkdraw-keeper/worker.lock /usr/bin/node /srv/crowdfund/current/bem-production-site/sparkdraw-automation.mjs
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictSUIDSGID=true
+UMask=0022
+
+[Install]
+WantedBy=multi-user.target
