@@ -265,3 +265,11 @@ test('known rdns takes precedence over a conflicting name, while unknown injecte
   active[1].dispatchEvent(new Event('click'));assert.equal(ui.selected[0].provider,unknown);
   assert.ok(ui.cards().some(card=>card.disabled&&cardName(card)==='MetaMask'));
 });
+
+
+test('TokenPocket dedicated EVM namespace is detected without shared injection',()=>{
+  const target=new EventTarget(),tp=provider();target.tokenpocket={ethereum:tp};
+  const registry=createWalletRegistry(target,()=>{});registry.discover();
+  assert.equal(values(registry).length,1);assert.equal(values(registry)[0].provider,tp);
+  assert.equal(values(registry)[0].name,'TokenPocket');assert.deepEqual(tp.requests,[]);
+});

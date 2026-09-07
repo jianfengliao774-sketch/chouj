@@ -36,6 +36,7 @@ try{
     {name:'OKX mobile shared provider uses its own wallet card',mobile:true,approval:false,selected:false,okx:'shared'},
     {name:'OKX mobile late provider appears after five seconds',mobile:true,approval:false,selected:false,okx:'dedicated',injectionDelay:5000},
     {name:'OKX mobile older browser without AbortSignal.timeout opens purchase',mobile:true,approval:false,selected:false,okx:'dedicated',legacyTimeout:true},
+    {name:'TokenPocket dedicated namespace approval and purchase',mobile:true,approval:true,selected:false,mobileWallet:'tpDedicated',confirmPurchase:'direct'},
     {name:'TokenPocket mobile approval then confirmed purchase',mobile:true,approval:true,selected:false,mobileWallet:'tp',confirmPurchase:'direct'},
     {name:'TokenPocket mobile legacy flag arrives after five seconds',mobile:true,approval:false,selected:false,mobileWallet:'tpLegacy',injectionDelay:5000},
     {name:'MetaMask mobile approval then confirmed purchase',mobile:true,approval:true,selected:false,mobileWallet:'metamask',confirmPurchase:'direct'},
@@ -55,7 +56,7 @@ try{
       if(legacyTimeout)Object.defineProperty(AbortSignal,'timeout',{value:undefined,configurable:true});
       window.__walletRequests=[];window.__purchases=[];window.__wrongWalletRequests=[];let authorized=false,currentAccount=account,currentChain=switchNetwork?'0x1':'0x38';const listeners={};
       document.addEventListener('click',e=>{if(e.target.closest?.('#buy')){window.__buyClickedAt=performance.now();window.__buyClickedWallAt=Date.now();}},true);
-      const flags=okx?{isOkxWallet:true}:({tp:{isTokenPocket:true,isMetaMask:true},tpLegacy:{isTp:true,isMetaMask:true},metamask:{isMetaMask:true},trust:{isTrust:true,isMetaMask:true}}[mobileWallet]||{isBinance:true});
+      const flags=okx?{isOkxWallet:true}:({tp:{isTokenPocket:true,isMetaMask:true},tpDedicated:{isTokenPocket:true},tpLegacy:{isTp:true,isMetaMask:true},metamask:{isMetaMask:true},trust:{isTrust:true,isMetaMask:true}}[mobileWallet]||{isBinance:true});
       const provider={...flags,on(name,fn){(listeners[name]??=[]).push(fn);},async request(q){
         window.__walletRequests.push({method:q.method,params:q.params,at:performance.now()});
         if(['eth_accounts','eth_chainId','eth_getTransactionCount'].includes(q.method))await new Promise(r=>setTimeout(r,walletDelay));
@@ -75,6 +76,7 @@ try{
       window.__installWallet=()=>{
         if(mixedProviders){const other={isMetaMask:true,async request(q){window.__wrongWalletRequests.push(q.method);if(q.method==='eth_accounts')return[];throw Error('Wrong wallet selected');}};other.providers=[other,provider];window.ethereum=other;}
         else if(okx==='dedicated')window.okxwallet=provider;
+        else if(mobileWallet==='tpDedicated')window.tokenpocket={ethereum:provider};
         else if(okx==='shared'||mobileWallet)window.ethereum=provider;
         else if(mobile)window.binancew3w={ethereum:provider};
         else window.ethereum=provider;

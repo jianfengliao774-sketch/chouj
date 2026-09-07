@@ -36,3 +36,13 @@ dialog.wallet-picker {
   .wallet-picker-hint { margin-bottom: 17px; }
   .wallet-picker-footer { margin-top: 19px; }
 }
+
+a.wallet-option { text-decoration: none; cursor: pointer; }
+.wallet-link-fallback { margin-top: 18px; color: #8a725a; font-size: 12px; }
+.wallet-link-fallback > div { display: flex; gap: 8px; margin-top: 6px; }
+#wallet-page-url { flex: 1; min-width: 0; padding: 9px; font-size: 12px; border: 1px solid #dcc8aa; border-radius: 8px; background: #fffdf8; color: #49372b; }
+#wallet-copy-url { flex: none; padding: 8px; font-size: 12px; border: 1px solid #dcc8aa; border-radius: 8px; background: #f8eddb; color: #9a503a; }
+.dialog-compat-backdrop { position: fixed; inset: 0; z-index: 9998; background: #2d211c80; }
+dialog[open].dialog-compat-open { display: block; position: fixed; z-index: 9999; top: 50%; left: 50%; margin: 0; transform: translate(-50%,-50%); max-height: 85vh; overflow-y: auto; }
+
+dialog[data-compat-dialog]:not([open]) { display: none; }
