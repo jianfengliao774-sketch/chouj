@@ -26,11 +26,25 @@ $('vault-stop-dialog').addEventListener('close',()=>{$('vault-stop-code').value=
 const clearPrivateKey=()=>{$('vault-private-key').value='';$('vault-key-preview').textContent='输入私钥后显示地址';};
 function previewKey(){try{const key=$('vault-private-key').value.trim();if(!/^(0x)?[a-fA-F0-9]{64}$/.test(key))throw Error();const address=new Wallet(key.startsWith('0x')?key:'0x'+key).address;$('vault-key-preview').textContent=address;return address;}catch{$('vault-key-preview').textContent='请输入有效的私钥';return null;}}
 $('vault-private-key').addEventListener('input',previewKey);
-$('vault-key-save').onclick=async()=>{if(busy)return;const expectedAddress=previewKey();if(!expectedAddress)return;busy=true;$('vault-key-save').disabled=true;
-  try{const request={privateKey:$('vault-private-key').value.trim(),expectedAddress,code:$('vault-code').value.trim()};clearPrivateKey();$('vault-code').value='';
+function openKeyDialog(){
+  if(busy)return;const address=previewKey();if(!address){$('vault-key-message').textContent='请先输入有效的执行钱包私钥。';return;}
+  $('vault-key-code').value='';$('vault-key-error').textContent='';$('vault-key-dialog-address').textContent=address;
+  $('vault-key-dialog').showModal();$('vault-key-code').focus();
+}
+async function confirmKeyImport(){
+  if(busy)return;const code=$('vault-key-code').value.trim();if(!/^\d{6}$/.test(code)){$('vault-key-error').textContent='请输入 6 位谷歌验证码。';return;}
+  const expectedAddress=previewKey();if(!expectedAddress||expectedAddress!==$('vault-key-dialog-address').textContent){$('vault-key-error').textContent='私钥已变化，请取消后重新核对钱包地址。';return;}
+  busy=true;$('vault-key-save').disabled=true;$('vault-key-confirm').disabled=true;$('vault-key-cancel').disabled=true;
+  try{const request={privateKey:$('vault-private-key').value.trim(),expectedAddress,code};clearPrivateKey();$('vault-key-code').value='';
     try{status=await api('/api/admin/vault/key',request);}finally{request.privateKey='';request.code='';}
-    $('vault-key-message').textContent='私钥已加密保存。后台切换后会自动开奖；请确保新钱包有 BNB 支付 Gas。';await refreshVault();
-  }catch(e){$('vault-key-message').textContent=e.message;}finally{busy=false;$('vault-key-save').disabled=!status?.keyImportAvailable||!status?.enrolled;}};
-window.addEventListener('pagehide',clearPrivateKey);
-new MutationObserver(()=>{if($('admin-content').hidden){clearPrivateKey();$('vault-code').value='';$('vault-stop-code').value='';$('vault-stop-dialog').close();$('vault-setup-secret').textContent='';$('vault-setup-detail').hidden=true;}else refreshVault();}).observe($('admin-content'),{attributes:true,attributeFilter:['hidden']});
+    $('vault-key-dialog').close();$('vault-key-message').textContent='私钥已加密保存。后台切换后会自动开奖；请确保新钱包有 BNB 支付 Gas。';await refreshVault();
+  }catch(e){$('vault-key-dialog').close();$('vault-key-message').textContent=e.message;}finally{busy=false;$('vault-key-confirm').disabled=false;$('vault-key-cancel').disabled=false;$('vault-key-save').disabled=!status?.keyImportAvailable||!status?.enrolled;}
+}
+$('vault-key-save').onclick=openKeyDialog;$('vault-key-confirm').onclick=confirmKeyImport;
+$('vault-key-cancel').onclick=()=>{if(!busy)$('vault-key-dialog').close();};
+$('vault-key-dialog').addEventListener('cancel',e=>{if(busy)e.preventDefault();});
+$('vault-key-dialog').addEventListener('close',()=>{$('vault-key-code').value='';$('vault-key-error').textContent='';$('vault-key-dialog-address').textContent='';});
+$('vault-key-code').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();confirmKeyImport();}});
+window.addEventListener('pagehide',()=>{clearPrivateKey();$('vault-key-code').value='';$('vault-key-dialog').close();});
+new MutationObserver(()=>{if($('admin-content').hidden){clearPrivateKey();$('vault-key-code').value='';$('vault-key-dialog').close();$('vault-code').value='';$('vault-stop-code').value='';$('vault-stop-dialog').close();$('vault-setup-secret').textContent='';$('vault-setup-detail').hidden=true;}else refreshVault();}).observe($('admin-content'),{attributes:true,attributeFilter:['hidden']});
 setInterval(refreshVault,5000);refreshVault();

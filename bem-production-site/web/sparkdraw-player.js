@@ -1,3 +1,4 @@
+import {randomUnsoldTickets} from './random-tickets.js';
 import {formatUnits,formatEther,getAddress} from 'ethers';
 import {formatWalletBalance3} from './balance-display.js';
 import {roundDisplay} from './round-display.js';
@@ -19,10 +20,10 @@ const context=()=>({account,key:JSON.stringify([revision,account,pool,chain,mode
 const note=x=>{$('notice').textContent=x;};
 async function api(path,body){const r=await fetch(path,{cache:'no-store',signal:AbortSignal.timeout(15000),...(body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw Error(t('服务暂时无法响应，正在自动重试。','Service temporarily unavailable; retrying.'));}if(!r.ok)throw Error(d.error||'Network unavailable');return d;}
 const rpc=async(method,params)=>{const d=await api('/rpc',{jsonrpc:'2.0',id:++serial,method,params});if(d.error)throw Error(d.error.message);return d.result;};
-const call=async(iface,to,name,args)=>iface.decodeFunctionResult(name,await rpc('eth_call',[{to,data:iface.encodeFunctionData(name,args)},'latest']));
+const call=async(iface,to,name,args,block='latest')=>iface.decodeFunctionResult(name,await rpc('eth_call',[{to,data:iface.encodeFunctionData(name,args)},block]));
 const manager=createSparkDrawTransactions({rpc,wallet:()=>wallet,context,onChange:()=>render()});
 const links=(kind,value,label=value)=>{const a=el('a',label);a.href='https://bscscan.com/'+kind+'/'+value;a.target='_blank';a.rel='noopener noreferrer';a.className='mono';return a;};
-const errors={GAS_FEE_CAP_EXCEEDED:['预计网络费超过 0.001 BNB，未发送。请减少份数或等待网络费用下降。','The maximum network fee exceeds 0.001 BNB. Nothing was sent. Reduce the quantity or wait.'],TICKET_LIMIT:['每笔请选择 1–5,000 份。','Choose 1–5,000 tickets per transaction.'],TICKET_RANGE:['请输入 00001–10000 内的号码或连续区间。','Enter numbers or ranges within 00001–10000.'],CONTEXT_CHANGED:['钱包或选择已变化，请重新操作。','Wallet or selection changed. Try again.'],TRANSACTION_PENDING:['上一笔交易仍在等待确认，请查看交易记录。','The previous transaction is pending. See its transaction record.'],GAS_LIMIT_EXCEEDED:['该组合的 Gas 超过单笔限制，请减少份数或使用自动分配。','Gas exceeds the transaction limit. Reduce tickets or use auto-assign.'],INSUFFICIENT_BEM:['BEM 余额不足。','Insufficient BEM balance.'],ADDRESS_LIMIT:['本钱包本期已达到 5,000 份。','This wallet has reached 5,000 tickets this round.']};
+const errors={GAS_FEE_CAP_EXCEEDED:['预计网络费超过 0.001 BNB，未发送。请减少份数或等待网络费用下降。','The maximum network fee exceeds 0.001 BNB. Nothing was sent. Reduce the quantity or wait.'],TICKET_LIMIT:['每笔请选择 1–5,000 份。','Choose 1–5,000 tickets per transaction.'],TICKET_RANGE:['请输入 00001–10000 内的号码或连续区间。','Enter numbers or ranges within 00001–10000.'],CONTEXT_CHANGED:['钱包或选择已变化，请重新操作。','Wallet or selection changed. Try again.'],TRANSACTION_PENDING:['上一笔交易仍在等待确认，请查看交易记录。','The previous transaction is pending. See its transaction record.'],GAS_LIMIT_EXCEEDED:['该组合的 Gas 超过单笔限制，请减少份数。','Gas exceeds the transaction limit. Reduce the ticket count.'],INSUFFICIENT_BEM:['BEM 余额不足。','Insufficient BEM balance.'],ADDRESS_LIMIT:['本钱包本期已达到 5,000 份。','This wallet has reached 5,000 tickets this round.']};
 function failure(e){note(e.code===4001||e.code==='ACTION_REJECTED'?t('已取消钱包确认。','Wallet request cancelled.'):errors[e.code]?t(...errors[e.code]):t('操作未完成：','Could not complete: ')+String(e.shortMessage||e.message||e).slice(0,150));}
 function button(label,fn){const b=el('button',label);b.type='button';b.onclick=()=>Promise.resolve(fn()).catch(failure);return b;}
 const bound=new WeakSet();
@@ -168,7 +169,18 @@ async function buy(){if(!account)return picker.open();if(flow)return;flow=true;c
     if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});
     render();if(al[0]<BigInt(filled)*p.ticketPrice){const hash=await manager.execute({poolId:id,method:'approve',args:[p.address,BigInt(s.count)*p.ticketPrice],kind:'approve'});await waitReceipt(hash,key);}
     if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});
-    await manager.execute({poolId:id,method:s.tickets?'buySelected':'buy',args:[current,s.tickets||s.count],kind:'buy',roundId:current,count:s.count});note(t('购买已提交，正在等待确认。','Purchase submitted; awaiting confirmation.'));
+    let chosen=s.tickets;
+    if(!chosen){
+      note(t('正在读取未售号码并随机选号…','Reading available tickets and choosing random numbers…'));
+      const block=await rpc('eth_blockNumber',[]);
+      const [roundNow,owned,words]=await Promise.all([call(GAME,p.address,'currentRoundId',[],block),call(GAME,p.address,'ticketsOf',[current,account],block),call(GAME,p.address,'ticketWords',[current,0,556],block)]);
+      if(roundNow[0]!==current)throw Error(t('期号已变化，请重新购买。','The round changed. Please try again.'));
+      const count=Math.min(s.count,5000-Number(owned[0]));if(count<=0)throw Object.assign(Error('ADDRESS_LIMIT'),{code:'ADDRESS_LIMIT'});
+      chosen=randomUnsoldTickets(words[0],count);
+      if(!chosen.length)throw Error(t('本期已售完，请等待下一期。','This round has sold out. Wait for the next round.'));
+    }
+    if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});
+    await manager.execute({poolId:id,method:'buySelected',args:[current,chosen],kind:'buy',roundId:current,count:chosen.length});note(t('购买已提交，正在等待确认。','Purchase submitted; awaiting confirmation.'));
   }catch(e){failure(e);}finally{flow=false;render();}}
 async function action(id,method,args){if(!['claimPrizes','refundMany','burnUnclaimedPrize','burnUnclaimed'].includes(method))throw Error('BACKEND_DRAW_ONLY');if(!account)return picker.open();await manager.execute({poolId:id,method,args,kind:method,roundId:Array.isArray(args[0])?0:args[0]});render();}
 function claimButton(r,id){const prize=r.prize,winner=prize?.winner||r.winner;let label=t('领取奖金','Claim prize');if(prize?.claimed)label=t('已领取','Claimed');else if(prize?.burned)label=t('已销毁','Burned');else if(chainNow()>=prize?.claimDeadline)label=t('领取期已结束','Claim window expired');
