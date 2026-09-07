@@ -1,7 +1,10 @@
+import {isMobileBrowser,walletPageUrl,walletDappLink} from './wallet-mobile-links.js';
+import {compatibleDialog} from './dialog-compat.js';
 import { t } from './player-i18n.js';
 
-function legacyBrand(provider, {okx, binance}) {
+function legacyBrand(provider, {okx, binance, tp}) {
   if (provider === okx || provider === okx?.ethereum) return ['OKX Wallet', 'com.okx.wallet'];
+  if (provider === tp || provider === tp?.ethereum) return ['TokenPocket', 'pro.tokenpocket'];
   if (provider === binance) return ['Binance Wallet', 'com.binance.wallet'];
   // Several wallets also set isMetaMask for protocol compatibility. Resolve
   // their own flags first; labels never replace the provider selected by users.
@@ -51,14 +54,14 @@ export function createWalletRegistry(target, onChange) {
     const shared = target.ethereum;
     // Mobile wallets may expose a dedicated EVM bridge without window.ethereum
     // or an EIP-6963 announcement. Preserve the exact selected provider object.
-    const okx = target.okxwallet, binance = target.binancew3w?.ethereum;
-    const providers = [okx, okx?.ethereum, binance,
+    const okx = target.okxwallet, binance = target.binancew3w?.ethereum, tp = target.tokenpocket;
+    const providers = [okx, okx?.ethereum, binance, tp?.ethereum, tp,
       ...(Array.isArray(shared?.providers) ? shared.providers.slice(0, 32) : []), shared];
     legacy = new Map();
     for (const provider of providers) {
       if (!isProvider(provider) || legacy.has(provider) || legacy.size >= 32) continue;
       const id = providerId(provider);
-      const brand = legacyBrand(provider, {okx, binance});
+      const brand = legacyBrand(provider, {okx, binance, tp});
       legacy.set(provider, { id, provider, name: brand?.[0] ?? t('浏览器钱包', 'Browser wallet') + ` ${legacy.size + 1}`,
         rdns: brand?.[1] ?? '', icon: null });
     }
@@ -88,8 +91,17 @@ const matches = (entry, wallet) => {
   return entry.name.trim().toLowerCase().replace(/\s+/g, ' ') === wallet.name.toLowerCase();
 };
 
-export function createWalletPicker({ dialog, onSelect, onChange, target = window }) {
+export function createWalletPicker({ dialog, onSelect, onChange, target = window, getPageUrl = () => target.location ? walletPageUrl(target.location) : null }) {
+  compatibleDialog(dialog);
   const list = dialog.querySelector('#wallet-options');
+  const mobile=isMobileBrowser(target.navigator);
+  const copyUrl=dialog.querySelector('#wallet-page-url'),copyButton=dialog.querySelector('#wallet-copy-url');
+  async function copyPageUrl(){
+    if(!copyUrl)return;copyUrl.value=getPageUrl()||'';copyUrl.focus();copyUrl.select();
+    try{await target.navigator.clipboard.writeText(copyUrl.value);dialog.querySelector('#wallet-picker-hint').textContent=t('网址已复制，请在钱包 App 的浏览器中粘贴打开。','URL copied. Paste it in your wallet app’s browser.');}
+    catch{dialog.querySelector('#wallet-picker-hint').textContent=t('请长按或选中下方网址复制，再粘贴到钱包 App 的浏览器中。','Select and copy the URL below, then paste it in your wallet app’s browser.');}
+  }
+  copyButton?.addEventListener('click',copyPageUrl);
   let wallets = new Map();
   let discoveryTimer;
   const stopDiscovery = () => clearTimeout(discoveryTimer);
@@ -103,8 +115,15 @@ export function createWalletPicker({ dialog, onSelect, onChange, target = window
     const cards = [...wallets.values()].map(entry => ({ entry, wallet: COMMON_WALLETS.find(wallet => matches(entry, wallet)) }));
     for (const wallet of COMMON_WALLETS) if (!cards.some(card => card.wallet === wallet)) cards.push({ wallet });
     list.replaceChildren(...cards.map(({ entry, wallet }) => {
-      const button = document.createElement('button');
-      button.type = 'button'; button.className = 'wallet-option'; button.disabled = !entry;
+      const external=mobile&&!wallets.size&&!entry,link=external?walletDappLink(wallet.name,getPageUrl()):null;
+      const button = document.createElement(link?'a':'button');
+      if(link){button.href=link;button.dataset.walletId='open:'+wallet.name;button.addEventListener('click',()=>{button.href=walletDappLink(wallet.name,getPageUrl());});}
+      else{button.type='button';button.disabled=!entry&&!external;}
+      button.className = 'wallet-option';
+      if(external&&!link)button.addEventListener('click',()=>{
+        dialog.querySelector('#wallet-picker-hint').textContent=t('请打开 {wallet}，进入它的浏览器，粘贴下方网址。','Open {wallet}, go to its browser and paste the URL below.',{wallet:wallet.name});
+        if(copyUrl){copyUrl.value=getPageUrl()||'';copyUrl.focus();copyUrl.select();}
+      });
       if (entry) {
         button.dataset.walletId = entry.id;
         button.addEventListener('click', () => { dialog.close(); onSelect(entry); });
@@ -118,14 +137,16 @@ export function createWalletPicker({ dialog, onSelect, onChange, target = window
       } else icon.textContent = wallet?.monogram ?? entry.name.slice(0, 1);
       const copy = document.createElement('span'); copy.className = 'wallet-option-copy';
       const name = document.createElement('strong'); name.textContent = entry?.name ?? wallet.name;
-      const status = document.createElement('small'); status.textContent = entry ? t('已检测到 · 点击连接', 'Detected · Connect') : t('未检测到', 'Not detected');
+      const status = document.createElement('small'); status.textContent = entry ? t('已检测到 · 点击连接', 'Detected · Connect') : link?t('在 App 中打开','Open in app'):external?t('复制网址到钱包','Copy URL to wallet'):t('未检测到', 'Not detected');
       copy.append(name, status); button.append(icon, copy);
       return button;
     }));
     dialog.querySelector('#wallet-picker-hint').textContent = wallets.size
       ? t('选择您要使用的钱包，再在该钱包中确认连接。', 'Choose your wallet, then confirm the connection in that wallet.')
+      : mobile?t('选择钱包，在 App 内打开本场次后连接购买。没有跳转时，可复制下方网址到钱包内置浏览器。','Choose a wallet to open this pool in the app, then connect and buy. If it does not open, copy the URL into the wallet’s browser.')
       : t('未检测到钱包扩展。请在已安装钱包的浏览器中打开本页，或从手机钱包的浏览器访问。', 'No wallet detected. Open this page in a browser with a wallet extension, or in your mobile wallet’s browser.');
-    if (focused) [...list.querySelectorAll('button')].find(button => button.dataset.walletId === focused)?.focus();
+    if(copyUrl)copyUrl.value=getPageUrl()||'';
+    if (focused) [...list.querySelectorAll('button'),...list.querySelectorAll('a')].find(button => button.dataset.walletId === focused)?.focus();
   }
   const registry = createWalletRegistry(target, entries => { wallets = entries; render(); onChange(entries); });
   dialog.querySelector('#wallet-picker-close').addEventListener('click', () => dialog.close());
@@ -138,7 +159,7 @@ export function createWalletPicker({ dialog, onSelect, onChange, target = window
   target.addEventListener('bem:languagechange', render);
   registry.discover();
   return { open() {
-    registry.discover();
+    registry.discover();render();
     if (!dialog.open) { dialog.showModal(); document.body.classList.add('wallet-picker-open'); }
     // Some mobile bridges inject after page load without announcing EIP-6963.
     stopDiscovery();

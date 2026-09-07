@@ -1,3 +1,6 @@
+import {waitForWalletResponse} from './wallet-response.js';
+import {walletPageUrl} from './wallet-mobile-links.js';
+import {compatibleDialog} from './dialog-compat.js';
 import {createWinnerRotation,latestWinnerForPool} from './winner-rotation.js';
 import {randomUnsoldTickets} from './random-tickets.js';
 import {formatUnits,formatEther,getAddress} from 'ethers';
@@ -22,6 +25,11 @@ const url=new URL(location.href);let pool=POOL_IDS.includes(url.searchParams.get
 let wallet=null,account=null,chain=null,revision=0,mode='auto',snapshot=null,balance=null,allowance=0n,held=0n,loading=false,flow=false,tab=document.body.dataset.initialTab||location.hash.slice(1)||'draw';
 let personalPage=1,burnPage=1,burnWalletPage=1,historyPage=1,recordsVersion=0,activeResult=null;
 let heldContext=null,preparationTimer,walletProgress='';
+if(url.searchParams.get('mode')==='selected'){
+  mode='selected';const text=url.searchParams.get('tickets')||'';
+  try{parseTickets('selected',0,text);$('selected-tickets').value=text;}catch{$('selected-tickets').value='';}
+}else{const n=url.searchParams.get('count');if(/^[1-9][0-9]*$/.test(n||'')&&Number(n)<=5000)$('ticket-count').value=String(Number(n));}
+const currentWalletPageUrl=()=>walletPageUrl(location,{pool,count:$('ticket-count').value,mode,tickets:$('selected-tickets').value});
 let refundData=null,refundError=false,refundFlow=false;
 const poolLabel=id=>id==='0.1'?t('历史场次','Archived pool'):id+' BEM';
 const roundName=r=>r?.displayRoundId?roundDisplay(r):r?.status===0?t('待开盘','Not opened'):t('期号同步中','Number syncing');
@@ -34,28 +42,53 @@ const manager=createSparkDrawTransactions({rpc,wallet:()=>wallet,context,onChang
 const links=(kind,value,label=value)=>{const a=el('a',label);a.href='https://bscscan.com/'+kind+'/'+value;a.target='_blank';a.rel='noopener noreferrer';a.className='mono';return a;};
 const errors={POOL_SALES_CLOSED:["本场已关闭新购买，请选择 5、10 或 50 BEM 正式场。","New purchases are closed. Choose the 5, 10 or 50 BEM pool."],GAS_FEE_CAP_EXCEEDED:['预计网络费超过 0.001 BNB，未发送。请减少份数或等待网络费用下降。','The maximum network fee exceeds 0.001 BNB. Nothing was sent. Reduce the quantity or wait.'],TICKET_LIMIT:['每笔请选择 1–5,000 份。','Choose 1–5,000 tickets per transaction.'],TICKET_RANGE:['请输入 00001–10000 内的号码或连续区间。','Enter numbers or ranges within 00001–10000.'],CONTEXT_CHANGED:['钱包或选择已变化，请重新操作。','Wallet or selection changed. Try again.'],TRANSACTION_PENDING:['上一笔交易仍在等待确认，请查看交易记录。','The previous transaction is pending. See its transaction record.'],GAS_LIMIT_EXCEEDED:['该组合的 Gas 超过单笔限制，请减少份数。','Gas exceeds the transaction limit. Reduce the ticket count.'],INSUFFICIENT_BEM:['BEM 余额不足。','Insufficient BEM balance.'],ADDRESS_LIMIT:['本钱包本期已达到 5,000 份。','This wallet has reached 5,000 tickets this round.']};
 Object.assign(errors, {ROUND_CHANGED:['期号已变化或正在读取，请稍后重新购买。','The round changed or is still loading. Please try again shortly.'],RPC_UNAVAILABLE:['链上查询暂时未完成，请稍后重试。','Chain reads are temporarily unavailable. Please try again.'],LOCK_UNAVAILABLE:['当前钱包浏览器不支持安全交易，请更新钱包 App 后重试。','Update your wallet app to use secure transactions.'],TRANSACTION_IN_FLIGHT:['已有操作等待钱包确认，请先完成该操作。','A wallet request is already in progress. Complete it first.']});
-function failure(e){note(walletRequestRejected(e)?t('已取消钱包确认。','Wallet request cancelled.'):errors[e.code]?t(...errors[e.code]):t('操作未完成：','Could not complete: ')+String(e.shortMessage||e.message||e).slice(0,150));}
+function failure(e){e=e||Error('Wallet unavailable');note(walletRequestRejected(e)?t('已取消钱包确认。','Wallet request cancelled.'):errors[e.code]?t(...errors[e.code]):t('操作未完成：','Could not complete: ')+String(e.shortMessage||e.message||e).slice(0,150));}
 function button(label,fn){const b=el('button',label);b.type='button';b.onclick=()=>Promise.resolve(fn()).catch(failure);return b;}
+Object.assign(errors,{
+  WALLET_RESPONSE_TIMEOUT:['钱包暂未响应。请打开钱包完成或取消已有提示，再回来重新连接或购买。','The wallet did not respond. Open it to finish or cancel its current prompt, then return and retry.'],
+  PENDING_STORAGE_UNAVAILABLE:['当前浏览器无法保存交易记录。请允许此网站使用存储，或使用钱包 App 的正常浏览模式。','This browser cannot save transaction records. Allow website storage or use normal browsing in your wallet app.'],
+  PENDING_STORAGE_INVALID:['本机交易记录无法读取。请先核对已提交交易，勿直接清除记录后重复支付。','Local transaction records cannot be read. Check submitted transactions before clearing records or paying again.'],
+  PENDING_STORAGE_WRITE_FAILED:['浏览器无法写入交易记录。请先在钱包核对本次结果，再检查存储空间或浏览模式。','Transaction records could not be saved. Check this request in your wallet before retrying, then check browser storage or browsing mode.'],
+  SECURE_RANDOM_UNAVAILABLE:['当前浏览器版本不支持交易所需功能，请更新钱包 App 后重新打开。','Update your wallet app to enable the browser features required for transactions.']
+});
 const bound=new WeakSet();
 function bind(p){if(bound.has(p))return;bound.add(p);
   p.on?.('accountsChanged',a=>{if(wallet!==p)return;const next=a[0]?getAddress(a[0]):null;if(next===account)return;account=next;revision++;balance=null;heldContext=null;allowance=0n;$('personal-wallet').value=account||'';render();refresh();refreshRecords();});
+  p.on?.('disconnect',()=>{if(wallet!==p)return;revision++;account=null;chain=null;balance=null;heldContext=null;allowance=0n;walletSession.cancel();render();note(t('钱包已断开，请重新连接。','Wallet disconnected. Connect again to continue.'));});
   p.on?.('chainChanged',c=>{if(wallet!==p)return;const next=Number(BigInt(c));if(next===chain)return;chain=next;revision++;snapshot=null;heldContext=null;render();refresh();});
 }
 let discoveredWallets=new Map(),restoreTimer,connectingWallet=false;
 let sessionStorage;try{sessionStorage=window.localStorage;}catch{sessionStorage={getItem:()=>null,setItem(){}};}
 const walletSession=createWalletSession({storage:sessionStorage,version:()=>revision,onRestore:async({entry,account:restored,chainId})=>{
-  if(account)return;wallet=entry.provider;account=getAddress(restored);chain=Number(BigInt(chainId));revision++;bind(wallet);
+  if(account)return;const nextAccount=getAddress(restored),nextChain=Number(BigInt(chainId));if(!Number.isSafeInteger(nextChain)||nextChain<=0)throw Error('Invalid wallet network');
+  wallet=entry.provider;account=nextAccount;chain=nextChain;revision++;bind(wallet);
   $('personal-wallet').value=account;render();await refresh();await refreshRecords();
 }});
 function restoreConnection(){clearTimeout(restoreTimer);if(account||connectingWallet)return;restoreTimer=setTimeout(()=>{if(!account&&!connectingWallet&&!$('wallet-picker').open)walletSession.restore(discoveredWallets).catch(()=>{});},120);}
-window.addEventListener('focus',()=>{restoreConnection();if(account)void poll(true);});
-document.addEventListener('visibilitychange',()=>{if(!document.hidden){restoreConnection();if(account)void poll(true);}});
-const picker=createWalletPicker({dialog:$('wallet-picker'),onChange(entries){discoveredWallets=entries;restoreConnection();},onSelect:async(entry)=>{
+let identityRefresh;
+async function resumeWallet(){
+  restoreConnection();if(!account||flow||manager.busy||identityRefresh)return;
+  const p=wallet,rev=revision;
+  identityRefresh=(async()=>{
+    try{const [a,c]=await Promise.all([waitForWalletResponse(()=>p.request({method:'eth_accounts'})),waitForWalletResponse(()=>p.request({method:'eth_chainId'}))]);
+      if(wallet!==p||revision!==rev)return;const next=a[0]?getAddress(a[0]):null,nextChain=Number(BigInt(c));
+      if(next!==account||nextChain!==chain){account=next;chain=nextChain;revision++;balance=null;allowance=0n;heldContext=null;$('personal-wallet').value=account||'';render();refresh();refreshRecords();}
+      if(account)void poll(true);
+    }catch(e){if(wallet===p&&revision===rev)failure(e);}
+  })();
+  try{await identityRefresh;}finally{identityRefresh=null;}
+}
+window.addEventListener('focus',resumeWallet);
+window.addEventListener('pageshow',resumeWallet);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)void resumeWallet();});
+const picker=createWalletPicker({dialog:$('wallet-picker'),getPageUrl:currentWalletPageUrl,onChange(entries){discoveredWallets=entries;restoreConnection();},onSelect:async(entry)=>{
   if(connectingWallet)return;
   const {provider}=entry;connectingWallet=true;walletSession.cancel();clearTimeout(restoreTimer);
   note(t('请在钱包中确认连接…','Confirm the connection in your wallet…'));render();
-  try{const r=++revision;const a=await provider.request({method:'eth_requestAccounts'});if(r!==revision)return;
-    wallet=provider;account=a[0]?getAddress(a[0]):null;heldContext=null;chain=Number(BigInt(await provider.request({method:'eth_chainId'})));bind(provider);
+  try{const r=++revision;const a=await waitForWalletResponse(()=>provider.request({method:'eth_requestAccounts'}),{timeout:30000});if(r!==revision)return;
+    const nextAccount=a[0]?getAddress(a[0]):null,nextChain=Number(BigInt(await waitForWalletResponse(()=>provider.request({method:'eth_chainId'}))));if(r!==revision)return;
+    if(!Number.isSafeInteger(nextChain)||nextChain<=0)throw Error('Invalid wallet network');
+    wallet=provider;account=nextAccount;heldContext=null;chain=nextChain;bind(provider);
     if(account)walletSession.remember(entry);$('personal-wallet').value=account||'';note(account?t('钱包已连接。','Wallet connected.'):t('钱包未返回账户，请重新连接。','No wallet account returned. Try connecting again.'));render();void refresh();void refreshRecords();
   }catch(e){failure(e);}finally{connectingWallet=false;render();}
 }});
@@ -98,13 +131,15 @@ function render(){
   // Never silently change a pending transaction's context. Outside that flow,
   // shortcuts, pasted values and live stock updates all use the same limit.
   if(mode==='auto'&&!flow&&!manager.busy&&!connectingWallet){const next=clampPurchaseCount(input.value,limit);if(next!==input.value){input.value=next;revision++;}}
-  let valid=true,selectedCount=0;try{const s=selection();selectedCount=s.count;$('purchase-total').textContent=money(BigInt(s.count)*p.ticketPrice)+' BEM';$('selection-note').textContent=t('申请 {count} 份，仅按实际分配份数扣款。','Requesting {count} tickets; only allocated tickets are charged.',{count:s.count});}catch{valid=false;$('purchase-total').textContent='— BEM';}
+  let valid=true,selectedCount=0;try{const s=selection();selectedCount=s.count;$('purchase-total').textContent=money(BigInt(s.count)*p.ticketPrice)+' BEM';$('selection-note').textContent=t('申请 {count} 份，仅按实际分配份数扣款。','Requesting {count} tickets; only allocated tickets are charged.',{count:s.count});}catch{valid=false;$('purchase-total').textContent='— BEM';$('selection-note').textContent=url.searchParams.get('reselect')==='1'?t('号码较多，未随链接传递，请重新填写要购买的号码。','The selection was too long to transfer. Enter your ticket numbers again.'):t('请填写有效的购买份数或号码。','Enter a valid quantity or ticket selection.');}
   if(limit===0){$('purchase-total').textContent='0 BEM';$('selection-note').textContent=t('本场暂无可购份数。','No tickets available for this purchase.');}
   const now=chainNow(),open=r&&(r.status===0||r.status===1&&now<Math.min(r.fundingDeadline,r.earlyDrawDeadline||Infinity));
+  const availabilityError=manager.availabilityError;
   const pendingPurchases=manager.pendings.filter(row=>['approve','buy','buySelected'].includes(row.method||row.kind)).length;
-  $('buy').disabled=!p.salesEnabled||connectingWallet||!account&&limit===0||!!account&&(chain!==56||flow||manager.busy||!valid||!open||limit===0);
+  $('buy').disabled=!p.salesEnabled||connectingWallet||!!account&&!!availabilityError||!account&&limit===0||!!account&&(chain!==56||flow||manager.busy||!valid||!open||limit===0);
   $('buy').textContent=flow?walletProgress||t('正在打开钱包…','Opening your wallet…'):!account?t('连接钱包并购买','Connect wallet to buy'):allowance>=BigInt(selectedCount)*p.ticketPrice?t('购买','Buy'):t('授权并购买','Approve & buy');
   $('purchase-state').textContent=!account?t('点击购买会连接钱包。','Click buy to connect your wallet.'):!open?t('读取状态中，或本期购买时间已结束。','Loading state, or sales for this round have ended.'):pendingPurchases?t('有 {count} 笔交易待确认，可继续发起新的购买。','{count} transactions are pending. You can submit another purchase.',{count:pendingPurchases}):t('本钱包本期还可购买 {count} 份。','This wallet may buy {count} more tickets this round.',{count:String(5000n-held)});
+  if(account&&availabilityError)$('purchase-state').textContent=errors[availabilityError]?t(...errors[availabilityError]):t('当前浏览器暂不能提交交易。','This browser cannot submit transactions right now.');
   $('my-count').textContent=account?String(held):'—';
   $('round-label').textContent=roundName(r);$('purchase-round-label').textContent=roundName(r);
   $('round-phase').textContent=r?statusText(r.status):t('读取中','Loading');$('funding-amount').textContent=`${money(BigInt(r?.sold||0)*p.ticketPrice)} / ${pool} BEM`;$('funding-tickets').textContent=`${r?.sold||0} / 10,000`;$('funding-progress').firstElementChild.style.width=((r?.sold||0)/100)+'%';
@@ -190,7 +225,7 @@ function renderPending(){
 }
 function transactionStatus(status){return({confirmed:t('已确认','Confirmed'),reverted:t('链上执行失败','Reverted'),cancelled:t('已被钱包取消','Cancelled in wallet'),replaced:t('已被其他交易替换','Replaced by another transaction'),unverified:t('已移出等待，链上结果未核实','No longer blocking; outcome unverified')})[status]||status;}
 function showTransactionResult(r){note(r.kind==='buy'&&r.status==='confirmed'&&r.result?t('购买已确认：{n} 份，实付 {amount} BEM。','Purchase confirmed: {n} tickets, paid {amount} BEM.',{n:r.result.filled,amount:money(r.result.paid)}):r.kind==='approve'&&r.status==='confirmed'?t('授权已确认，可以继续购买。','Approval confirmed. You can continue purchasing.'):transactionStatus(r.status));partial(r);}
-function partial(result){if(!result?.result||result.result.filled>=result.result.requested)return;const r=result.result,dialog=el('dialog','');dialog.className='partial-fill-result';dialog.append(el('h2',t('部分购买成功','Partial purchase completed')),el('p',t('申请 {a} 份，成交 {b} 份；实际扣款 {c} BEM，其余 {d} BEM 未扣除。','Requested {a}, filled {b}; paid {c} BEM. The remaining {d} BEM was not charged.',{a:r.requested,b:r.filled,c:money(r.paid),d:money(r.unspent)})),button(t('知道了','OK'),()=>dialog.close()));document.body.append(dialog);dialog.onclose=()=>dialog.remove();dialog.showModal();}
+function partial(result){if(!result?.result||result.result.filled>=result.result.requested)return;const r=result.result,dialog=el('dialog','');dialog.className='partial-fill-result';dialog.append(el('h2',t('部分购买成功','Partial purchase completed')),el('p',t('申请 {a} 份，成交 {b} 份；实际扣款 {c} BEM，其余 {d} BEM 未扣除。','Requested {a}, filled {b}; paid {c} BEM. The remaining {d} BEM was not charged.',{a:r.requested,b:r.filled,c:money(r.paid),d:money(r.unspent)})),button(t('知道了','OK'),()=>dialog.close()));document.body.append(dialog);compatibleDialog(dialog);dialog.onclose=()=>dialog.remove();dialog.showModal();}
 async function poll(force=false){try{const r=await manager.check({force});if(r){showTransactionResult(r);refresh();refreshRecords();return r;}}catch(e){failure(e);}return null;}
 async function waitReceipt(hash,key){
   const started=Date.now();
