@@ -152,6 +152,39 @@ test('real startup HTML connects and estimates without signing; both fixed actio
   assert.equal(app.wallet.calls.filter(c => c.method === 'eth_sendTransaction').length, 0);
 });
 
+test('holder wallet can review container execution when its provider returns numeric RPC quantities', async () => {
+  const app = await harness({ consumer: true }), original = app.wallet.request;
+  app.wallet.request = async input => {
+    const value = await original(input);
+    if (input.method === 'eth_getBlockByNumber') return { ...value, number: Number(BigInt(value.number)) };
+    if (['eth_chainId', 'eth_gasPrice', 'eth_estimateGas', 'eth_getTransactionCount'].includes(input.method)) return Number(BigInt(value));
+    if (input.method === 'eth_getBalance' && guards.same(input.params[0], F.authorizationContainer)) return 0;
+    return value;
+  };
+  await app.connect();
+  assert.equal(app.state.account, A);
+  assert.equal(app.$('review-authorize').disabled, false);
+  await app.review('authorize');
+  assert.equal(app.state.estimate.account, A);
+  assert.equal(app.state.estimate.to, F.authorizationContainer);
+  assert.equal(ABI.decodeFunctionData('execute', app.state.estimate.data)[0], F.game);
+  assert.equal(app.wallet.calls.filter(call => call.method === 'eth_sendTransaction').length, 0);
+  assert.ok(app.wallet.calls.filter(call => call.method === 'eth_call').every(call => call.params[1] === '0x64'));
+});
+
+test('an inexact numeric block height keeps startup review disabled and never reaches a signature', async () => {
+  const app = await harness({ consumer: true }), original = app.wallet.request;
+  app.wallet.request = async input => {
+    const value = await original(input);
+    return input.method === 'eth_getBlockByNumber' ? { ...value, number: Number.MAX_SAFE_INTEGER + 1 } : value;
+  };
+  await app.connect();
+  assert.equal(app.state.snapshot, null);
+  assert.equal(app.$('review-authorize').disabled, true);
+  assert.match(app.$('notice').textContent, /钱包区块高度格式异常/);
+  assert.equal(app.wallet.calls.filter(call => call.method === 'eth_sendTransaction').length, 0);
+});
+
 test('only an explicit reviewed click sends; pending state survives wallet changes and prevents duplicate calls', async () => {
   const app = await harness(); await app.connect(); await app.review('consumer');
   app.wallet.sendHook = async () => { app.wallet.account = B; await app.wallet.emit('accountsChanged'); };

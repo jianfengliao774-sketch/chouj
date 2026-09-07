@@ -1,0 +1,65 @@
+{
+  "status": "production-candidate-not-deployed",
+  "contractVersion": 3,
+  "architecture": "container13061-authorized-2075-computation",
+  "contractName": "BemOwnContainer13061Pool50BSC",
+  "sourceName": "contracts/production-v3/BemOwnContainer13061Pool50BSC.sol",
+  "compilerVersion": "0.8.36+commit.8a079791.Emscripten.clang",
+  "sourceSha256s": {
+    "contracts/production-v3/BemSelectableRaffleV3.sol": "512d825674075141e7059645256b0d8d44d732aa141d3072d82cc17338629d73",
+    "contracts/production-v3/BemSelectableRaffle13061V3BSC.sol": "aaf1c26e0060b7e7d8ca979d2feef993e37bc437f74f755cc72c5f9d7433fd34",
+    "contracts/production-v3/BemOwnContainer13061SeriesBSC.sol": "8606b28b839496d74b58b6751b8e171cf283d1fbad852a89fd8e5ff2b9eace2b",
+    "contracts/production-v3/BemOwnContainer13061Pool10BSC.sol": "60b5a355bba1584337a6630f24a406b0c5ddd7efa6b19b594522bea2dfc85bf1",
+    "contracts/production-v3/BemOwnContainer13061Pool50BSC.sol": "2ae810d1384fe0e232b28006a76ca55b7ad64991874853fbc70f0d72a80d738d",
+    "contracts/production-v3/BemOwnContainer13061Pool100BSC.sol": "807ade52f17a6c2c5b543bdb1a021ecde3b06210dc8be261dfff6a6333d4848d"
+  },
+  "preservedDeployedTreeSha256": "5e32b076506d2c447da57116a07d30a04476cc11df8a1b1fa1a3ab0c10a5d299",
+  "preservedDeployedFileCount": 34,
+  "optimizer": {
+    "enabled": true,
+    "runs": 200
+  },
+  "evmVersion": "paris",
+  "fixedBindings": {
+    "processor": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+    "processorId": 2075,
+    "authorizationContainer": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+    "authorizationNft": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+    "authorizationTokenId": 13061,
+    "revenueContainer": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+    "revenueNft": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+    "revenueTokenId": 13061
+  },
+  "testOnly": false,
+  "fixedRules": {
+    "poolBaseUnits": "5000000000",
+    "ticketPriceBaseUnits": "500000",
+    "ticketsPerRound": 10000,
+    "maxTicketsPerPurchase": 1000,
+    "maxTicketsPerAddress": 5000,
+    "blackholeBaseUnits": "200000000",
+    "organizerBaseUnits": "50000000",
+    "winnerBaseUnits": "4750000000",
+    "fundingWindowSeconds": 86400,
+    "refundClaimWindowSeconds": 86400,
+    "partialFill": true
+  },
+  "partialFill": {
+    "resultEvent": "PurchaseResult(uint256,address,uint32,uint32,uint256,uint256)",
+    "filled": "min(requested, roundStock, addressQuota)",
+    "paid": "filled * TICKET_PRICE",
+    "unspent": "(requested - filled) * TICKET_PRICE; never transferred from the buyer",
+    "zeroFill": "Previously full expected round or exhausted current-round address quota. No token call, ticket allocation or VRF request.",
+    "selection": "Validate the entire ascending unique selection, then allocate its filled-length prefix with deterministic sold-ticket replacement."
+  },
+  "standardJsonSha256": "2c1691a85ee2465ec8eb21dd8d399970e9bc7b24d93262b481d047557855b03e",
+  "creationBytecodeBytes": 23164,
+  "runtimeBytecodeBytes": 19194,
+  "runtimeBytecodeIsTemplate": true,
+  "runtimeNote": "Constructor immutables require comparison with the exact constructor and live getters. The template hash is not a deployed runtime hash.",
+  "unchangedTest1": true,
+  "staticSourceCompilation": true,
+  "mainnetTransactionsSent": 0,
+  "standardJsonInput": "BemOwnContainer13061Pool50BSC.compile-input.json",
+  "artifact": "BemOwnContainer13061Pool50BSC.artifact.json"
+}

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow"><meta name="theme-color" content="#fbf7ed">
+  <title>正式场次部署 · 13061 容器授权</title>
+  <link rel="stylesheet" href="/deploy-formal.css"><link rel="stylesheet" href="/wallet-picker.css">
+</head>
+<body>
+<main class="deployment-shell">
+  <header><a class="brand" href="/">BEHEMOTH <b>/ 2075</b></a><a href="/">返回用户页面</a></header>
+  <section class="intro">
+    <span class="eyebrow">BNB 主网 · 正式合约 V3</span>
+    <h1>容器授权与收款，2075 计算</h1>
+    <p>选择 10、50 或 100 BEM 正式场次。每档均为 10,000 份，分别创建独立合约；现有 1 BEM 测试场保持不变。</p>
+    <div class="scope-note">本页只创建并核验新合约。部署后还需添加 VRF 消费者，再由 13061 容器持有人授权启动。创建成功不会自动开售，也不会自动替换网站上的合约地址。</div>
+  </section>
+
+  <section class="card" aria-labelledby="mode-heading">
+    <h2 id="mode-heading">选择本次部署类型</h2>
+    <div class="mode-options" role="group" aria-label="部署类型">
+      <button id="mode-pool10" type="button" class="mode-option secondary" aria-pressed="false"><strong>10 BEM · 正式场次</strong><span>10,000 份 · 每份 0.001 BEM</span><small id="mode-pool10-record">独立正式合约</small></button>
+      <button id="mode-pool50" type="button" class="mode-option secondary" aria-pressed="false"><strong>50 BEM · 正式场次</strong><span>10,000 份 · 每份 0.005 BEM</span><small id="mode-pool50-record">独立正式合约</small></button>
+      <button id="mode-pool100" type="button" class="mode-option secondary" aria-pressed="false"><strong>100 BEM · 正式场次</strong><span>10,000 份 · 每份 0.01 BEM</span><small id="mode-pool100-record">独立正式合约</small></button>
+    </div>
+    <p class="muted">三档均使用真实 BEM。13061 容器负责授权启动和收款，2075 电路负责开奖计算。各档部署记录独立保存。</p>
+  </section>
+
+  <section class="card" aria-labelledby="wallet-heading">
+    <div class="card-heading"><h2 id="wallet-heading">1. 连接钱包</h2><span id="network-state" class="pill">尚未连接</span></div>
+    <p id="wallet-address" class="mono">指定部署钱包：0x304F06903324B8056cB1ED627144EfB2C34df3a8</p>
+    <div class="actions"><button id="connect-wallet" type="button" aria-haspopup="dialog" aria-controls="wallet-picker">连接钱包</button><button id="switch-network" type="button" class="secondary" hidden>切换 BNB 主网</button><button id="copy-url" type="button" class="secondary">复制本页网址</button></div>
+    <p class="muted">请使用安装了钱包扩展的浏览器，或手机钱包内的浏览器。连接不会扣款；部署 Gas 由本次签名钱包支付。</p>
+  </section>
+
+  <div id="notice" class="notice" role="status" aria-live="polite">正在载入固定部署参数…</div>
+
+  <section class="card" aria-labelledby="bindings-heading">
+    <div class="card-heading"><h2 id="bindings-heading">2. 核对固定参数</h2><span id="selected-mode" class="pill">请先选择类型</span></div>
+    <dl id="fixed-fields" class="fields"></dl>
+    <div class="allocation"><div><span>转入黑洞</span><strong><span id="blackhole-amount">—</span> <small>BEM</small></strong></div><div><span>转入容器</span><strong><span id="organizer-amount">—</span> <small>BEM</small></strong></div><div><span>中奖钱包</span><strong><span id="winner-amount">—</span> <small>BEM</small></strong></div></div>
+    <p id="pool-note" class="muted">请选择档位查看期总额、每份价格及分配金额。所有档位按 4% / 1% / 95% 分配。</p>
+    <details><summary>查看创建代码与 VRF 参数</summary><dl id="technical-fields" class="fields"></dl></details>
+  </section>
+
+  <section class="card" aria-labelledby="deploy-heading">
+    <h2 id="deploy-heading">3. 核对费用并部署</h2>
+    <div class="identity-note"><strong>两个钱包，各自负责不同操作</strong><p>部署及 VRF 订阅钱包：<span class="mono">0x304F06903324B8056cB1ED627144EfB2C34df3a8</span></p><p>13061 授权启动钱包：<span class="mono">0x7674fa446D42b1f7f150DC5e678cc525d275Ea53</span></p><p>部署本身不会让部署钱包获得启动权限。后续必须使用 13061 当前持有人钱包操作容器。</p></div>
+    <button id="estimate" type="button" class="secondary" disabled>核对链上绑定并估算费用</button>
+    <dl class="fields fee-fields"><dt>绑定核对</dt><dd id="binding-state">尚未核对</dd><dt>部署钱包</dt><dd id="review-account" class="mono">—</dd><dt>预计 Gas 费用</dt><dd id="estimated-fee">— BNB</dd><dt>交易 Gas 上限对应费用</dt><dd id="maximum-fee">— BNB</dd><dt>钱包 BNB 余额</dt><dd id="wallet-balance">— BNB</dd><dt>核对有效期</dt><dd id="estimate-expiry">—</dd></dl>
+    <label class="review-checkbox"><input id="confirm-review" type="checkbox" disabled><span>我已核对本次档位、13061 授权与收款、2075 计算及部署费用；确认可以使用上列两个钱包，部署后将由 13061 持有人另行启动。</span></label>
+    <button id="deploy" type="button" class="primary" disabled>确认部署新合约</button>
+    <p class="muted">部署交易转入的 BNB 为 0，仅支付 Gas。费用以钱包最终确认页为准。钱包或网络变化后，需要重新核对。</p>
+  </section>
+
+  <section id="record-panel" class="card" aria-labelledby="record-heading" hidden>
+    <div class="card-heading"><h2 id="record-heading">部署记录</h2><span id="record-state" class="pill">等待核验</span></div>
+    <dl id="record-fields" class="fields"></dl>
+    <p id="record-note" class="muted">已提交的部署不会自动重发。</p>
+    <label for="recovery-hash">交易哈希（加速或恢复记录时可填写）</label>
+    <div class="recovery"><input id="recovery-hash" type="text" class="mono" spellcheck="false" autocomplete="off" placeholder="0x…"><button id="verify-receipt" type="button" class="secondary" disabled>重新核对交易</button></div>
+    <button id="download-record" type="button" class="secondary" disabled>下载公开部署记录</button>
+    <button id="reset-resolved" type="button" class="secondary" hidden>重置已结束记录，重新核对费用</button>
+  </section>
+  <footer>授权与收款：容器 #13061 · 开奖计算：BEHEMOTH #2075 · 所有签名均由您的钱包确认</footer>
+</main>
+<dialog id="wallet-picker" class="wallet-picker" aria-labelledby="wallet-picker-title">
+  <div class="wallet-picker-heading"><div><span class="eyebrow">YOUR WALLET</span><h2 id="wallet-picker-title">选择钱包</h2></div><button id="wallet-picker-close" type="button" aria-label="关闭">×</button></div>
+  <p id="wallet-picker-hint" class="wallet-picker-hint"></p><div id="wallet-options" class="wallet-options"></div>
+  <div class="wallet-picker-footer"><span>连接后，由您单独确认部署。</span><button id="wallet-picker-refresh" type="button">重新检测</button></div>
+</dialog>
+<script type="module" src="/deploy-formal.js"></script>
+</body>
+</html>

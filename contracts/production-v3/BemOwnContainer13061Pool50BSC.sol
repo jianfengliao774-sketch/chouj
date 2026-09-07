@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.24;
+
+import "./BemOwnContainer13061SeriesBSC.sol";
+
+/// @notice Fixed 50 BEM / 10000 tickets. V3 production denomination.
+/// TapeOut13061 authorizes and receives 1%; BEHEMOTH2075 computes only.
+/// Funding24h; refunds24h; unclaimed principal then goes to dead.
+contract BemOwnContainer13061Pool50BSC is BemOwnContainer13061SeriesBSC {
+    bool public constant TEST_ONLY = false;
+    constructor(uint256 vrfSubscriptionId,uint16 confirmations,uint32 vrfCallbackGasLimit)
+        BemOwnContainer13061SeriesBSC(vrfSubscriptionId,confirmations,vrfCallbackGasLimit,5000000000) {}
+}

@@ -158,7 +158,8 @@ test('concurrent reads reserve at most six upstream slots and reject overflow wi
     await new Promise(resolve => gates.push(resolve)); active--;
     return { ok: true, json: async () => ({ jsonrpc: '2.0', id: payload.id, result: '0x38' }) };
   } });
-  const results = Array.from({ length: 107 }, () => rpc('eth_chainId', []).then(value => ({ value }), error => ({ code: error.code })));
+  const results = Array.from({ length: 107 }, (_, index) => rpc('eth_getCode', [GAME, block(index)]).then(value => ({ value }), error => ({ code: error.code })));
+  await new Promise(resolve => setImmediate(resolve));
   assert.equal(forwarded, 6);
   for (let turn = 0; turn < 30 && forwarded < 106; turn++) {
     gates.splice(0).forEach(resolve => resolve());
@@ -337,6 +338,21 @@ test('HTTP envelope blocks foreign hosts/origins and refuses write methods insid
   const before = f.forwarded.length;
   assert.equal((await f.send({ body: Array(26).fill(request('eth_chainId')) })).status, 400);
   assert.equal(f.forwarded.length, before);
+});
+
+test('static page requests, public API and RPC have independent budgets and throttling gives a retry interval', async () => {
+  const f = await httpFixture({ publicOrigin: 'https://tapeout.cc.cd' });
+  for (let n = 0; n < 601; n++) {
+    const asset = await f.send({ url: '/missing-static-resource.css', method: 'GET', body: null });
+    assert.equal(asset.status, 404, 'static resources do not consume the dynamic budget');
+  }
+  for (let n = 0; n < 600; n++) assert.equal((await f.send({ url: '/api/health', method: 'GET', body: null })).status, 200);
+  const limited = await f.send({ url: '/api/health', method: 'GET', body: null });
+  assert.equal(limited.status, 429); assert.ok(Number(limited.headers['retry-after']) >= 1);
+  for (let n = 0; n < 1200; n++) assert.equal((await f.send()).status, 200, 'API exhaustion does not disable wallet reads');
+  assert.equal((await f.send()).status, 429);
+  assert.equal((await f.send({ extraHeaders: { 'x-real-ip': '203.0.113.121' } })).status, 200, 'another visitor has an independent budget');
+  assert.equal((await f.send({ url: '/missing-static-resource.css', method: 'GET', body: null })).status, 404);
 });
 
 test('admin HTTP requires same-origin credentials, rejects the removed wallet flow, and rotates the scoped cookie', async () => {

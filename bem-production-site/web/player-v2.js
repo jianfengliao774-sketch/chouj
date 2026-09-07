@@ -4,6 +4,10 @@ import { createWalletPicker } from './wallet-picker.js';
 import { createPoolSelection, poolMetadata } from './pool-selection.js';
 import { createPendingPlayerState } from './player-v2-state.js';
 import { createTestPlayerTransactions } from './test-player-transactions.js';
+import { createFormalPlayerTransactions } from './formal-player-transactions.js';
+import { createPartialFillResult } from './partial-fill-result.js';
+import { createReadRpcBatcher } from './read-rpc-batcher.js';
+import { createPendingReadPoller, hasFastPendingRead } from './pending-read-poller.js';
 
 const BEM = '0x5ce033B2bFCa3Af30b3e8C8457DeaF776A8b695a';
 const PROCESSOR = '0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C';
@@ -18,10 +22,20 @@ const initialPool = ['1', '10', '50', '100'].includes(selectedQuery) ? selectedQ
 const model = createPendingPlayerState({ poolId: initialPool });
 const tokenInterface = new Interface(['function balanceOf(address) view returns(uint256)']);
 const state = { wallet: null, wallets: new Map(), connecting: false, connectVersion: 0, connectAttempt: null, balanceGeneration: 0,
-  balanceAbort: null, refreshing: false, noticeError: false, rpcId: 0, tab: 'draw', poolStatus: null, poolGeneration: 0,
-  testView: null, refundView: null, settlementView: null, testGeneration: 0, testRefreshing: false };
+  balanceAbort: null, refreshing: false, noticeError: false, tab: 'draw', poolStatus: null, poolStatusError: false, poolGeneration: 0,
+  testView: null, refundView: null, settlementView: null, testGeneration: 0, testRefreshing: false, testReadError: false };
 let pools = null;
 let testTransactions = null;
+let pendingPoller = null;
+const formalTransactions = new Map();
+const partialFillResult = createPartialFillResult({ getLanguage: () => getLocale().startsWith('en') ? 'en' : 'zh' });
+const batchedRead = createReadRpcBatcher();
+function currentTransactions() {
+  const poolId = model.getState().poolId;
+  if (poolId === '1') return testTransactions;
+  const manager = formalTransactions.get(poolId);
+  return manager?.getState().registered ? manager : null;
+}
 
 function notice(message, error = false) { put('notice', message); $('notice')?.classList.toggle('error-copy', error); state.noticeError = error; }
 function errorCopy(error) {
@@ -32,6 +46,8 @@ function errorCopy(error) {
     NO_TICKETS: ['请输入您要选择的票号。', 'Enter the ticket numbers you want.'],
     POOL_NOT_LAUNCHED: ['该场次暂未开放，暂不接受授权、购买或退款交易。', 'This pool is not open yet. Approvals, purchases and refund transactions are unavailable.'],
     TEST_POOL_ONLY: ['交易入口仅供 1 BEM 测试场次。', 'Transactions are limited to the 1 BEM test pool.'],
+    FORMAL_NOT_REGISTERED: ['新正式合约尚未完成部署核验，暂不接受购买。', 'The new production contract has not completed deployment verification. Purchases are unavailable.'],
+    FORMAL_POOL_ONLY: ['场次合约不匹配，请重新选择场次。', 'The pool contract does not match. Select the pool again.'],
     CONTEXT_CHANGED: ['钱包、场次或选号已变化，请核对后重新操作。', 'The wallet, pool or selection changed. Review and try again.'],
     WALLET_CHANGED: ['钱包已变化，请重新连接。', 'The wallet changed. Reconnect.'],
     WALLET_NETWORK: ['请连接钱包并切换到 BNB 主网。', 'Connect your wallet on BNB Chain.'],
@@ -47,6 +63,7 @@ function errorCopy(error) {
     SETTLEMENT_NOT_DUE: ['尚未到结算时间，或该期已结算。', 'Settlement is not due or the round is already settled.'],
     GAS_LIMIT_EXCEEDED: ['该组合所需 Gas 过高，请减少份数或选择更连续的号码。', 'This selection requires too much gas. Reduce the quantity or choose more consecutive numbers.'],
     TRANSACTION_UNRESOLVED: ['上一笔交易结果尚未确认，请先核查交易记录。', 'The previous transaction is unresolved. Check its record first.'],
+    RPC_UNAVAILABLE: ['链上状态读取暂时失败，请点击刷新余额与状态重试。', 'Chain state could not be read. Refresh balances and state to retry.'],
     TRANSACTION_IN_FLIGHT: ['正在处理交易，请先完成钱包中的请求。', 'A transaction is being processed. Resolve the wallet request first.'],
     TRANSACTION_LOCK_UNAVAILABLE: ['请在支持安全连接的新版 Chrome 或 Edge 中打开本页。', 'Open this HTTPS page in a current Chrome or Edge browser.'],
     PENDING_STORAGE_UNAVAILABLE: ['浏览器无法保存交易记录，请允许本站存储后重试。', 'Transaction storage is unavailable. Allow storage for this site.'],
@@ -76,7 +93,7 @@ function onPoolChange(selection) {
   if (before.poolId === selection.id) model.invalidate();
   model.setSelection({ mode: 'auto', count: '1', text: '' });
   state.balanceAbort?.abort(); applySelectionFields();
-  state.poolStatus = null; state.poolGeneration++;
+  state.poolStatus = null; state.poolStatusError = false; state.poolGeneration++;
   clearTestViews();
   put('refund-round', ''); if ($('refund-round')) $('refund-round').value = '';
   hidden('proof-detail', true); render();
@@ -110,8 +127,10 @@ function render() {
   put('prize-bem', meta.winnerAmount);
   put('purchase-rules', t('每份 {price} BEM · 00001–10000 · 单笔最多 1,000 份',
     '{price} BEM each · 00001–10000 · Up to 1,000 per purchase', { price: meta.unitPrice }));
-  put('selected-help', t('已售号码自动顺延补足，成交后以链上实际分配号码为准。剩余份数不足则无法购买。',
-    'Sold numbers are skipped and filled with the next available numbers. Final assignments are recorded onchain. Purchases fail if too few tickets remain.'));
+  put('selected-help', rules.testOnly ? t('已售号码自动顺延补足，成交后以链上实际分配号码为准。剩余份数不足则无法购买。',
+    'Sold numbers are skipped and filled with the next available numbers. Final assignments are recorded onchain. Purchases fail if too few tickets remain.')
+    : t('已售号码自动顺延。新正式场按链上顺序分配剩余份数，只扣除实际成交金额，未成交金额保留在钱包。',
+      'Sold numbers are skipped. New production pools allocate remaining tickets in onchain order and charge only filled tickets. Unspent BEM remains in your wallet.'));
   put('rule-funding', t('凑满 {amount} BEM 封盘，目标在一分钟内开奖；VRF 与网络确认可能延迟。',
     'Sales close at {amount} BEM. The draw targets one minute after closing; VRF and network confirmations can take longer.', { amount: meta.poolTotal }));
   put('rule-refunds', t('24 小时未凑满可退款，须在随后 24 小时内自行领取；截止后未领本金可销毁。每地址每期最多 5,000 份。',
@@ -124,7 +143,8 @@ function render() {
   put('footer-rules', t('{price} BEM / 份 · 每期 10,000 份', '{price} BEM per ticket · 10,000 per round', { price: meta.unitPrice }));
   put('payout-burn', `${meta.blackholeAmount} BEM`); put('payout-container', `${meta.organizerAmount} BEM`); put('payout-winner', `${meta.winnerAmount} BEM`);
   put('round-label', t('{amount} BEM 场次', '{amount} BEM pool', { amount: rules.id }));
-  put('round-phase', configured ? t('已启动', 'Started') : deployment ? t('已部署 · 待启动', 'Deployed · Awaiting start') : t('读取中', 'Loading'));
+  put('round-phase', rules.testOnly && !launch ? state.poolStatusError ? t('状态读取暂不可用', 'State temporarily unavailable') : t('读取中', 'Loading')
+    : configured ? t('已启动', 'Started') : deployment ? t('已部署 · 待启动', 'Deployed · Awaiting start') : t('读取中', 'Loading'));
   const sold = launch ? Number(launch.currentRound.sold) : null;
   put('funding-amount', `${sold == null ? '—' : money(BigInt(sold) * BigInt(rules.ticketPriceBaseUnits))} / ${meta.poolTotal} BEM`);
   put('funding-tickets', t('{count} / 10,000 份', '{count} / 10,000 tickets', { count: sold == null ? '—' : sold.toLocaleString(getLocale()) }));
@@ -133,11 +153,17 @@ function render() {
   put('reel-message', t('等待本场次产生已确认的中奖号码。', 'Awaiting a confirmed winning number for this pool.'));
   for (const step of ['lock', 'random', 'circuit', 'settle']) $('step-' + step)?.classList.remove('active');
   for (const id of ['approve', 'buy', 'refund', 'check-refund', 'replay', 'check-transactions']) disabled(id, true);
-  put('purchase-state', launch && !launch.vrf.consumerAuthorized ? t('合约已部署，需先添加 VRF 消费者并完成容器启动。', 'Contract deployed. Add the VRF consumer and activate it through the container.')
+  put('purchase-state', rules.testOnly && (state.testReadError || (!launch && state.poolStatusError)) ? t('链上状态读取暂时失败，请刷新余额与状态重试。', 'Chain state is temporarily unavailable. Refresh balances and state to retry.')
+    : rules.testOnly && !launch ? t('正在读取测试场链上状态…', 'Reading the test pool’s onchain state…')
+    : launch && !launch.vrf.consumerAuthorized ? t('合约已部署，需先添加 VRF 消费者并完成容器启动。', 'Contract deployed. Add the VRF consumer and activate it through the container.')
     : launch && !launch.seriesAuthorized ? t('合约已部署，等待容器授权启动。', 'Contract deployed. Awaiting container activation.')
+    : rules.testOnly && configured ? !current.account ? t('测试场已开放，请先连接钱包。', 'The test pool is open. Connect your wallet to continue.')
+      : current.chainId !== 56 ? t('测试场已开放，请切换 BNB 主网。', 'The test pool is open. Switch to BNB Chain.')
+      : t('测试场已开放，正在核对本钱包的余额与购买权限。', 'The test pool is open. Checking this wallet’s balance and purchase eligibility.')
     : t('该场次暂未开放，选号仅用于预览。', 'This pool is not open yet. Ticket selection is a preview.'));
   hidden('test-start-link', !rules.testOnly);
-  put('my-count', '—'); put('my-numbers', t('场次开放后可查询本期持票。', 'Your tickets will be available to query after this pool opens.'));
+  put('my-count', '—'); put('my-numbers', configured ? t('连接钱包后查询本期持票。', 'Connect your wallet to see your tickets.')
+    : t('场次开放后可查询本期持票。', 'Your tickets will be available to query after this pool opens.'));
   put('refund-amount', '— BEM'); put('refund-state', t('该场次暂未开放，尚无可查询的退款期号。', 'This pool is not open yet. There are no refundable rounds to query.'));
   hidden('transactions', true);
   put('wallet-label', current.account ? t('钱包已连接', 'Wallet connected') : state.wallets.size
@@ -159,14 +185,11 @@ function render() {
     put('selection-note', t('预选 {count} 份 · 成交号码以链上实际分配为准', '{count} tickets previewed · Final assigned numbers are recorded onchain', { count: selection.quantity.toLocaleString(getLocale()) }));
   } catch (error) { put('purchase-total', '— BEM'); put('selection-note', errorCopy(error)); }
   renderContractLinks(); renderTestControls();
+  if (!current.account) { disabled('approve', state.connecting); disabled('buy', state.connecting); }
+  pendingPoller?.update();
 }
 async function rpc(method, params, signal) {
-  if (!['eth_chainId', 'eth_blockNumber', 'eth_getBlockByNumber', 'eth_getCode', 'eth_getBalance', 'eth_call', 'eth_estimateGas', 'eth_gasPrice', 'eth_getTransactionCount', 'eth_getTransactionByHash', 'eth_getTransactionReceipt'].includes(method)) throw new Error('Read-only method required');
-  const response = await fetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: ++state.rpcId, method, params }), signal });
-  if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error(t('主网余额读取暂时不可用。', 'Mainnet balances are temporarily unavailable.'));
-  const result = await response.json(); if (result.error || result.result == null) throw new Error(t('主网余额读取暂时不可用。', 'Mainnet balances are temporarily unavailable.'));
-  return result.result;
+  return batchedRead(method, params, signal);
 }
 async function refreshPoolStatus() {
   const generation = ++state.poolGeneration, poolId = model.getState().poolId;
@@ -178,9 +201,9 @@ async function refreshPoolStatus() {
     const deployment = pools?.getState().deployment;
     if (result.schemaVersion !== 2 || result.chainId !== 56 || result.poolId !== poolId || !result.runtimeVerified ||
       !same(result.gameAddress, deployment?.address) || !Number.isSafeInteger(result.snapshot?.blockNumber)) throw new Error('Invalid pool state');
-    state.poolStatus = result; render();
+    state.poolStatus = result; state.poolStatusError = false; render();
   } catch {
-    if (generation === state.poolGeneration) { state.poolStatus = null; render(); }
+    if (generation === state.poolGeneration) { state.poolStatus = null; state.poolStatusError = true; render(); }
   }
 }
 async function refreshBalance() {
@@ -218,34 +241,36 @@ function walletChanged(accounts) {
 }
 function detachWallet() { for (const event of ['accountsChanged', 'chainChanged', 'disconnect']) state.wallet?.removeListener?.(event, walletChanged); }
 function clearTestViews() {
-  state.testGeneration++; state.testRefreshing = false;
+  state.testGeneration++; state.testRefreshing = false; state.testReadError = false;
   state.testView = null; state.refundView = null; state.settlementView = null;
 }
 const testViewCurrent = view => view && model.isCurrent(view.context);
 async function refreshTestState() {
-  const context = model.getState();
-  if (!testTransactions || context.poolId !== '1' || !context.account || context.chainId !== 56 || state.testRefreshing) return;
-  const generation = ++state.testGeneration; state.testRefreshing = true;
+  const context = model.getState(), transactions = currentTransactions();
+  if (!transactions || !context.account || context.chainId !== 56 || state.testRefreshing) return;
+  const generation = ++state.testGeneration; state.testRefreshing = true; state.testReadError = false;
   try {
-    const result = await testTransactions.readState(context.account);
+    const result = await transactions.readState(context.account);
     if (generation !== state.testGeneration || !model.isCurrent(context)) return;
     state.testView = { ...result, context }; state.settlementView = null;
     if (result.currentRoundId > 1n && result.round.status === 0) {
-      const previous = await testTransactions.readState(context.account, { roundId: result.currentRoundId - 1n });
+      const previous = await transactions.readState(context.account, { roundId: result.currentRoundId - 1n });
       if (generation !== state.testGeneration || !model.isCurrent(context)) return;
       state.settlementView = { ...previous, context };
     }
     if (result.canSettle) state.settlementView = { ...result, context };
     render();
   } catch (error) {
-    if (generation === state.testGeneration && model.isCurrent(context)) { state.testView = null; state.settlementView = null; render(); notice(errorCopy(error), true); }
+    if (generation === state.testGeneration && model.isCurrent(context)) { state.testView = null; state.settlementView = null; state.testReadError = true; render(); notice(errorCopy(error), true); }
   } finally { if (generation === state.testGeneration) state.testRefreshing = false; }
 }
 function renderTestControls() {
   const context = model.getState(), internal = context.poolId === '1';
+  const transactions = currentTransactions();
   hidden('settle-test', true);
-  if (!internal || !testTransactions) return;
-  const txState = testTransactions.getState(), view = testViewCurrent(state.testView) ? state.testView : null;
+  if (!transactions) return;
+  const txState = transactions.getState(), view = testViewCurrent(state.testView) ? state.testView : null;
+  if (!internal) partialFillResult.accept(txState.records);
   const refund = testViewCurrent(state.refundView) ? state.refundView : null;
   const settlement = testViewCurrent(state.settlementView) ? state.settlementView : null;
   const connected = Boolean(context.account && context.chainId === 56);
@@ -256,18 +281,45 @@ function renderTestControls() {
     put('refund-state', refund.canRefund ? t('请在 {time} 前领取到当前钱包。', 'Claim to your connected wallet before {time}.', { time: new Date(Number(refund.refundDeadline)*1000).toLocaleString(getLocale()) }) : t('该期目前没有可领取本金。', 'No principal is claimable for this round right now.'));
   }
   if (view) {
+    // The verified wallet snapshot is also the current round snapshot. Do not
+    // leave progress blank merely because the separate public status API failed.
+    put('funding-amount', `${money(view.round.sold * BigInt(context.rules.ticketPriceBaseUnits))} / ${context.poolId} BEM`);
+    put('funding-tickets', t('{count} / 10,000 份', '{count} / 10,000 tickets', { count: view.round.sold.toLocaleString(getLocale()) }));
+    const progress = $('funding-progress')?.firstElementChild;
+    if (progress) progress.style.width = `${Number(view.round.sold) / 100}%`;
+    put('snapshot-label', t('链上已核验 · 区块 {block}', 'Onchain state verified · Block {block}', { block: view.blockNumber.toLocaleString(getLocale()) }));
     put('my-count', view.myCount.toLocaleString(getLocale()));
     put('my-numbers', t('第 {round} 期 · 已持有 {count} 份。具体号码可查看已确认购买交易。', 'Round {round} · You hold {count} tickets. Check confirmed purchase transactions for their numbers.', { round: view.roundId.toString(), count: view.myCount.toString() }));
-    put('round-label', t('1 BEM 测试 · 第 {round} 期', '1 BEM test · Round {round}', { round: view.roundId.toString() }));
+    put('round-label', internal ? t('1 BEM 测试 · 第 {round} 期', '1 BEM test · Round {round}', { round: view.roundId.toString() })
+      : t('{amount} BEM · 第 {round} 期', '{amount} BEM · Round {round}', { amount: context.poolId, round: view.roundId.toString() }));
     if (view.seriesAuthorized && view.consumerAuthorized && view.round.status === 1 && view.timestamp < view.round.fundingDeadline) {
-      put('launch-status', t('1 BEM 测试已开放', '1 BEM test open'));
+      put('launch-status', internal ? t('1 BEM 测试已开放', '1 BEM test open') : t('{amount} BEM 场次已开放', '{amount} BEM pool open', { amount: context.poolId }));
       put('round-phase', t('购买中', 'Funding'));
-      put('purchase-state', t('单笔最多 1,000 份（0.1 BEM），本地址本期还可购买 {count} 份。', 'Up to 1,000 tickets (0.1 BEM) per transaction. This address can buy {count} more this round.', { count: (5000n-view.myCount).toLocaleString(getLocale()) }));
+      put('purchase-state', internal ? t('单笔最多 1,000 份（0.1 BEM），本地址本期还可购买 {count} 份。', 'Up to 1,000 tickets (0.1 BEM) per transaction. This address can buy {count} more this round.', { count: (5000n-view.myCount).toLocaleString(getLocale()) })
+        : t('单笔最多 1,000 份，本地址本期还可购买 {count} 份。份数不足时按实际成交扣款。',
+          'Up to 1,000 tickets per purchase. This address can buy {count} more this round. Only filled tickets are charged.', { count: (5000n-view.myCount).toLocaleString(getLocale()) }));
       try {
         const selection = model.preview(), amount = BigInt(selection.amountBaseUnits), qty = BigInt(selection.quantity);
-        const allowed = view.canBuy && !txState.blocking && view.bemBalance >= amount && qty + view.myCount <= 5000n && qty + view.round.sold <= 10000n;
-        disabled('approve', !allowed || view.allowance >= amount); disabled('buy', !allowed || view.allowance < amount);
-      } catch { disabled('approve', true); disabled('buy', true); }
+        const fill = internal ? qty : [qty, 10000n - view.round.sold, 5000n - view.myCount].reduce((a, b) => a < b ? a : b);
+        const payable = fill * BigInt(context.rules.ticketPriceBaseUnits);
+        const allowed = view.canBuy && !txState.blocking && view.bemBalance >= payable &&
+          (!internal || qty + view.myCount <= 5000n && qty + view.round.sold <= 10000n);
+        disabled('approve', !allowed || (internal && view.bemBalance < amount) || view.allowance >= payable); disabled('buy', !allowed || view.allowance < payable);
+        if (txState.blocking) {
+          const pending = txState.records.find(record => !['confirmed', 'reverted'].includes(record.status));
+          put('purchase-state', txState.storageError ? errorCopy({ code: 'PENDING_STORAGE_UNAVAILABLE' })
+            : pending ? transactionStatusCopy(pending)
+            : t('正在准备交易，请在钱包中确认。', 'Preparing the transaction. Confirm it in your wallet.'));
+        }
+        else if (view.bemBalance < payable) put('purchase-state', t('场次已开放。钱包现有 {balance} BEM，本次需 {amount} BEM，余额不足。',
+          'The pool is open. Your wallet has {balance} BEM; this purchase needs {amount} BEM. The balance is insufficient.', { balance: money(view.bemBalance), amount: money(payable) }));
+        else if (view.myCount >= 5000n || internal && qty + view.myCount > 5000n) put('purchase-state', t('本地址本期还可购买 {count} 份，请调整购买数量。',
+          'This address can buy {count} more tickets this round. Adjust the quantity.', { count: (5000n - view.myCount).toLocaleString(getLocale()) }));
+        else if (view.round.sold >= 10000n || internal && qty + view.round.sold > 10000n) put('purchase-state', t('本期仅剩 {count} 份，请调整购买数量。',
+          'Only {count} tickets remain in this round. Adjust the quantity.', { count: (10000n - view.round.sold).toLocaleString(getLocale()) }));
+        else if (!view.canBuy && view.subscriptionNativeBalance === 0n) put('purchase-state', t('场次已启动，VRF 订阅余额不足，暂时无法购买。',
+          'The pool has started, but its VRF subscription balance is insufficient for purchases.'));
+      } catch (error) { disabled('approve', true); disabled('buy', true); put('purchase-state', errorCopy(error)); }
     }
     if (view.round.status === 1) {
       hidden('countdown-panel', false); put('countdown-label', t('本期购买截止', 'Funding closes'));
@@ -279,7 +331,8 @@ function renderTestControls() {
     put('round-phase', settlement.round.status === 5 ? t('已结算', 'Settled') : settlement.round.status === 4 ? t('等待结算', 'Awaiting settlement') : t('等待 VRF', 'Awaiting VRF'));
     put('reel-message', settlement.round.status === 5 ? t('本期已结算，确认后的中奖记录将显示在播报和历史中。', 'Settled. Confirmed winnings will appear in announcements and history.') : t('本期已封盘，等待随机数确认及结算。', 'Sales are closed. Awaiting randomness and settlement.'));
     hidden('settle-test', settlement.round.status !== 4); disabled('settle-test', !settlement.canSettle || txState.blocking);
-    put('settle-test', t('结算第 {round} 期测试', 'Settle test round {round}', { round: settlement.roundId.toString() }));
+    put('settle-test', internal ? t('结算第 {round} 期测试', 'Settle test round {round}', { round: settlement.roundId.toString() })
+      : t('结算第 {round} 期', 'Settle round {round}', { round: settlement.roundId.toString() }));
   }
   hidden('transactions', txState.records.length === 0 && !txState.storageError);
   disabled('check-transactions', txState.busy);
@@ -290,7 +343,7 @@ function renderTestControls() {
   for (const record of txState.records) {
     const row = document.createElement('article'); row.className = 'tx-entry';
     const labels = { approve: t('授权', 'Approval'), buy: t('购买', 'Purchase'), refund: t('领取本金', 'Refund'), settle: t('结算', 'Settlement') };
-    const label = document.createElement('strong'); label.textContent = `${labels[record.kind] ?? ''} · ${record.status === 'confirmed' ? t('已确认', 'Confirmed') : record.status === 'reverted' ? t('交易失败', 'Reverted') : t('核对中，请勿重复提交', 'Checking; do not submit again')}`;
+    const label = document.createElement('strong'); label.textContent = `${labels[record.kind] ?? ''} · ${transactionStatusCopy(record)}`;
     row.append(label);
     const who = document.createElement('p'); who.textContent = t('钱包 {account} · 第 {round} 期', 'Wallet {account} · Round {round}', { account: record.account ?? '—', round: record.input?.roundId ?? '—' }); row.append(who);
     if (record.hash) { const a = document.createElement('a'); a.href = `https://bscscan.com/tx/${record.hash}`; a.textContent = record.hash; a.target = '_blank'; a.rel = 'noopener noreferrer'; row.append(a); }
@@ -299,30 +352,53 @@ function renderTestControls() {
     target.append(row);
   }
 }
+function transactionStatusCopy(record) {
+  if (record.status === 'confirmed') return t('已上链确认', 'Confirmed onchain');
+  if (record.status === 'reverted') return t('交易失败', 'Transaction reverted');
+  if (record.status === 'confirming') return t('已上链 · {count}/{required} 个确认', 'Included onchain · {count}/{required} confirmations',
+    { count: record.confirmations ?? 0, required: record.requiredConfirmations ?? (['approve', 'buy'].includes(record.kind) ? 1 : 12) });
+  if (record.status === 'awaiting_wallet') return t('等待钱包确认', 'Awaiting wallet confirmation');
+  if (record.status === 'pending') return ['approve', 'buy'].includes(record.kind)
+    ? t('已提交，等待上链；每 2 秒自动更新状态。', 'Submitted; awaiting inclusion. Status refreshes every 2 seconds.')
+    : t('已提交，等待上链。', 'Submitted; awaiting inclusion.');
+  return record.hash ? t('已提交，节点暂未返回明确结果，正在自动刷新。', 'Submitted; the node has not returned a definite result. Refreshing automatically.')
+    : t('钱包未返回交易哈希，请查看钱包或填写哈希核实。', 'No transaction hash was returned. Check your wallet or enter its hash.');
+}
 async function queryTestRefund() {
-  const context = model.getState(); state.refundView = null; render();
-  if (context.poolId !== '1' || !context.account || context.chainId !== 56) return;
+  const context = model.getState(), transactions = currentTransactions(); state.refundView = null; render();
+  if (!transactions || !context.account || context.chainId !== 56) return;
   const text = $('refund-round')?.value.trim();
   if (!/^[1-9][0-9]{0,76}$/.test(text ?? '')) { notice(t('请输入正确的期号。', 'Enter a valid round number.'), true); return; }
   try {
-    const result = await testTransactions.readState(context.account, { roundId: text });
+    const result = await transactions.readState(context.account, { roundId: text });
     if (!model.isCurrent(context) || text !== $('refund-round')?.value.trim()) return;
     state.refundView = { ...result, context }; render();
   } catch (error) { if (model.isCurrent(context)) notice(errorCopy(error), true); }
 }
 async function executeTestAction(kind) {
-  if (model.getState().poolId !== '1') { notice(errorCopy({ code: 'POOL_NOT_LAUNCHED' }), true); return; }
+  if (['approve', 'buy'].includes(kind) && !model.getState().account) {
+    if (!state.connecting) picker.open();
+    return;
+  }
+  const transactions = currentTransactions();
+  if (!transactions) { notice(errorCopy({ code: 'POOL_NOT_LAUNCHED' }), true); return; }
   try {
     const view = kind === 'refund' ? state.refundView : kind === 'settle' ? state.settlementView : state.testView;
     if (!testViewCurrent(view)) throw Object.assign(new Error(), { code: 'CONTEXT_CHANGED' });
     const selection = ['approve','buy'].includes(kind) ? model.preview() : null;
     notice(t('正在核对本次交易，随后请在钱包中确认。', 'Checking the transaction. Then confirm it in your wallet.'));
-    await testTransactions.execute(kind, { roundId: view.roundId, ...(selection ? { quantity: selection.quantity, tickets: selection.tickets } : {}) });
-    notice(t('请查看下方交易记录；链上确认后会更新。', 'See the transaction record below. It will update after onchain confirmation.'));
-    await testTransactions.checkPending(); await refreshTestState();
+    await transactions.execute(kind, { roundId: view.roundId, ...(selection ? { quantity: selection.quantity, tickets: selection.tickets } : {}) });
+    notice(t('交易已提交，正在自动查询上链结果。', 'Transaction submitted. Checking its onchain result automatically.'));
+    await checkPlayerTransactions();
     if (kind === 'refund') await queryTestRefund();
   } catch (error) { notice(errorCopy(error), true); }
   finally { render(); }
+}
+async function checkPlayerTransactions() {
+  const wasBlocking = currentTransactions()?.getState().blocking;
+  await pendingPoller.checkNow();
+  // The completion callback already refreshes a newly unlocked wallet.
+  if (!wasBlocking) await refreshTestState();
 }
 async function connect(entry) {
   if (state.connecting) return; state.connecting = true; const version = ++state.connectVersion;
@@ -363,6 +439,16 @@ function selectTab(tab) {
 
 initLanguage();
 testTransactions = createTestPlayerTransactions({ wallet: () => state.wallet, getContext: () => model.getState(), readRpc: rpc, onUpdate: () => render() });
+for (const poolId of ['10', '50', '100']) formalTransactions.set(poolId,
+  createFormalPlayerTransactions({ poolId, wallet: () => state.wallet, getContext: () => model.getState(), readRpc: rpc, onUpdate: () => render() }));
+pendingPoller = createPendingReadPoller({ getManager: currentTransactions,
+  onResolved: async manager => {
+    if (manager !== currentTransactions()) return;
+    clearTestViews(); render();
+    await refreshTestState(); refreshBalance(); refreshHistory();
+  },
+  onError: error => notice(errorCopy(error), true),
+});
 pools = createPoolSelection({ mount: $('pool-selection'), search: location.search, autoLoad: false, onChange: onPoolChange });
 const picker = createWalletPicker({ dialog: $('wallet-picker'), onSelect: connect, onChange: wallets => { state.wallets = wallets; render(); } });
 $('connect-wallet')?.addEventListener('click', () => { if (!state.connecting) picker.open(); });
@@ -387,19 +473,21 @@ for (const button of document.querySelectorAll('[data-count]')) button.addEventL
   model.setSelection({ count: button.dataset.count, mode: 'auto' }); applySelectionFields(); render();
 });
 for (const id of ['approve', 'buy', 'refund']) $(id)?.addEventListener('click', event => { event.preventDefault(); executeTestAction(id); });
-$('check-refund')?.addEventListener('click', () => { if (model.getState().poolId === '1') queryTestRefund(); });
+$('check-refund')?.addEventListener('click', queryTestRefund);
 $('refund-round')?.addEventListener('input', () => { state.refundView = null; render(); });
 $('settle-test')?.addEventListener('click', () => executeTestAction('settle'));
-$('check-transactions')?.addEventListener('click', async () => { try { await testTransactions.checkPending(); await refreshTestState(); } catch(error) { notice(errorCopy(error), true); } });
-$('attach-test-hash')?.addEventListener('click', async () => { try { await testTransactions.attachHash($('unknown-test-hash')?.value.trim()); await refreshTestState(); } catch(error) { notice(errorCopy(error), true); } });
+$('check-transactions')?.addEventListener('click', async () => { try { await checkPlayerTransactions(); } catch(error) { notice(errorCopy(error), true); } });
+$('attach-test-hash')?.addEventListener('click', async () => { try { await currentTransactions()?.attachHash($('unknown-test-hash')?.value.trim()); await refreshTestState(); } catch(error) { notice(errorCopy(error), true); } });
 for (const tab of ['draw', 'proof']) $('tab-' + tab)?.addEventListener('click', () => selectTab(tab));
-window.addEventListener('bem:languagechange', () => { render(); if (!state.noticeError) notice(t('请核对所选场次与钱包，交易需在钱包中确认。', 'Review the selected pool and wallet. Confirm transactions in your wallet.')); else put('notice', translateKnown($('notice')?.textContent ?? '')); });
+window.addEventListener('bem:languagechange', () => { render(); partialFillResult.refreshLanguage(); if (!state.noticeError) notice(t('请核对所选场次与钱包，交易需在钱包中确认。', 'Review the selected pool and wallet. Confirm transactions in your wallet.')); else put('notice', translateKnown($('notice')?.textContent ?? '')); });
 put('history-summary', t('本场次暂无已确认的往期开奖。', 'No confirmed past draws are available for this pool.'));
 notice(t('正在读取场次信息。连接钱包后可查看余额与参与状态。', 'Reading pool information. Connect your wallet to view balances and participation status.'));
 applySelectionFields(); render(); dispatchPool(); pools.load();
 setInterval(() => { if (document.visibilityState === 'visible') {
   refreshBalance(); refreshPoolStatus(); refreshTestState();
-  if (testTransactions.getState().records.some(r => !['confirmed','reverted'].includes(r.status))) testTransactions.checkPending().catch(error => notice(errorCopy(error), true));
+  const transactions = currentTransactions();
+  const transactionState = transactions?.getState();
+  if (!hasFastPendingRead(transactionState) && transactionState?.records.some(r => !['confirmed','reverted'].includes(r.status))) pendingPoller.checkNow();
 } }, 15000);
-window.addEventListener('storage', () => { if (model.getState().poolId === '1') testTransactions.checkPending().catch(error => notice(errorCopy(error), true)); });
-window.addEventListener('beforeunload', () => { state.balanceAbort?.abort(); pools.destroy(); detachWallet(); });
+window.addEventListener('storage', () => { pendingPoller.checkNow(); });
+window.addEventListener('beforeunload', () => { pendingPoller.destroy(); state.balanceAbort?.abort(); pools.destroy(); detachWallet(); });

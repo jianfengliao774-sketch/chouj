@@ -10,7 +10,13 @@ export const START_ACTIONS = Object.freeze({ consumer: '添加 VRF 消费者', a
 export const same = (a, b) => typeof a === 'string' && typeof b === 'string' && a.toLowerCase() === b.toLowerCase();
 export const need = (condition, message) => { if (!condition) throw Error(message); };
 export const isHash = value => typeof value === 'string' && /^0x[0-9a-f]{64}$/i.test(value);
-export const uint = value => { need(typeof value === 'bigint' || typeof value === 'string' && /^(0x[0-9a-f]+|0|[1-9][0-9]*)$/i.test(value), '链上数值格式异常。'); const n = BigInt(value); need(n >= 0n && n < 2n ** 256n, '链上数值越界。'); return n; };
+export const uint = (value, field = '链上数值') => {
+  // Some wallet providers normalize small RPC quantities to JavaScript numbers.
+  // Accept those only when exact; amounts above the safe range must stay strings/bigints.
+  need(typeof value === 'bigint' || typeof value === 'number' && Number.isSafeInteger(value) ||
+    typeof value === 'string' && /^(0x[0-9a-f]+|0|[1-9][0-9]*)$/i.test(value), `${field}格式异常。`);
+  const n = BigInt(value); need(n >= 0n && n < 2n ** 256n, `${field}越界。`); return n;
+};
 export const START_ABI = new Interface([
   'function addConsumer(uint256 subId,address consumer)',
   'function getSubscription(uint256) view returns(uint96 balance,uint96 nativeBalance,uint64 reqCount,address owner,address[] consumers)',

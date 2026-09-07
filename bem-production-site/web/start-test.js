@@ -120,7 +120,7 @@ async function connect(entry) {
     const chain = await wallet.request({ method: 'eth_chainId' });
     const current = await wallet.request({ method: 'eth_accounts' });
     need(epoch === state.epoch && wallet === state.wallet && accounts?.length && current?.length && same(accounts[0], current[0]), '连接过程中钱包已变化，请重试。');
-    state.account = getAddress(current[0]); state.chainId = Number(uint(chain));
+    state.account = getAddress(current[0]); state.chainId = Number(uint(chain, '钱包网络 ID'));
     if (state.chainId === 56) state.snapshot = await readSnapshot(capture());
     notice(state.chainId === 56 ? '钱包已连接并核对。请选择尚未完成的配置步骤。' : '请切换 BNB 主网，再重新连接核对。');
   } catch (error) { notice(errorText(error), true); }
@@ -140,7 +140,7 @@ async function read(c, method, params = []) {
 }
 async function identity(c) {
   const chain = await read(c, 'eth_chainId'), accounts = await read(c, 'eth_accounts');
-  need(uint(chain) === 56n && accounts?.length && same(accounts[0], c.account), '当前钱包或网络与核对资料不一致。');
+  need(uint(chain, '钱包网络 ID') === 56n && accounts?.length && same(accounts[0], c.account), '当前钱包或网络与核对资料不一致。');
 }
 async function call(c, to, name, args = [], block = 'latest') {
   return ABI.decodeFunctionResult(name, await read(c, 'eth_call', [{ to, data: ABI.encodeFunctionData(name, args) }, block]));
@@ -148,7 +148,7 @@ async function call(c, to, name, args = [], block = 'latest') {
 async function readSnapshot(c, at = 'latest') {
   await identity(c);
   const header = await read(c, 'eth_getBlockByNumber', [at, false]); need(header?.number && isHash(header.hash), '区块资料暂不可用。');
-  const block = header.number;
+  const block = toQuantity(uint(header.number, '钱包区块高度'));
   const [code, sub, owner, nftOwner, fee, token, account, opened, authorized, current, subscription, native, codes] = await Promise.all([
     read(c, 'eth_getCode', [F.game, block]), call(c, F.coordinator, 'getSubscription', [F.subscriptionId], block),
     call(c, F.authorizationContainer, 'owner', [], block), call(c, F.processor, 'ownerOf', ['2075'], block),
@@ -161,7 +161,7 @@ async function readSnapshot(c, at = 'latest') {
   const s = assertSnapshot({ chainId: '56', block, blockHash: header.hash, code, subscriptionId: subscription[0].toString(), dependencyCodes: codes,
     containerOpened: opened[0], containerAccount: account[0], containerToken: [...token].map(String), containerOwner: owner[0], nftOwner: nftOwner[0],
     subscriptionOwner: sub[3], consumers: [...sub[4]], seriesAuthorized: authorized[0], currentRound: current[0].toString(), round: [...round].map(String),
-    execFeeWei: fee[0].toString(), subscriptionNativeWei: sub[1].toString(), containerNativeWei: uint(native).toString() });
+    execFeeWei: fee[0].toString(), subscriptionNativeWei: sub[1].toString(), containerNativeWei: uint(native, '容器 BNB 余额').toString() });
   need(same((await read(c, 'eth_getBlockByNumber', [block, false]))?.hash, header.hash), '区块发生变化，请重新核对。');
   await identity(c); return s;
 }

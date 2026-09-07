@@ -2,10 +2,19 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { keccak256 } from 'ethers';
-import { START_FIXED as F, START_ABI as ABI, actionTransaction, assertSnapshot, assertActionReady, assertIntent, restoreRecord, assertReceiptEvents } from '../bem-production-site/web/start-test-guards.js';
+import { START_FIXED as F, START_ABI as ABI, actionTransaction, assertSnapshot, assertActionReady, assertIntent, restoreRecord, assertReceiptEvents, uint } from '../bem-production-site/web/start-test-guards.js';
 
 const code = fs.readFileSync(new URL('./fixtures/start-test-runtime.hex', import.meta.url), 'utf8').trim();
 const owner = '0x304F06903324B8056cB1ED627144EfB2C34df3a8';
+test('wallet quantities accept exact numeric representations without rounding or coercing malformed values', () => {
+  for (const value of [56, 56n, '56', '0x38']) assert.equal(uint(value), 56n);
+  assert.equal(uint(0), 0n);
+  assert.equal(uint(Number.MAX_SAFE_INTEGER), 9007199254740991n);
+  assert.equal(uint('1000000000000000000'), 1000000000000000000n);
+  for (const value of [Number.MAX_SAFE_INTEGER + 1, 1e18, 0.5, NaN, Infinity, -1, null, true, {}, '0x', '', ' 56', '5e1'])
+    assert.throws(() => uint(value));
+  assert.throws(() => uint((2n ** 256n).toString()));
+});
 function snapshot() { return { chainId: '56', block: '100', blockHash: '0x' + 'ab'.repeat(32), code, subscriptionId: F.subscriptionId, dependencyCodes: Array(4).fill('0x6000'),
   containerOpened: true, containerAccount: F.authorizationContainer, containerToken: ['56', F.processor, '2075'], containerOwner: owner, nftOwner: owner, subscriptionOwner: owner,
   consumers: [F.game], seriesAuthorized: false, execFeeWei: F.execFeeWei, subscriptionNativeWei: '10000000000000000', containerNativeWei: '0', currentRound: '1', round: ['0'] }; }

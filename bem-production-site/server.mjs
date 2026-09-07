@@ -93,10 +93,17 @@ export async function createProductionServer({ port = 8788, rpc = createReadRpc(
       // It must overwrite X-Real-IP; X-Forwarded-Host/Proto/For are never trusted.
       const loopback = ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(peer);
       const ip = publicUrl && loopback && typeof realIp === 'string' && isIP(realIp) ? realIp : peer;
-      const now = Date.now();
-      if (limits.size > 2000) for (const [key, entry] of limits) if (now - entry.at > 60000) limits.delete(key);
-      let count = limits.get(ip); if (!count || now - count.at > 60000) { count = { at: now, requests: 0 }; limits.set(ip, count); }
-      if (++count.requests > 600) return json(res, 429, { error: '访问较频繁，请稍后重试。' }, { 'retry-after': '10' });
+      // Static assets do not consume a wallet's read budget. RPC and API traffic
+      // have independent per-IP budgets; upstream RPC concurrency is bounded separately.
+      const bucket = url.pathname === '/rpc' ? 'rpc' : url.pathname.startsWith('/api/') ? 'api' : null;
+      if (bucket) {
+        const now = Date.now(), key = `${bucket}:${ip}`, maximum = bucket === 'rpc' ? 1200 : 600;
+        if (limits.size > 2000) for (const [id, entry] of limits) if (now - entry.at >= 60000) limits.delete(id);
+        let count = limits.get(key);
+        if (!count || now - count.at >= 60000) { count = { at: now, requests: 0 }; limits.set(key, count); }
+        if (++count.requests > maximum) return json(res, 429, { error: '访问较频繁，请稍后重试。' },
+          { 'retry-after': String(Math.max(1, Math.ceil((count.at + 60000 - now) / 1000))) });
+      }
       if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { mode: 'production', chainId: 56, gameAddress: GAME, salesEnabled: false });
       if (req.method === 'GET' && url.pathname === '/api/config') return json(res, 200, manifest);
       if (req.method === 'GET' && url.pathname === '/api/pools') {

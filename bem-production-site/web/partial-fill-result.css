@@ -1,0 +1,8 @@
+.partial-fill-result{box-sizing:border-box;width:min(480px,calc(100vw - 32px));max-height:calc(100vh - 40px);overflow:auto;padding:26px;border:1px solid #dfc598;border-top:3px solid #bf2030;border-radius:12px;background:#fffaf1;color:#774525;box-shadow:0 18px 70px #37281844;font:inherit}
+.partial-fill-result::backdrop{background:#2b201b66}
+.partial-fill-result h2{margin:0 0 20px;color:#bd2030;font-size:23px;line-height:1.4}
+.partial-fill-result p{font-size:16px;line-height:1.75;margin:14px 0}
+.partial-fill-result .partial-fill-payment{font-weight:700}
+.partial-fill-result .partial-fill-note{font-size:14px;color:#927458}
+.partial-fill-result a{display:block;color:#a3202e;overflow-wrap:anywhere;margin:20px 0}
+.partial-fill-result button{width:100%;border:0;border-radius:7px;background:#bd2030;color:#fff;padding:12px 16px;font:inherit;font-weight:700;cursor:pointer}

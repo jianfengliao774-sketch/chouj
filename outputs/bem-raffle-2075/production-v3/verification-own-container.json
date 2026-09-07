@@ -1,0 +1,76 @@
+{
+  "status": "passed",
+  "expectedTestCount": 10,
+  "executedTestCount": 10,
+  "checkedAt": "2026-09-07T06:49:11.347Z",
+  "contractVersion": 3,
+  "scope": "local_mocks_only",
+  "tests": [
+    {
+      "name": "V3 artifacts preserve deployed V1/V2 bytes and fixed formal bindings, exposing partial-fill gameplay",
+      "passed": true
+    },
+    {
+      "name": "10 BEM formal: only 13061 may activate once, independently of the 2075 container or deployer",
+      "passed": true
+    },
+    {
+      "name": "50 BEM formal: only 13061 may activate once, independently of the 2075 container or deployer",
+      "passed": true
+    },
+    {
+      "name": "100 BEM formal: only 13061 may activate once, independently of the 2075 container or deployer",
+      "passed": true
+    },
+    {
+      "name": "V3 deployment rejects wrong, unopened and incorrectly bound 13061 containers",
+      "passed": true
+    },
+    {
+      "name": "10 BEM V3 preserves address limits, auto replacement, VRF atomicity, 2075 computation and exact 4/1/95 distribution",
+      "passed": true,
+      "finalPurchaseGas": "2009191",
+      "settlementGas": "214681"
+    },
+    {
+      "name": "10 BEM V3 keeps fixed 24h self-claim and 48h unclaimed burn boundaries, protecting the next round",
+      "passed": true,
+      "refundBaseUnits": "1000000",
+      "unclaimedBurnBaseUnits": "2000000"
+    },
+    {
+      "name": "Partial automatic order: 1000 requested / 800 left charges only 800 and preserves zero-fill races",
+      "passed": true,
+      "requested": 1000,
+      "filled": 800,
+      "unspentBaseUnits": "20000000",
+      "partialFillGas": "1691500"
+    },
+    {
+      "name": "Partial selected order: 1000 requested / 800 left charges only 800 and preserves zero-fill races",
+      "passed": true,
+      "requested": 1000,
+      "filled": 800,
+      "unspentBaseUnits": "20000000",
+      "partialFillGas": "9699072"
+    },
+    {
+      "name": "Address quota partial fill charges actual tickets and self-refunds only paid principal; expired and nonfull old rounds still reject",
+      "passed": true,
+      "paidRefundedBaseUnits": "500000000",
+      "unspentLastOrderBaseUnits": "80000000"
+    }
+  ],
+  "preservedDeployedFileCount": 34,
+  "preservedDeployedTreeSha256": "5e32b076506d2c447da57116a07d30a04476cc11df8a1b1fa1a3ab0c10a5d299",
+  "sourceSha256s": {
+    "contracts/production-v3/BemSelectableRaffleV3.sol": "512d825674075141e7059645256b0d8d44d732aa141d3072d82cc17338629d73",
+    "contracts/production-v3/BemSelectableRaffle13061V3BSC.sol": "aaf1c26e0060b7e7d8ca979d2feef993e37bc437f74f755cc72c5f9d7433fd34",
+    "contracts/production-v3/BemOwnContainer13061SeriesBSC.sol": "8606b28b839496d74b58b6751b8e171cf283d1fbad852a89fd8e5ff2b9eace2b",
+    "contracts/production-v3/BemOwnContainer13061Pool10BSC.sol": "60b5a355bba1584337a6630f24a406b0c5ddd7efa6b19b594522bea2dfc85bf1",
+    "contracts/production-v3/BemOwnContainer13061Pool50BSC.sol": "2ae810d1384fe0e232b28006a76ca55b7ad64991874853fbc70f0d72a80d738d",
+    "contracts/production-v3/BemOwnContainer13061Pool100BSC.sol": "807ade52f17a6c2c5b543bdb1a021ecde3b06210dc8be261dfff6a6333d4848d"
+  },
+  "unchangedTest1": true,
+  "mainnetTransactionsSent": 0
+}

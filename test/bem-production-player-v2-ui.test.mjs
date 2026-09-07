@@ -4,6 +4,9 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { Interface, formatUnits, getAddress, toQuantity } from 'ethers';
 import { createTestPlayerTransactions } from '../bem-production-site/web/test-player-transactions.js';
+import { createFormalPlayerTransactions } from '../bem-production-site/web/formal-player-transactions.js';
+import { createPartialFillResult } from '../bem-production-site/web/partial-fill-result.js';
+import { createPendingReadPoller, hasFastPendingRead } from '../bem-production-site/web/pending-read-poller.js';
 import { poolRegistry } from '../bem-production-site/pools.mjs';
 import { quoteView } from '../bem-production-site/web/market-guards.js';
 import { validateRecords, transactionUrl } from '../bem-production-site/web/public-record-guards.js';
@@ -11,7 +14,7 @@ import { validateRecords, transactionUrl } from '../bem-production-site/web/publ
 const WEB = new URL('../bem-production-site/web/', import.meta.url);
 const A = '0x1111111111111111111111111111111111111111', B = '0x2222222222222222222222222222222222222222';
 const token = new Interface(['function balanceOf(address) view returns(uint256)']);
-const tick = () => new Promise(resolve => setImmediate(resolve));
+const tick = () => new Promise(resolve => setTimeout(resolve, 1));
 async function until(condition, label) { for (let n = 0; n < 100; n++) { if (condition()) return; await tick(); } throw new Error(`Timed out: ${label}`); }
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
 
@@ -73,6 +76,9 @@ test('the real player entry forwards only explicit test actions and keeps a new 
   })});
   await app.connect();await until(()=>app.$('approve').disabled===false,'test approve enabled');
   assert.match(app.$('round-phase').textContent,/购买中/);assert.ok(reads.every(id=>id===undefined));
+  assert.equal(app.$('funding-amount').textContent, '0.1 / 1 BEM', 'verified wallet reads populate progress even without the public status API');
+  assert.equal(app.$('funding-tickets').textContent, '1,000 / 10,000 份');
+  assert.equal(app.$('funding-progress').firstElementChild.style.width, '10%');
   assert.equal(actions.length,0);await app.$('approve').emit('click');
   await until(()=>app.$('buy').disabled===false,'exact approval permits explicit purchase');
   assert.deepEqual(actions.map(a=>a.kind),['approve']);
@@ -80,6 +86,86 @@ test('the real player entry forwards only explicit test actions and keeps a new 
   assert.equal(actions[1].context.poolId,'1');assert.equal(actions[1].payload.roundId,2n);assert.equal(actions[1].payload.quantity,1);
   await app.choose('10');await app.$('buy').emit('click');await tick();
   assert.equal(app.$('buy').disabled,true);assert.equal(actions.length,2);
+});
+
+test('an open test pool explains a zero BEM balance without calling it unstarted', async () => {
+  const app = await harness({ search: '?pool=1', openTest: true, testFactory: () => ({
+    getState: () => ({ busy: false, blocking: false, records: [] }), checkPending: async () => {},
+    readState: async account => ({ account, blockNumber: 120000001, roundId: 1n, currentRoundId: 1n, timestamp: 100n,
+      round: { status: 1, sold: 0n, fundingDeadline: 10000n }, myCount: 0n, allowance: 0n, bemBalance: 0n,
+      seriesAuthorized: true, consumerAuthorized: true, canBuy: true, canRefund: false, canSettle: false }),
+  }) });
+  await app.connect(); await until(() => /余额不足/.test(app.$('purchase-state').textContent), 'actual zero balance explanation');
+  assert.match(app.$('purchase-state').textContent, /场次已开放.*0 BEM.*0\.0001 BEM/);
+  assert.equal(app.$('approve').disabled, true); assert.equal(app.$('buy').disabled, true);
+  assert.equal(app.wallet.calls.filter(call => call.method === 'eth_sendTransaction').length, 0);
+});
+
+test('a registered formal fixture permits 1000 requested with 800 remaining while passing the original quantity', async () => {
+  const actions = [];
+  const app = await harness({ search: '?pool=10', formalFactory: options => options.poolId !== '10'
+    ? createFormalPlayerTransactions(options) : ({
+      getState: () => ({ busy: false, blocking: false, registered: true, records: [] }), checkPending: async () => {},
+      readState: async account => ({ account, blockNumber: 120000001, roundId: 1n, currentRoundId: 1n, timestamp: 100n,
+        round: { status: 1, sold: 9200n, fundingDeadline: 10000n }, myCount: 0n, allowance: 80000000n, bemBalance: 80000000n,
+        seriesAuthorized: true, consumerAuthorized: true, canBuy: true, canRefund: false, canSettle: false }),
+      execute: async (kind, payload) => actions.push({ kind, payload }),
+    }) });
+  await app.connect(); await until(() => app.$('buy').disabled === false, 'registered formal purchase');
+  app.$('ticket-count').value = '1000'; await app.$('ticket-count').emit('input');
+  assert.equal(app.$('buy').disabled, false); assert.equal(app.$('approve').disabled, true);
+  assert.match(app.$('purchase-state').textContent, /实际成交扣款/);
+  await app.$('buy').emit('click'); await until(() => actions.length === 1, 'explicit formal purchase');
+  assert.equal(actions[0].payload.quantity, 1000); assert.equal(actions[0].payload.roundId, 1n);
+  await app.choose('50'); await app.$('buy').emit('click'); await tick();
+  assert.equal(actions.length, 1); assert.equal(app.$('buy').disabled, true);
+});
+
+test('disconnected purchase buttons open the wallet picker, preserve 1000 tickets and never continue into a transaction', async () => {
+  for (const poolId of ['1', '10']) for (const button of ['approve', 'buy']) {
+    const actions = [];
+    const app = await harness({ search: `?pool=${poolId}`, testFactory: () => ({
+      getState: () => ({ busy: false, blocking: false, records: [] }),
+      readState: async account => ({ account, blockNumber: 120000001, roundId: 1n, currentRoundId: 1n, timestamp: 100n,
+        round: { status: 1, sold: 0n, fundingDeadline: 10000n }, myCount: 0n, allowance: 0n, bemBalance: 100000000n,
+        seriesAuthorized: true, consumerAuthorized: true, canBuy: true, canRefund: false, canSettle: false }),
+      execute: async kind => actions.push(kind),
+    }) });
+    app.$('ticket-count').value = '1000'; await app.$('ticket-count').emit('input');
+    assert.equal(app.$(button).disabled, false); await app.$(button).emit('click');
+    await until(() => app.$('wallet-address').textContent === A, 'purchase-area wallet connection');
+    await tick(); assert.equal(app.$('ticket-count').value, '1000'); assert.deepEqual(actions, []);
+    assert.equal(app.wallet.calls.filter(call => call.method === 'eth_requestAccounts').length, 1);
+    assert.equal(app.wallet.calls.filter(call => call.method === 'eth_sendTransaction').length, 0);
+    if (poolId === '10') { assert.equal(app.$('approve').disabled, true); assert.equal(app.$('buy').disabled, true); }
+  }
+});
+
+test('an approval shows submitted status then the fast read loop refreshes allowance and enables buy without another click', async () => {
+  const timers = new Map(), actions = []; let nextTimer = 0, pending = null, history = [], allowance = 0n, reads = 0, checks = 0;
+  const getState = () => ({ busy: false, blocking: !!pending, records: pending ? [{ ...pending }] : history });
+  const app = await harness({ search: '?pool=1', pendingTimers: {
+    setTimer(fn, delay) { assert.equal(delay, 2000); const id = ++nextTimer; timers.set(id, fn); return id; }, clearTimer: id => timers.delete(id),
+  }, testFactory: options => ({
+    getState,
+    readState: async account => { reads++; return { account, blockNumber: 120000001, roundId: 1n, currentRoundId: 1n, timestamp: 100n,
+      round: { status: 1, sold: 0n, fundingDeadline: 10000n }, myCount: 0n, allowance, bemBalance: 100000000n,
+      seriesAuthorized: true, consumerAuthorized: true, canBuy: true, canRefund: false, canSettle: false }; },
+    execute: async kind => { actions.push(kind); pending = { id: 'approval', hash: '0x' + 'a'.repeat(64), kind, status: 'pending', account: A, input: { roundId: '1' } }; options.onUpdate(getState()); },
+    checkPending: async () => {
+      if (++checks === 1) return getState();
+      history = [{ ...pending, status: 'confirmed', confirmations: 1 }]; pending = null; allowance = 10000n; options.onUpdate(getState()); return getState();
+    },
+  }) });
+  await app.connect(); await until(() => !app.$('approve').disabled, 'approval available');
+  await app.$('approve').emit('click'); await until(() => checks === 1 && timers.size === 1, 'pending fast read scheduled');
+  assert.match(app.$('transaction-list').textContent, /已提交.*等待上链/); assert.equal(app.$('buy').disabled, true);
+  const [id, callback] = [...timers][0]; timers.delete(id); callback();
+  await until(() => !app.$('buy').disabled, 'confirmed allowance refreshed');
+  assert.match(app.$('transaction-list').textContent, /已上链确认/);
+  assert.equal(reads, 2, 'one initial view and one completion refresh'); assert.equal(checks, 2);
+  assert.equal(timers.size, 0); assert.deepEqual(actions, ['approve']);
+  await app.surface.emit('beforeunload');
 });
 
 class Element {
@@ -104,7 +190,7 @@ class Element {
   focus() {} scrollIntoView() {} select() {}
 }
 
-async function harness({ language = 'zh', search = '', balanceHook = null, announcements = [], testFactory = null } = {}) {
+async function harness({ language = 'zh', search = '', balanceHook = null, announcements = [], testFactory = null, formalFactory = null, openTest = false, pendingTimers = null } = {}) {
   const html = fs.readFileSync(new URL('index.html', WEB), 'utf8'), elements = new Map(), all = [];
   for (const match of html.matchAll(/<([\w-]+)\b([^>]*)>([^<]*)/g)) {
     const node = new Element(match[1]); node.textContent = match[3];
@@ -135,17 +221,23 @@ async function harness({ language = 'zh', search = '', balanceHook = null, annou
   const storage = new Map([['bem2075-player-language', language]]), quote = { chainId: 56, token: poolRegistry().bemAddress,
     source: 'DEX Screener', stale: false, updatedAt: new Date().toISOString(),
     usdt: { price: '2', pairAddress: A }, bnb: { price: '0.001', pairAddress: B } };
-  const sandbox = { createTestPlayerTransactions: testFactory ?? createTestPlayerTransactions, Interface, formatUnits, getAddress, toQuantity, quoteView, validateRecords, transactionUrl,
+  const sandbox = { createTestPlayerTransactions: testFactory ?? createTestPlayerTransactions, createFormalPlayerTransactions: formalFactory ?? createFormalPlayerTransactions,
+    createPartialFillResult, hasFastPendingRead, createPendingReadPoller: options => createPendingReadPoller({ ...options, document, ...(pendingTimers ?? {}) }),
+    Interface, formatUnits, getAddress, toQuantity, quoteView, validateRecords, transactionUrl,
     document, window: surface, location: { href: `https://example.invalid/${search}`, origin: 'https://example.invalid', search },
     navigator: { clipboard: { writeText: async () => {} } }, localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
     createWalletPicker: options => { options.onChange(new Map([['fixture', { provider: wallet, name: 'Synthetic wallet' }]])); return { open: () => options.onSelect({ provider: wallet }) }; },
     fetch: async (path, options = {}) => {
       calls.push({ path, options }); let result;
       if (path === '/api/pools') result = poolRegistry();
+      else if (path === '/api/pools/1/status' && openTest) result = { schemaVersion: 2, chainId: 56, poolId: '1', runtimeVerified: true,
+        gameAddress: poolRegistry().pools.find(pool => pool.id === '1').deployment.address, seriesAuthorized: true,
+        vrf: { consumerAuthorized: true }, currentRound: { sold: '0' }, snapshot: { blockNumber: 120000001 } };
       else if (path === '/api/market') result = quote;
       else if (path.startsWith('/api/announcements')) result = { schemaVersion: 2, chainId: 56, rows: announcements, page: 1, totalPages: announcements.length ? 1 : 0, total: announcements.length, deploymentPending: true, index: { state: 'ready' } };
       else if (path === '/rpc') {
-        const request = JSON.parse(options.body); let value;
+        const payload = JSON.parse(options.body);
+        const respond = async request => { let value;
         if (request.method === 'eth_chainId') value = '0x38';
         else if (request.method === 'eth_blockNumber') value = '0x64';
         else if (request.method === 'eth_getBalance') value = '0xde0b6b3a7640000';
@@ -153,7 +245,8 @@ async function harness({ language = 'zh', search = '', balanceHook = null, annou
           const account = token.decodeFunctionData('balanceOf', request.params[0].data)[0];
           value = token.encodeFunctionResult('balanceOf', [balanceHook ? await balanceHook(account) : 100000000n]);
         } else throw new Error(`Unexpected RPC method ${request.method}`);
-        result = { jsonrpc: '2.0', id: request.id, result: value };
+        return { jsonrpc: '2.0', id: request.id, result: value }; };
+        result = Array.isArray(payload) ? await Promise.all(payload.map(respond)) : await respond(payload);
       } else throw new Error(`Unexpected fetch ${path}`);
       return { ok: true, headers: { get: () => 'application/json' }, json: async () => result };
     },
@@ -168,6 +261,7 @@ async function harness({ language = 'zh', search = '', balanceHook = null, annou
   evaluate('player-i18n.js', ['t', 'getLocale', 'initLanguage', 'translateKnown', 'setLanguage']);
   evaluate('pool-selection.js', ['createPoolSelection', 'poolMetadata', 'getPoolRules']);
   evaluate('player-v2-state.js', ['createPendingPlayerState']);
+  evaluate('read-rpc-batcher.js', ['createReadRpcBatcher']);
   const entries = [...html.matchAll(/<script type="module" src="\/([^"]+)"/g)].map(match => match[1]);
   assert.deepEqual(entries, ['prize-market.js', 'public-records.js', 'player-v2.js'], 'actual module order installs price/history listeners before the pool event');
   for (const file of entries) {
@@ -182,6 +276,21 @@ async function harness({ language = 'zh', search = '', balanceHook = null, annou
     async choose(id) { const button = elements.get('pool-selection').querySelectorAll('button').find(node => node.dataset.pool === id); assert.ok(button); await button.emit('click'); },
   };
 }
+
+test('open test pool asks for a wallet; unavailable RPC is never labelled as an unopened pool', async () => {
+  const app = await harness({ search: '?pool=1', openTest: true, testFactory: () => ({
+    getState: () => ({ busy: false, blocking: false, records: [] }),
+    readState: async () => { throw Object.assign(new Error('busy'), { code: 'RPC_UNAVAILABLE' }); },
+  }) });
+  await until(() => app.$('purchase-state').textContent.includes('请先连接钱包'), 'open pool copy');
+  await app.connect();
+  await until(() => app.$('purchase-state').textContent.includes('读取暂时失败'), 'read failure copy');
+  assert.doesNotMatch(app.$('purchase-state').textContent, /未开放/);
+  assert.equal(app.$('approve').disabled, true); assert.equal(app.$('buy').disabled, true);
+  const unavailable = await harness({ search: '?pool=1' });
+  await until(() => unavailable.$('purchase-state').textContent.includes('读取暂时失败'), 'public status failure copy');
+  assert.doesNotMatch(unavailable.$('round-phase').textContent, /待启动/);
+});
 
 test('actual index modules boot in initial English and selected-pool event updates all BEM/U/BNB figures', async () => {
   const app = await harness({ language: 'en', search: '?pool=10' });
@@ -203,7 +312,7 @@ test('actual index wallet connection, selection and even forced write-button han
   await app.choose('10'); assert.equal(app.$('ticket-count').value, '1'); assert.equal(app.$('purchase-total').textContent, '0.001 BEM');
   for (const id of ['approve', 'buy', 'refund', 'check-refund']) { assert.equal(app.$(id).disabled, true); await app.$(id).emit('click'); }
   assert.ok(app.wallet.calls.every(call => ['eth_requestAccounts', 'eth_accounts', 'eth_chainId'].includes(call.method)));
-  const rpcCalls = app.calls.filter(call => call.path === '/rpc').map(call => JSON.parse(call.options.body));
+  const rpcCalls = app.calls.filter(call => call.path === '/rpc').flatMap(call => JSON.parse(call.options.body));
   assert.ok(rpcCalls.every(call => ['eth_chainId', 'eth_blockNumber', 'eth_call', 'eth_getBalance'].includes(call.method)));
   assert.ok(app.calls.every(call => !String(call.options.body ?? '').includes('0xBee0848D')));
 });

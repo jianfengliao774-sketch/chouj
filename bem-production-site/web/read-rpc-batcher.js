@@ -1,0 +1,59 @@
+const METHODS = new Set(['eth_chainId', 'eth_blockNumber', 'eth_getBlockByNumber', 'eth_getCode', 'eth_getBalance',
+  'eth_call', 'eth_estimateGas', 'eth_gasPrice', 'eth_getTransactionCount', 'eth_getTransactionByHash', 'eth_getTransactionReceipt']);
+
+// Coalesce one render's reads into the server's existing 25-item JSON-RPC batches.
+// No wallet request or signing method is supported here.
+export function createReadRpcBatcher({ fetchImpl = globalThis.fetch, endpoint = '/rpc',
+  retryDelay = attempt => new Promise(resolve => setTimeout(resolve, 300 * 2 ** attempt + Math.floor(Math.random() * 200))) } = {}) {
+  let serial = 0, scheduled = false, queue = [];
+  const unavailable = () => Object.assign(new Error('Chain reads are temporarily unavailable'), { code: 'RPC_UNAVAILABLE' });
+  async function dispatch(items, attempt = 0) {
+    items = items.filter(item => !item.finished);
+    if (!items.length) return;
+    try {
+      let response;
+      try {
+        response = await fetchImpl(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(items.map(item => item.request)), signal: AbortSignal.timeout(20000) });
+      } catch { throw Object.assign(unavailable(), { retryable: true }); }
+      if ([429, 502, 503, 504].includes(response.status)) throw Object.assign(unavailable(), { retryable: true });
+      if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw unavailable();
+      const rows = await response.json(), expected = new Set(items.map(item => item.request.id));
+      if (!Array.isArray(rows) || rows.length !== items.length || rows.some(row => !row || row.jsonrpc !== '2.0' || !expected.has(row.id)) ||
+        new Set(rows.map(row => row.id)).size !== rows.length) throw unavailable();
+      const byId = new Map(rows.map(row => [row.id, row]));
+      const busy = [];
+      for (const item of items) {
+        const row = byId.get(item.request.id);
+        if (row.error?.code === -32005 && attempt < 2) busy.push(item);
+        else if (row.error || !Object.hasOwn(row, 'result')) item.finish(false, unavailable());
+        else item.finish(true, row.result);
+      }
+      if (busy.length) { await retryDelay(attempt); await dispatch(busy, attempt + 1); }
+    } catch (error) {
+      if (error.retryable && attempt < 2) { await retryDelay(attempt); await dispatch(items, attempt + 1); }
+      else for (const item of items) item.finish(false, unavailable());
+    }
+  }
+  function flush() {
+    scheduled = false;
+    const items = queue.filter(item => !item.finished); queue = [];
+    for (let offset = 0; offset < items.length; offset += 25) void dispatch(items.slice(offset, offset + 25));
+  }
+  return function rpc(method, params = [], signal) {
+    if (!METHODS.has(method)) return Promise.reject(new Error('Read-only method required'));
+    if (signal?.aborted) return Promise.reject(Object.assign(new Error('Read cancelled'), { name: 'AbortError' }));
+    if (queue.length >= 250) return Promise.reject(unavailable());
+    return new Promise((resolve, reject) => {
+      const item = { request: { jsonrpc: '2.0', id: ++serial, method, params }, finished: false };
+      const abort = () => item.finish(false, Object.assign(new Error('Read cancelled'), { name: 'AbortError' }));
+      item.finish = (success, value) => {
+        if (item.finished) return; item.finished = true; signal?.removeEventListener('abort', abort);
+        (success ? resolve : reject)(value);
+      };
+      signal?.addEventListener('abort', abort, { once: true });
+      queue.push(item);
+      if (!scheduled) { scheduled = true; setTimeout(flush, 0); }
+    });
+  };
+}

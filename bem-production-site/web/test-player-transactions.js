@@ -218,15 +218,10 @@ export function createTestPlayerTransactions({ wallet, getContext, readRpc, onUp
         need(BigInt(selected.quantity) === input.quantity && stringify(selected.tickets) === stringify(input.tickets), 'SELECTION_CHANGED');
       }
       await walletMatches(p, key, account);
-      const first = await readState(account, { roundId: input.roundId }); validateAction(kind, input, first);
       const action = actionData(kind, input, account), tx = { from: account, to: action.to, data: action.data, value: '0x0' };
-      const tag = toQuantity(first.blockNumber);
-      // Simulate and estimate only the exact action; no approval is injected here.
-      await rpc('eth_call', [tx, tag]);
-      const preliminary = integer(await rpc('eth_estimateGas', [tx, tag])); need(preliminary > 0n && preliminary <= TEST_PLAYER.gasCap, 'GAS_LIMIT_EXCEEDED');
       const latest = await readState(account, { roundId: input.roundId }); validateAction(kind, input, latest);
-      // Sold-number replacement can change execution cost between snapshots.
-      // Re-simulate and re-estimate against the freshly verified block.
+      // One fresh, verified snapshot and one simulation/estimate avoid repeating
+      // the full preflight. The exact recipient, amount and wallet are still pinned.
       const finalTag = toQuantity(latest.blockNumber);
       await rpc('eth_call', [tx, finalTag]);
       const [estimateRaw, priceRaw] = await Promise.all([rpc('eth_estimateGas', [tx, finalTag]), rpc('eth_gasPrice', [])]);
@@ -333,9 +328,12 @@ export function createTestPlayerTransactions({ wallet, getContext, readRpc, onUp
         need(integer(latest.number) >= integer(block.number) && same((await header(latest.number)).hash, latest.hash), 'REORG');
         const count = integer(latest.number) - integer(block.number) + 1n;
         const proof = status === 1n ? evidence(receipt, record) : null;
-        const checked = { ...record, status: count >= BigInt(confirmations) ? status === 1n ? 'confirmed' : 'reverted' : 'confirming',
-          reason: count >= BigInt(confirmations) ? 'RECEIPT_CONFIRMED' : 'AWAITING_CONFIRMATIONS', confirmations: Number(count), evidence: proof };
-        if (count >= BigInt(confirmations)) { if (persist(null, record.id)) { history.unshift(checked); if (history.length > 25) history.pop(); } }
+        // Approvals and purchases unlock after their first verified onchain
+        // receipt. Refunds/settlement retain the longer confirmation threshold.
+        const requiredConfirmations = ['approve', 'buy'].includes(record.kind) ? 1 : confirmations;
+        const checked = { ...record, status: count >= BigInt(requiredConfirmations) ? status === 1n ? 'confirmed' : 'reverted' : 'confirming',
+          reason: count >= BigInt(requiredConfirmations) ? 'RECEIPT_CONFIRMED' : 'AWAITING_CONFIRMATIONS', confirmations: Number(count), requiredConfirmations, evidence: proof };
+        if (count >= BigInt(requiredConfirmations)) { if (persist(null, record.id)) { history.unshift(checked); if (history.length > 25) history.pop(); } }
         else persist(checked, record.id);
       } catch (error) { persist({ ...record, status: 'unknown', reason: error.code ?? 'RPC_UNAVAILABLE' }, record.id); }
       return getState();

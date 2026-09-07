@@ -53,25 +53,75 @@ export function validateReadRequest(request) {
   return { jsonrpc: '2.0', id: request.id, method: m, params: p };
 }
 
-export function createReadRpc({ endpoint = 'https://bsc-dataseed.bnbchain.org', logsEndpoint = 'https://bsc-rpc.publicnode.com', fetchImpl = fetch } = {}) {
+// Only identical, concurrent reads share an upstream response. No completed
+// response is cached: a fresh request, including a numeric-block read after a
+// reorg, must go upstream again. Transaction/fee/nonce and pending reads stay
+// independent because they can be part of a wallet preflight or recovery.
+const SHAREABLE_METHODS = new Set(['eth_chainId', 'net_version', 'eth_blockNumber', 'eth_getBlockByNumber',
+  'eth_getCode', 'eth_getBalance', 'eth_call', 'eth_getLogs']);
+function shareable({ method, params }) {
+  if (!SHAREABLE_METHODS.has(method)) return false;
+  if (method === 'eth_getBlockByNumber') return params[0] !== 'pending';
+  if (['eth_getCode', 'eth_getBalance', 'eth_call'].includes(method)) return params[1] !== 'pending';
+  return true;
+}
+const busy = message => Object.assign(new Error(message), { code: -32005 });
+
+export function createReadRpc({ endpoint = 'https://bsc-dataseed.bnbchain.org', logsEndpoint = 'https://bsc-rpc.publicnode.com', fetchImpl = fetch,
+  concurrency = 6, maxQueue = 100, queueTimeoutMs = 5000, requestTimeoutMs = 20000, maxSharedWaiters = 128 } = {}) {
   const url = new URL(endpoint), logsUrl = new URL(logsEndpoint);
   for (const target of [url, logsUrl]) if (target.protocol !== 'https:' || target.username || target.password) throw new Error('Use a HTTPS RPC endpoint without inline credentials');
+  for (const [name, value, min, max] of [['concurrency', concurrency, 1, 32], ['maxQueue', maxQueue, 0, 1000],
+    ['queueTimeoutMs', queueTimeoutMs, 1, 30000], ['requestTimeoutMs', requestTimeoutMs, 1, 60000], ['maxSharedWaiters', maxSharedWaiters, 1, 1024]]) {
+    if (!Number.isSafeInteger(value) || value < min || value > max) throw new Error(`Invalid RPC ${name}`);
+  }
   let serial = 0, active = 0;
-  const waiting = [];
-  return async function rpc(method, params) {
-    const payload = validateReadRequest({ jsonrpc: '2.0', id: ++serial, method, params });
-    if (active >= 6) {
-      if (waiting.length >= 100) throw Object.assign(new Error('RPC is busy'), { code: -32005 });
-      await new Promise(resolve => waiting.push(resolve));
-    } else active++;
+  const waiting = [], inflight = new Map();
+  function acquire() {
+    if (active < concurrency) { active++; return Promise.resolve(); }
+    if (waiting.length >= maxQueue) return Promise.reject(busy('RPC is busy; retry shortly'));
+    return new Promise((resolve, reject) => {
+      const entry = { resolve, timer: null };
+      entry.timer = setTimeout(() => {
+        const index = waiting.indexOf(entry);
+        if (index !== -1) { waiting.splice(index, 1); reject(busy('RPC queue wait expired; retry shortly')); }
+      }, queueTimeoutMs);
+      waiting.push(entry);
+    });
+  }
+  function release() {
+    const next = waiting.shift();
+    if (next) { clearTimeout(next.timer); next.resolve(); }
+    else active--;
+  }
+  async function execute(payload, body) {
+    await acquire();
     try {
-      const response = await fetchImpl(method === 'eth_getLogs' ? logsUrl : url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: AbortSignal.timeout(20000) });
+      const response = await fetchImpl(payload.method === 'eth_getLogs' ? logsUrl : url, { method: 'POST', headers: { 'content-type': 'application/json' }, body, signal: AbortSignal.timeout(requestTimeoutMs) });
       if (!response.ok) throw Object.assign(new Error('Upstream RPC temporarily unavailable'), { code: -32000 });
       const data = await response.json();
       if (data?.jsonrpc !== '2.0' || data.id !== payload.id) throw new Error('Mismatched chain response');
       if (data.error) throw Object.assign(new Error('Chain read failed'), { code: Number.isInteger(data.error.code) ? data.error.code : -32000 });
       if (!Object.hasOwn(data, 'result')) throw new Error('Missing chain result');
       return data.result;
-    } finally { const next = waiting.shift(); if (next) next(); else active--; }
+    } finally { release(); }
+  }
+  return async function rpc(method, params) {
+    const payload = validateReadRequest({ jsonrpc: '2.0', id: ++serial, method, params });
+    // Freeze the exact payload before waiting; callers cannot change queued reads.
+    const body = JSON.stringify(payload);
+    if (!shareable(payload)) return execute(payload, body);
+    const key = JSON.stringify([payload.method, payload.params]);
+    let job = inflight.get(key);
+    if (job) {
+      if (job.waiters >= maxSharedWaiters) throw busy('RPC shared read is busy; retry shortly');
+      job.waiters++;
+    } else {
+      job = { waiters: 1, promise: null };
+      job.promise = execute(payload, body).finally(() => { if (inflight.get(key) === job) inflight.delete(key); });
+      inflight.set(key, job);
+    }
+    try { return structuredClone(await job.promise); }
+    finally { job.waiters--; }
   };
 }

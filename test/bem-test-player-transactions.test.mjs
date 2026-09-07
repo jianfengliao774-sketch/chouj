@@ -179,10 +179,11 @@ test('context, provider account and chain changes while estimating block the wal
   }
 });
 
-test('fresh replacement cost is re-estimated, capped, and never split into extra sends', async () => {
-  const a = setup({ estimate: call => call === 1 ? 100000n : 9484958n });
+test('one fresh gas estimate is buffered, capped, and never split into extra sends', async () => {
+  const a = setup({ estimate: 9484958n });
   await a.manager.execute('buy', { roundId: 1n, quantity: 2 }); assert.equal(BigInt(a.sent[0].gas), (9484958n * 120n + 99n) / 100n);
-  for (const estimate of [18369353n, call => call === 1 ? 100000n : 18369353n]) {
+  assert.equal(a.reads.filter(read => read.method === 'eth_estimateGas').length, 1);
+  for (const estimate of [0n, 18369353n]) {
     const s = setup({ estimate }); await rejects(() => s.manager.execute('buy', { roundId: 1n, quantity: 2 }), 'GAS_LIMIT_EXCEEDED'); assert.equal(s.sent.length, 0);
   }
   const s = setup({ estimate: 16000000n }); await s.manager.execute('buy', { roundId: 1n, quantity: 2 }); assert.equal(BigInt(s.sent[0].gas), F.gasCap);
@@ -245,12 +246,13 @@ test('receipt checking holds the same cross-tab lock and cannot erase the next t
   assert.equal(JSON.parse(s.storage.getItem(TEST_PLAYER_STORAGE_KEY)).hash, OTHERHASH);
 });
 
-test('selected purchase evidence accepts actual replacement numbers and needs 12 canonical confirmations', async () => {
+test('selected purchase unlocks on the first verified receipt and accepts actual replacement numbers', async () => {
   const s = setup(); s.context.selection = { mode: 'selected', text: '1,10000', count: '2' };
   await s.manager.execute('buy', { roundId: 1n, quantity: 2, tickets: [1, 10000] });
-  s.mine([s.event('TicketsPurchased', [1n, ACCOUNT, 21n, 23n, 20000n])]); s.state.tip = 110n;
-  let r = await s.manager.checkPending(); assert.equal(r.blocking, true); assert.equal(r.records[0].status, 'confirming');
-  s.state.tip = 111n; r = await s.manager.checkPending(); assert.equal(r.blocking, false); assert.equal(r.records[0].status, 'confirmed');
+  assert.equal((await s.manager.checkPending()).blocking, true, 'no receipt remains pending');
+  s.mine([s.event('TicketsPurchased', [1n, ACCOUNT, 21n, 23n, 20000n])]); s.state.tip = 100n;
+  const r = await s.manager.checkPending(); assert.equal(r.blocking, false); assert.equal(r.records[0].status, 'confirmed');
+  assert.equal(r.records[0].confirmations, 1); assert.equal(r.records[0].requiredConfirmations, 1);
   assert.deepEqual(r.records[0].evidence.tickets, [22, 23]); assert.equal(s.sent.length, 1);
 });
 
@@ -291,9 +293,12 @@ test('successful settlement progress with four rejected attempts clears pending 
 
 test('exact approve and self-refund receipts confirm, altered paid amounts stay unknown', async () => {
   const a = setup({ allowance: 0n }); await a.manager.execute('approve', { roundId: 1n, quantity: 2 });
-  a.mine([a.event('Approval', [ACCOUNT, F.address, 20000n])]); assert.equal((await a.manager.checkPending()).blocking, false);
+  a.mine([a.event('Approval', [ACCOUNT, F.address, 20000n])]); a.state.tip = 100n;
+  assert.equal((await a.manager.checkPending()).blocking, false);
   const b = setup({ timestamp: 2000n }); await b.manager.execute('refund', { roundId: 1n });
-  b.mine([b.event('Refunded', [1n, ACCOUNT, 20000n])]); assert.equal((await b.manager.checkPending()).blocking, false);
+  b.mine([b.event('Refunded', [1n, ACCOUNT, 20000n])]); b.state.tip = 100n;
+  assert.equal((await b.manager.checkPending()).blocking, true, 'refund retains its independent confirmation threshold');
+  b.state.tip = 111n; assert.equal((await b.manager.checkPending()).blocking, false);
   const c = setup(); await c.manager.execute('buy', { roundId: 1n, quantity: 2 });
   c.mine([c.event('TicketsPurchased', [1n, ACCOUNT, 1n, 3n, 10000n])]); assert.equal((await c.manager.checkPending()).blocking, true);
 });

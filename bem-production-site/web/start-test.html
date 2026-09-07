@@ -4,11 +4,12 @@
 <header><a class="brand" href="/">BEHEMOTH <b>2075</b></a><a href="/?pool=1">查看 1 BEM 测试场 →</a></header>
 <section class="intro"><span class="eyebrow">1 BEM · 启动配置</span><h1>启动小额测试场</h1><p>合约已经部署。先添加 VRF 消费者，再由容器持有人授权启动，分别在钱包中确认。</p><div class="scope-note">第二步授权成功后，第一期立即开始 24 小时筹集倒计时。每期总额 1 BEM，共 10,000 份，每份 0.0001 BEM。本页只配置这一份测试合约。</div></section>
 <div id="notice" class="notice" role="status" aria-live="polite">正在读取链上配置…</div>
+<a id="test-entry" class="test-entry" href="/?pool=1">进入 1 BEM 测试场 →</a>
 <section class="card"><div class="card-heading"><h2>连接配置钱包</h2><span id="network-state" class="pill">尚未连接</span></div><p id="wallet-address" class="mono">使用浏览器钱包连接，核对当前权限。</p><div class="actions"><button id="connect-wallet" type="button">连接钱包</button><button id="switch-network" class="secondary" type="button" hidden>切换 BNB 主网</button><button id="refresh-status" class="secondary" type="button">刷新链上状态</button><button id="copy-url" class="secondary" type="button">复制本页网址</button></div><p class="muted">请在安装 MetaMask 等钱包的 Chrome / Edge 中打开。连接与核对不会发送交易。</p></section>
 <section class="card"><div class="card-heading"><h2>固定合约与当前状态</h2><span id="snapshot-label" class="pill">待核对</span></div><dl id="status-fields" class="fields"></dl></section>
 <div class="configuration-steps">
 <section class="card"><span class="eyebrow">第一步</span><h2>添加 VRF 消费者</h2><p>允许这份 1 BEM 测试合约使用指定订阅请求随机数。</p><p id="consumer-state" class="muted">等待核对</p><button id="review-consumer" type="button" disabled>核对添加消费者</button></section>
-<section class="card"><span class="eyebrow">第二步</span><h2>容器授权并启动</h2><p>由 2075 容器调用测试合约的 authorizeSeries()，开始第一期。</p><p id="authorize-state" class="muted">等待核对</p><button id="review-authorize" type="button" disabled>核对启动费用</button></section>
+<section class="card"><span class="eyebrow">第二步</span><h2>容器授权并启动</h2><p>连接 2075 容器的持有人钱包，由页面填写容器地址并调用授权。钱包确认后开始第一期。</p><p id="authorize-state" class="muted">等待核对</p><button id="review-authorize" type="button" disabled>核对启动费用</button></section>
 </div>
 <section id="review-panel" class="card" hidden><div class="card-heading"><h2 id="review-heading">确认配置交易</h2><span id="estimate-expiry" class="pill">—</span></div><dl id="review-fields" class="fields fee-fields"></dl><details><summary>查看完整交易数据</summary><p id="review-data" class="mono"></p></details><label class="review-checkbox"><input id="confirm-review" type="checkbox" disabled><span id="confirmation-copy">我已核对本步骤的目标、金额与权限。</span></label><button id="send-action" class="primary" type="button" disabled>在钱包中确认本步骤</button><p class="muted">费用以钱包最终确认页为准。钱包、网络、持有人或协议费用变化后，需要重新核对。本页不会自动充值或购买。</p></section>
 <section class="card"><h2>配置交易记录</h2><p class="muted">等待 12 个区块确认后核对结果，交易不会自动重发。刷新页面后可重新核对；在其他浏览器完成的步骤，也可导入原交易哈希核验。</p>
