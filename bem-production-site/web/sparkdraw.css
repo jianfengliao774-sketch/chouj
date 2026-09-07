@@ -242,3 +242,84 @@ html[lang="en-US"] .player-page .tabs button, html[lang="en-US"] .player-page .t
 @media (prefers-reduced-motion: reduce) {
   .player-page .sparkdraw-art { animation: none; }
 }
+
+/* Live draw-page refresh: presentation only; 2026-09-07. */
+.player-page .masthead-meta { display:flex; flex-direction:column; align-items:flex-end; gap:8px; min-width:0; }
+.player-page .site-clock { font-size:16px; line-height:1.6; font-variant-numeric:tabular-nums; color:var(--spark-muted); overflow-wrap:anywhere; }
+.player-page .wallet-identity #wallet-label { font-size:24px; line-height:1.6; font-weight:650; }
+.player-page .wallet-address-row { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-top:10px; min-width:0; }
+.player-page .wallet-address-row #wallet-address { font-size:20px; line-height:1.7; margin:0; overflow-wrap:anywhere; min-width:0; }
+.player-page #copy-wallet-address { font-size:16px; min-height:44px; flex:none; padding:8px 14px; }
+.player-page #wallet-balances { font-size:20px; }
+.player-page .reactor > .hero.draw-hero:has(.prize-card) { grid-template-columns:200px minmax(0,1fr) 360px; grid-template-rows:auto auto auto; gap:22px 20px; align-items:center; }
+.player-page .draw-hero:has(.prize-card) .processor-chip { grid-column:1; grid-row:1; width:220px; max-width:100%; margin:0; align-self:center; }
+.player-page .draw-hero:has(.prize-card) .hero-content { grid-column:2; grid-row:1; }
+.player-page .draw-hero:has(.prize-card) .hero-heading h1 { font-size:48px; line-height:1.25; }
+.player-page .draw-hero:has(.prize-card) .rank-feature { grid-column:1/3; grid-row:2; max-width:none; width:100%; padding:16px 20px; margin:0; gap:16px; }
+.player-page .draw-hero:has(.prize-card) .rank-feature b { font-size:20px; }
+.player-page .draw-hero:has(.prize-card) .rank-feature small { font-size:18px; }
+.player-page .draw-hero:has(.prize-card) .prize-card { grid-column:3; grid-row:1/3; width:100%; padding:24px; margin:0; min-height:0; }
+.player-page .draw-hero .prize-equivalents { gap:16px; }
+.player-page .draw-hero .prize-equivalents b { font-size:21px; line-height:1.6; }
+.player-page .draw-hero:has(.prize-card) .hero-message { grid-column:1/-1; grid-row:3; }
+.player-page .draw-hero .market-footer { gap:6px 12px; }
+.player-page .round-heading, .player-page .progress-label { font-size:21px; }
+.player-page .reactor #funding-progress { height:20px; border-radius:999px; margin:14px 0 26px; background:#eadcc4; box-shadow:inset 0 1px 3px #8f5d2520; }
+.player-page #funding-progress > i { display:block; height:100%; border-radius:inherit; background:linear-gradient(90deg,#b72a32,#db5744); transition:width .45s ease; box-shadow:inset 0 1px #fff4d955; }
+.player-page .machine { --reel-height:160px; --digit-height:160px; padding:28px 24px; }
+.player-page .machine-heading { font-size:21px; font-weight:600; }
+.player-page .machine #reel-caption { font-size:18px; }
+.player-page .machine .reveal-cadence { color:#ffe8c0; font-size:17px; line-height:1.7; margin:0 0 16px; }
+.player-page .machine .reels { max-width:720px; width:100%; gap:14px; margin:20px auto 24px; }
+.player-page #reels .reel-strip > span, .player-page #reels .placeholder { font:700 82px/1.1 "Segoe UI",sans-serif; font-variant-numeric:tabular-nums; color:#b68138; }
+.player-page .reel.is-revealed { border-color:#f4c865; box-shadow:0 0 0 2px #f7d68566,0 6px 20px #4d061820; animation:revealed-digit .65s ease-out; }
+.player-page .reel-message, .player-page .reel-message a { font-size:20px; line-height:1.85; overflow-wrap:anywhere; }
+.player-page .machine .steps { font-size:18px; gap:12px 20px; margin:22px 0; }
+.player-page .machine #replay { font-size:18px; min-height:52px; padding:12px 24px; }
+.player-page .machine .animation-note { font-size:17px; }
+@keyframes revealed-digit { from{transform:translateY(-4px);filter:brightness(1.15)} to{transform:translateY(0);filter:brightness(1)} }
+@media(max-width:1360px) {
+  .player-page .reactor > .hero.draw-hero:has(.prize-card) { grid-template-columns:180px minmax(0,1fr); grid-template-rows:auto auto auto auto; }
+  .player-page .draw-hero:has(.prize-card) .processor-chip { width:180px; }
+  .player-page .draw-hero:has(.prize-card) .prize-card { grid-column:1/-1; grid-row:3; }
+  .player-page .draw-hero:has(.prize-card) .hero-message { grid-row:4; }
+}
+@media(max-width:760px) {
+  .player-page .masthead-meta { align-items:flex-start; }
+  .player-page .reactor > .hero.draw-hero:has(.prize-card) { grid-template-columns:144px minmax(0,1fr); gap:18px 16px; }
+  .player-page .draw-hero:has(.prize-card) .processor-chip { width:144px; }
+  .player-page .draw-hero:has(.prize-card) .hero-heading h1 { font-size:36px; }
+  .player-page .machine { --reel-height:124px; --digit-height:124px; }
+  .player-page #reels .reel-strip > span, .player-page #reels .placeholder { font-size:62px; }
+  .player-page .machine-heading { flex-wrap:wrap; gap:10px; }
+}
+@media(max-width:560px) {
+  .player-page .masthead-meta { width:100%; }
+  .player-page .wallet-identity #wallet-label { font-size:22px; }
+  .player-page .wallet-address-row #wallet-address { font-size:18px; }
+  .player-page #wallet-balances { font-size:18px; }
+  .player-page .reactor > .hero.draw-hero:has(.prize-card) { grid-template-columns:124px minmax(0,1fr); gap:18px 14px; }
+  .player-page .draw-hero:has(.prize-card) .processor-chip { width:124px; }
+  .player-page .draw-hero:has(.prize-card) .hero-heading h1 { font-size:34px; }
+  .player-page .draw-hero:has(.prize-card) .rank-feature { padding:14px; }
+  .player-page .draw-hero:has(.prize-card) .prize-card { padding:22px 18px; }
+  .player-page .draw-hero .prize-equivalents b { font-size:19px; }
+  .player-page .round-heading, .player-page .progress-label { font-size:18px; }
+  .player-page .reactor #funding-progress { height:18px; }
+  .player-page .machine { --reel-height:100px; --digit-height:100px; padding:22px 12px; }
+  .player-page .machine .reels { gap:7px; }
+  .player-page #reels .reel-strip > span, .player-page #reels .placeholder { font-size:44px; }
+  .player-page .reel-message, .player-page .reel-message a { font-size:18px; }
+  .player-page .machine .steps { font-size:16px; gap:10px 14px; }
+}
+@media(max-width:380px) {
+  .player-page .reactor > .hero.draw-hero:has(.prize-card) { grid-template-columns:88px minmax(0,1fr); gap:16px 12px; }
+  .player-page .draw-hero:has(.prize-card) .processor-chip { width:88px; }
+  .player-page .draw-hero:has(.prize-card) .hero-heading h1 { font-size:28px; }
+  .player-page .draw-hero .prize-equivalents { grid-template-columns:1fr; }
+  .player-page #reels .reel-strip > span, .player-page #reels .placeholder { font-size:36px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .player-page .reel.is-revealed { animation:none; }
+  .player-page #funding-progress > i { transition:none; }
+}
