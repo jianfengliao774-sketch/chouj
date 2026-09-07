@@ -29,7 +29,7 @@ function flow({changeContext=false,changeRound=false,readFailure=false,quota=499
   const sent=[],reads=[],failures=[],words=empty();occupy(words,0);
   if(allSold)for(let n=0;n<10000;n++)occupy(words,n);
   let contextChanged=false;
-  const c=vm.createContext({account:'wallet',pool:'0.1',flow:false,GAME:'game',TOKEN:'token',F:{bem:'bem'},
+  const c=vm.createContext({poolSalesEnabled:()=>true,account:'wallet',pool:'0.1',flow:false,GAME:'game',TOKEN:'token',F:{bem:'bem'},
     context:()=>({key:contextChanged?'changed':'same'}),selection:()=>({count:chosen?.length||4,tickets:chosen}),profile:()=>({address:'game',ticketPrice:1000n}),
     call:async(iface,to,method,args,block)=>{reads.push({method,block});if(method==='currentRoundId')return [block&&changeRound?2n:1n];if(method==='rounds')return [1n,100n];if(method==='ticketsOf')return [quota];if(method==='balanceOf')return [balance];if(method==='allowance')return [1000000n];if(method==='ticketWords'){if(readFailure)throw Error('RPC_UNAVAILABLE');contextChanged=changeContext;return [words];}throw Error(method);},
     rpc:async()=> '0x100',randomUnsoldTickets,manager:{execute:async args=>{sent.push(args);}},render(){},note(){},failure:e=>failures.push(e),t:zh=>zh,

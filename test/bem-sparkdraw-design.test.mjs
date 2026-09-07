@@ -78,27 +78,27 @@ function fixture(language) {
   const ctx = vm.createContext({
     $: () => list, el: (tag, text) => new Node(tag, text),
     t: (zh, en, params = {}) => (language === 'en' ? en : zh).replace(/\{(\w+)\}/g, (_, key) => params[key]),
-    money: value => formatUnits(value, 8).replace(/\.0$/, ''), profile, POOL_IDS,
+    money: value => formatUnits(value, 8).replace(/\.0$/, ''), profile, POOL_IDS, SALES_POOL_IDS: ['5','10','50'],
     button: (label, onClick) => Object.assign(new Node('button', label), { onClick }),
-    pool: '0.1', revision: 0, snapshot: {}, held: 3n, historyPage: 2,
-    url: new URL('https://example.invalid/?pool=0.1#mine'),
+    pool: '5', revision: 0, snapshot: {}, held: 3n, historyPage: 2,
+    url: new URL('https://example.invalid/?pool=5#mine'),
     history: { replaceState() {} }, render() {}, refresh() {}, refreshRecords() {},
   });
   vm.runInContext(selector + '; renderSelector();', ctx);
   return { list, ctx };
 }
 
-test('both languages show the common 10000-ticket heading and current five-pool prices', () => {
+test('both languages show the common 10000-ticket heading and current three-pool prices', () => {
   for (const language of ['zh', 'en']) {
     const { list } = fixture(language), [heading, group] = list.children;
     assert.equal(heading.textContent, language === 'zh' ? '请选择场次（每个场次份额均为10,000份）' : 'Please choose a pool (10,000 tickets per pool)');
-    assert.equal(group.children.length, 5);
+    assert.equal(group.children.length, 3);
     group.children.forEach((button, index) => {
-      const id = POOL_IDS[index], price = formatUnits(profile(id).ticketPrice, 8);
+      const id = ['5','10','50'][index], price = formatUnits(profile(id).ticketPrice, 8);
       assert.ok(button.children[0].textContent.startsWith(`${id} BEM`));
       assert.equal(button.children[1].textContent, language === 'zh' ? `每份 ${price} BEM` : `${price} BEM per ticket`);
       assert.equal(button.attributes.role, 'radio');
-      assert.equal(button.attributes['aria-checked'], String(id === '0.1'));
+      assert.equal(button.attributes['aria-checked'], String(id === '5'));
     });
   }
 });
@@ -106,10 +106,10 @@ test('restyled pool buttons preserve selection invalidation and the current tab'
   const { list, ctx } = fixture('zh');
   list.children[1].children[0].onClick();
   assert.equal(ctx.revision, 0);
-  list.children[1].children[4].onClick();
-  assert.equal(ctx.pool, '100'); assert.equal(ctx.revision, 1);
+  list.children[1].children[2].onClick();
+  assert.equal(ctx.pool, '50'); assert.equal(ctx.revision, 1);
   assert.equal(ctx.snapshot, null); assert.equal(ctx.held, 0n); assert.equal(ctx.historyPage, 1);
-  assert.equal(ctx.url.searchParams.get('pool'), '100'); assert.equal(ctx.url.hash, '#mine');
+  assert.equal(ctx.url.searchParams.get('pool'), '50'); assert.equal(ctx.url.hash, '#mine');
 });
 test('shared pages retain current transaction controls, drand and Vite-managed branding', () => {
   const index = read('index.html'), burns = read('burns.html');

@@ -22,7 +22,7 @@ function fixture(){
     if(method==='eth_getTransactionCount'){if(nonceFailure)throw Error('RPC offline');return toQuantity(BigInt(args[1])>=12n&&mined.length?6n:5n);}
     throw Error(method);
   };
-  const manager=()=>createSparkDrawTransactions({rpc,wallet:()=>wallet,context:()=>ctx,locks,storage,now:()=>tick});
+  const manager=()=>createSparkDrawTransactions({checkSales:()=>{},rpc,wallet:()=>wallet,context:()=>ctx,locks,storage,now:()=>tick});
   const m=manager(),buy=()=>m.execute({poolId:'0.1',method:'buy',args:[1,1000],kind:'buy',roundId:1,count:1000});
   function replace(change={},logs=true,status='0x1'){
     const old=sent[0],tx={...old,hash:hash(100),blockHash,blockNumber:'0xc',...change};if(change.input!==undefined)tx.data=change.input;

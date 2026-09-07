@@ -1,4 +1,5 @@
 import {SPARKDRAW as F} from './sparkdraw-config.js';
+import {poolSalesEnabled} from './sparkdraw-sales-policy.js';
 export const VERIFIER='0x354957617B115a90AD57482f56DaeEb922AE572D';
 export const VERIFIER_HASH='0x82e55440d6d8456fd43c1ff3a324cce31d9306d4bfb276d6797a5d89c3c50d6d';
 export const POOL_IDS=Object.freeze(['0.1','5','10','50','100']);
@@ -28,5 +29,5 @@ export const POOLS=Object.freeze(Object.fromEntries(Object.entries({
     "runtimeHash": "0x5554c683821e8a0147f6571989b86257dcce45dc33d44e006f51a4b3b59d5ce7",
     "deploymentBlock": 120475547
   }
-}).map(([id,p])=>[id,Object.freeze({...p,id,...F.pools[id],ticketPrice:BigInt(F.pools[id].units)/10000n})])));
+}).map(([id,p])=>[id,Object.freeze({...p,id,...F.pools[id],salesEnabled:poolSalesEnabled(id),ticketPrice:BigInt(F.pools[id].units)/10000n})])));
 export function profile(id){if(!Object.hasOwn(POOLS,id))throw Error('Unknown SparkDraw pool');return POOLS[id];}

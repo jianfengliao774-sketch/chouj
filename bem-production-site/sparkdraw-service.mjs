@@ -5,6 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {Interface,keccak256,getAddress} from 'ethers';
 import {SPARKDRAW as F} from './web/sparkdraw-config.js';
 import {POOL_IDS,POOLS,profile,VERIFIER,VERIFIER_HASH} from './web/sparkdraw-profiles.js';
+import {SALES_POOL_IDS,DEFAULT_POOL_ID,requirePoolSales} from './web/sparkdraw-sales-policy.js';
 import {createReadRpc,validateReadRequest} from './rpc.mjs';
 import {createSparkDrawIndex} from './sparkdraw-index.mjs';
 import {createSparkDrawVault} from './sparkdraw-vault.mjs';
@@ -17,6 +18,18 @@ const json=x=>JSON.stringify(x,(_,v)=>typeof v==='bigint'?v.toString():v);
 const int=x=>Number(BigInt(x));
 export async function createSparkDrawService({rpc=createReadRpc(),directory,credential,origin='http://127.0.0.1:8788',staticRoot=path.join(SITE,'dist'),verify=true,vaultSecret=null,keyStore=null,automationStatusFile='/run/sparkdraw-keeper/status.json',automationControlFile=process.env.SPARKDRAW_CONTROL}={}){
   const abi=JSON.parse(await fs.readFile(path.join(SITE,'web/sparkdraw-abi.json'),'utf8')),game=new Interface(abi);
+  const token=new Interface(['function approve(address,uint256) returns(bool)']);
+  function checkSaleEstimate(request){
+    if(request.method!=='eth_estimateGas')return;
+    const tx=request.params[0],to=tx.to.toLowerCase(),data=tx.data||tx.input||'0x';
+    const id=POOL_IDS.find(id=>profile(id).address.toLowerCase()===to);
+    if(id){const parsed=game.parseTransaction({data});if(parsed)requirePoolSales(id,parsed.name);}
+    else if(to===F.bem.toLowerCase()&&data.slice(0,10).toLowerCase()===token.getFunction('approve').selector){
+      const [spender,amount]=token.decodeFunctionData('approve',data);
+      const pool=POOL_IDS.find(id=>profile(id).address.toLowerCase()===spender.toLowerCase());
+      if(pool&&amount>0n)requirePoolSales(pool,'approve');
+    }
+  }
   const call=async(id,name,args=[],block='latest')=>game.decodeFunctionResult(name,await rpc('eth_call',[{to:profile(id).address,data:game.encodeFunctionData(name,args)},block]));
   if(verify){
     if(BigInt(await rpc('eth_chainId',[]))!==56n||keccak256(await rpc('eth_getCode',[VERIFIER,'latest']))!==VERIFIER_HASH)throw Error('Verifier identity mismatch');
@@ -45,7 +58,7 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
     const rounds=await Promise.all(ids.map(async n=>labelRound(id,await readRound(id,n,b.number),b)));
     return{version:5,chainId:56,poolId:id,address:profile(id).address,blockNumber:int(b.number),blockHash:b.hash,time:int(b.timestamp),currentRoundId:String(current),rounds,index:index.metadata(id),keeper:await vault.status()};
   });
-  function selected(params){const id=params.get('pool')||'all';if(id==='all')return POOL_IDS;profile(id);return[id];}
+  function selected(params){const id=params.get('pool')||'all';if(id==='all')return SALES_POOL_IDS;profile(id);return SALES_POOL_IDS.includes(id)?[id]:[];}
   function pageRows(rows,params){const page=Number(params.get('page')||1);if(!Number.isSafeInteger(page)||page<1||page>1000000)throw Error('Invalid page');
     return{rows:rows.slice((page-1)*20,page*20),page,total:rows.length,totalPages:Math.max(1,Math.ceil(rows.length/20))};}
   const headers={'content-type':'application/json; charset=utf-8','cache-control':'no-store'};
@@ -63,13 +76,13 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
       const peer=req.socket.remoteAddress,ip=['127.0.0.1','::1','::ffff:127.0.0.1'].includes(peer)?String(req.headers['x-real-ip']||peer):peer;
       if(isApi){const now=Date.now();if(rate.size>5000)for(const[k,v]of rate)if(now-v.at>60000)rate.delete(k);
         const key=ip+':'+(url.pathname==='/rpc'?'rpc':'api');let r=rate.get(key);if(!r||now-r.at>60000){r={at:now,n:0};rate.set(key,r);}if(++r.n>1200)return respond(res,429,{error:'Too many requests'},{'retry-after':'5'});}
-      if(req.method==='GET'&&url.pathname==='/api/health')return respond(res,200,{mode:'production',version:5,chainId:56,salesEnabled:true,pools:POOL_IDS});
-      if(req.method==='GET'&&['/api/config','/api/pools'].includes(url.pathname))return respond(res,200,{version:5,mode:'production',chainId:56,verifier:VERIFIER,bem:F.bem,revenue:F.revenue,pools:POOLS});
-      if(req.method==='GET'&&url.pathname==='/api/sparkdraw/deployments')return respond(res,200,registry);
+      if(req.method==='GET'&&url.pathname==='/api/health')return respond(res,200,{mode:'production',version:5,chainId:56,salesEnabled:true,pools:POOL_IDS,openPools:SALES_POOL_IDS});
+      if(req.method==='GET'&&['/api/config','/api/pools'].includes(url.pathname))return respond(res,200,{version:5,mode:'production',chainId:56,verifier:VERIFIER,bem:F.bem,revenue:F.revenue,pools:Object.fromEntries(SALES_POOL_IDS.map(id=>[id,POOLS[id]])),openPools:SALES_POOL_IDS,defaultPool:DEFAULT_POOL_ID});
+      if(req.method==='GET'&&url.pathname==='/api/sparkdraw/deployments')return respond(res,200,{...registry,pools:Object.fromEntries(SALES_POOL_IDS.map(id=>[id,registry.pools[id]]))});
       if(req.method==='GET'&&url.pathname==='/api/market')return respond(res,200,await market.getQuote());
       if(req.method==='POST'&&url.pathname==='/rpc'){
         const input=await body(req),batch=Array.isArray(input),items=batch?input:[input];if(items.length<1||items.length>25)throw Error('Invalid batch');
-        const results=await Promise.all(items.map(async q=>{try{const s=validateReadRequest(q);return{jsonrpc:'2.0',id:s.id,result:await rpc(s.method,s.params)};}catch(e){return{jsonrpc:'2.0',id:q?.id??null,error:{code:e.code||-32000,message:'Chain read unavailable: '+String(e.message).slice(0,90)}};}}));return respond(res,200,batch?results:results[0]);
+        const results=await Promise.all(items.map(async q=>{try{const s=validateReadRequest(q);checkSaleEstimate(s);return{jsonrpc:'2.0',id:s.id,result:await rpc(s.method,s.params)};}catch(e){return{jsonrpc:'2.0',id:q?.id??null,error:{code:Number.isInteger(e.code)?e.code:-32000,message:'Chain read unavailable: '+String(e.message).slice(0,90)}};}}));return respond(res,200,batch?results:results[0]);
       }
       if(req.method==='GET'&&url.pathname==='/api/sparkdraw/state'){const id=url.searchParams.get('pool');profile(id);return respond(res,200,await state(id));}
       if(req.method==='GET'&&url.pathname==='/api/sparkdraw/beacon'){
@@ -91,7 +104,7 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
         const claims=kind==='wallet'?walletClaimGroups(rows,ids):undefined;
         return respond(res,200,{version:5,...pageRows(rows,url.searchParams),claims,indexes:Object.fromEntries(ids.map(id=>[id,index.metadata(id)]))});
       }
-      if(req.method==='GET'&&url.pathname==='/api/burns/summary')return respond(res,200,await cached('burn-summary',300000,()=>({totalBaseUnits:POOL_IDS.flatMap(id=>index.view(id).burns).reduce((a,b)=>a+BigInt(b.amountBaseUnits),0n).toString(),updatedAt:new Date().toISOString(),indexes:Object.fromEntries(POOL_IDS.map(id=>[id,index.metadata(id)]))})));
+      if(req.method==='GET'&&url.pathname==='/api/burns/summary')return respond(res,200,await cached('burn-summary',300000,()=>({totalBaseUnits:SALES_POOL_IDS.flatMap(id=>index.view(id).burns).reduce((a,b)=>a+BigInt(b.amountBaseUnits),0n).toString(),updatedAt:new Date().toISOString(),indexes:Object.fromEntries(SALES_POOL_IDS.map(id=>[id,index.metadata(id)]))})));
       if(url.pathname.startsWith('/api/admin/')){
         if(req.method==='POST'&&req.headers.origin!==origin)return respond(res,403,{error:'Same-origin request required'});
         if(url.pathname==='/api/admin/login'&&req.method==='POST'){const d=await body(req),login=await auth.login({...d,ip});try{await vault.verifyLogin({code:d.code,username:login.username});}catch(e){auth.logout('bem2075_admin='+login.token);throw e;}auth.logout(req.headers.cookie);return respond(res,200,{username:login.username},{'set-cookie':`bem2075_admin=${login.token}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=900${origin.startsWith('https:')?'; Secure':''}`});}
@@ -108,9 +121,9 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
         if(url.pathname==='/api/admin/round'){const id=url.searchParams.get('pool');profile(id);const rid=url.searchParams.get('round');return respond(res,200,{events:index.events(id).filter(e=>e.args.roundId===rid)});}
       }
       if(req.method!=='GET'&&req.method!=='HEAD')return respond(res,405,{error:'Method not allowed'});
-      if(['/legacy.html','/start-test.html','/deploy-formal.html','/deploy-container.html'].includes(url.pathname)){res.writeHead(302,{location:'/?pool=0.1'});return res.end();}
+      if(['/deploy-sparkdraw.html','/legacy.html','/start-test.html','/deploy-formal.html','/deploy-container.html'].includes(url.pathname)){res.writeHead(302,{location:'/?pool=5'});return res.end();}
       const name=url.pathname==='/'?'index.html':decodeURIComponent(url.pathname.slice(1));
-      const allowed=['index.html','burns.html','admin.html','deploy-sparkdraw.html','draw-guide.html'].includes(name)||/^assets\/[a-zA-Z0-9_.-]+$/.test(name)||/^sparkdraw\/(standard-input|deployed-contracts)\.json$/.test(name)||/^wallet-icons\/(metamask\.svg|okx\.png|binance\.svg|trust\.svg|rabby\.png|coinbase\.svg)$/.test(name);
+      const allowed=['index.html','burns.html','admin.html','draw-guide.html'].includes(name)||/^assets\/[a-zA-Z0-9_.-]+$/.test(name)||/^sparkdraw\/(standard-input|current-contracts)\.json$/.test(name)||/^wallet-icons\/(metamask\.svg|okx\.png|binance\.svg|trust\.svg|rabby\.png|coinbase\.svg)$/.test(name);
       if(!allowed)return respond(res,404,{error:'Not found'});
       const file=path.resolve(staticRoot,name);if(!file.startsWith(path.resolve(staticRoot)+path.sep))throw Error('Invalid path');
       let bytes;try{bytes=await fs.readFile(file);}catch{return respond(res,404,{error:'Not found'});}
