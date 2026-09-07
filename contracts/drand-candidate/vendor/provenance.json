@@ -1,0 +1,27 @@
+{
+  "repository": "https://github.com/randa-mu/bls-solidity",
+  "commit": "11af179a8287d978659aae07adb66aa60f64b8a6",
+  "status": "Upstream experimental, unaudited and archived; candidate evaluation only",
+  "files": [
+    {
+      "file": "BLS.sol",
+      "url": "https://raw.githubusercontent.com/randa-mu/bls-solidity/11af179a8287d978659aae07adb66aa60f64b8a6/src/libraries/BLS.sol",
+      "sha256": "648f351a44699f5e23ba035d388617891a820ddb84f423af7875ed9d1ac30fa8"
+    },
+    {
+      "file": "ModExp.sol",
+      "url": "https://raw.githubusercontent.com/randa-mu/bls-solidity/11af179a8287d978659aae07adb66aa60f64b8a6/src/libraries/ModExp.sol",
+      "sha256": "47d46311eb25d86de97b335f9c58f936164a1311e54f2519b33225084662498a"
+    },
+    {
+      "file": "Precompiles.sol",
+      "url": "https://raw.githubusercontent.com/randa-mu/bls-solidity/11af179a8287d978659aae07adb66aa60f64b8a6/src/libraries/Precompiles.sol",
+      "sha256": "ca7ca28f0811a20e0b67d0c7efccea0a185e05ec749ec72060ffd26769183c4f"
+    },
+    {
+      "file": "LICENSE",
+      "url": "https://raw.githubusercontent.com/randa-mu/bls-solidity/11af179a8287d978659aae07adb66aa60f64b8a6/LICENSE",
+      "sha256": "5ce92df6e28d3512986f4304bf70eead8d8088b2cf6d16b6fb1a603334100906"
+    }
+  ]
+}

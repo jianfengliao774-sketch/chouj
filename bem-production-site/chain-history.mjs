@@ -33,6 +33,8 @@ const EXPECTED_EVENT_LAYOUT = new Interface(EVENT_ABI).fragments.map(f => f.form
 const READ_METHODS = new Set(['eth_chainId', 'eth_getBlockByNumber', 'eth_getLogs', 'eth_getTransactionReceipt']);
 const hex = value => `0x${value.toString(16)}`;
 const clone = value => structuredClone(value);
+const normalizedArg = value => typeof value === 'bigint' ? value.toString()
+  : Array.isArray(value) ? Array.from(value, normalizedArg) : value;
 const same = (a, b) => String(a).toLowerCase() === String(b).toLowerCase();
 const validHash = value => typeof value === 'string' && /^0x[0-9a-f]{64}$/i.test(value);
 const number = value => {
@@ -57,8 +59,8 @@ const paginate = (rows, { page = 1, pageSize = 20 } = {}) => {
  */
 export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
   deploymentBlock = HISTORY_DEPLOYMENT_BLOCK, storagePath, confirmations = 12,
-  chunkSize = 100, maxBlocksPerSync = 400, maxLogsPerChunk = 5000, maxTransactionsPerChunk = 100, poolId = 'legacy100' } = {}) {
-  const profile = poolId === 'legacy100' ? { address: HISTORY_GAME, deploymentBlock: HISTORY_DEPLOYMENT_BLOCK } : POOL_DEPLOYMENTS[poolId];
+  chunkSize = 100, maxBlocksPerSync = 400, maxLogsPerChunk = 5000, maxTransactionsPerChunk = 100, poolId = 'legacy100', customProfile = null } = {}) {
+  const profile = customProfile ?? (poolId === 'legacy100' ? { address: HISTORY_GAME, deploymentBlock: HISTORY_DEPLOYMENT_BLOCK } : POOL_DEPLOYMENTS[poolId]);
   assert.ok(profile, 'Unknown history profile');
   const historyGame = profile.address;
   assert.equal(typeof rpc, 'function'); assert.equal(getAddress(gameAddress), historyGame);
@@ -71,7 +73,7 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
   assert.ok(chunkSize <= 1000 && maxBlocksPerSync <= 5000, 'Unbounded history scan prohibited');
   const iface = new Interface(abi);
   const eventFragments = iface.fragments.filter(f => f.type === 'event');
-  const expectedLayout = poolId === 'legacy100' ? EXPECTED_EVENT_LAYOUT : new Interface([...EVENT_ABI,
+  const expectedLayout = customProfile ? [...customProfile.eventLayout].sort() : poolId === 'legacy100' ? EXPECTED_EVENT_LAYOUT : new Interface([...EVENT_ABI,
     'event RevenueBindingFixed(address indexed container,address indexed nft,uint256 tokenId)',
     'event UnclaimedPrincipalBurned(uint256 indexed roundId,uint256 amount)']).fragments.map(f => f.format('full')).sort();
   assert.deepEqual(eventFragments.map(f => f.format('full')).sort(), expectedLayout, 'Unexpected production event ABI');
@@ -92,7 +94,7 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
       const parsed = iface.parseLog({ topics: event.topics, data: event.data });
       assert.equal(parsed.name, event.name);
       const args = Object.fromEntries(parsed.fragment.inputs.map((input, i) => [input.name,
-        typeof parsed.args[i] === 'bigint' ? parsed.args[i].toString() : parsed.args[i]]));
+        normalizedArg(parsed.args[i])]));
       assert.deepEqual(event.args, args, 'Stored decoded event differs from raw log');
       assert.ok(!ids.has(event.id), 'Duplicate stored event'); ids.add(event.id);
       assert.ok(stored.receipts[event.transactionHash], 'Stored event lacks receipt');
@@ -210,7 +212,7 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
           assert.ok(receiptLog && same(receiptLog.data, log.data) && stringify(receiptLog.topics) === stringify(log.topics), 'RPC log missing from its receipt');
           const parsed = iface.parseLog(log);
           const args = Object.fromEntries(parsed.fragment.inputs.map((input, i) => [input.name,
-            typeof parsed.args[i] === 'bigint' ? parsed.args[i].toString() : parsed.args[i]]));
+            normalizedArg(parsed.args[i])]));
           decoded.push({ id: eventId, address: historyGame, name: parsed.name, args,
             blockNumber, blockHash: log.blockHash, transactionHash: log.transactionHash, transactionIndex, logIndex,
             timeUtc: new Date(block.timestamp * 1000).toISOString(), topics: log.topics, data: log.data,
@@ -353,6 +355,6 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
         fillSeconds: row.fillSeconds, purchases: row.purchases.filter(item => same(item.buyer, selected)) }] : [];
     }));
   }
-  return { sync, getStatus, listRounds, getRound, listTransactions, listAnnouncements, listBurns,
+  return { sync, getStatus, confirmedEvents: () => clone(db.events), listRounds, getRound, listTransactions, listAnnouncements, listBurns,
     getAdminSummary, listAdminRounds, getAdminRound, walletParticipation };
 }
