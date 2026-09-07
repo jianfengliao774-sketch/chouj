@@ -38,7 +38,18 @@ export function createReadRpcBatcher({ fetchImpl = globalThis.fetch, endpoint = 
   function flush() {
     scheduled = false;
     const items = queue.filter(item => !item.finished); queue = [];
-    for (let offset = 0; offset < items.length; offset += 25) void dispatch(items.slice(offset, offset + 25));
+    // buySelected(5000) alone is ~320 KB. Count AND byte limits must match the
+    // server's 512 KiB body cap when estimates share a flush with other reads.
+    let batch = [], bytes = 2;
+    for (const item of items) {
+      const size = new TextEncoder().encode(JSON.stringify(item.request)).length;
+      if (size + 2 > 524288) { item.finish(false, unavailable()); continue; }
+      if (batch.length && (batch.length === 25 || bytes + size + 1 > 524288)) {
+        void dispatch(batch); batch = []; bytes = 2;
+      }
+      bytes += size + (batch.length ? 1 : 0); batch.push(item);
+    }
+    if (batch.length) void dispatch(batch);
   }
   return function rpc(method, params = [], signal) {
     if (!METHODS.has(method)) return Promise.reject(new Error('Read-only method required'));

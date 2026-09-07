@@ -32,6 +32,10 @@ test('V5 service exposes only the five new pools, routes old pages away and reje
     for(const method of ['refundMany','claimPrizes'])assert.equal((await estimate(profile(id).address,iface.encodeFunctionData(method,[[1],'0x1111111111111111111111111111111111111111']))).result,'0x5208');
   }
   for(const id of ['5','10','50'])assert.equal((await estimate(profile(id).address,iface.encodeFunctionData('buy',[1,1]))).result,'0x5208');
+  // Exercise HTTP body parsing as well as RPC validation: 5,000 tickets exceed 256 KiB.
+  const largeData=iface.encodeFunctionData('buySelected',[1,Array.from({length:5000},(_,i)=>i)]);
+  assert.ok(Buffer.byteLength(largeData)>262144);
+  assert.equal((await estimate(profile('5').address,largeData)).result,'0x5208');
   assert.equal((await request('/deploy-sparkdraw.html',{redirect:'manual'})).headers.get('location'),'/?pool=5');
   const publicGuide=await request('/draw-guide.html');assert.equal(publicGuide.status,200);assert.match(publicGuide.headers.get('content-type'),/^text\/html/);assert.equal(await publicGuide.text(),guide);
   for(const id of POOL_IDS){const state=await(await request('/api/sparkdraw/state?pool='+id)).json();assert.equal(state.address,profile(id).address);assert.equal(state.rounds[0].status,0);}
