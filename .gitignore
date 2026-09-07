@@ -91,3 +91,23 @@ outputs/**
 !outputs/bem-raffle-2075/production-v3/BemOwnContainer13061Pool100BSC.compile-input.json
 !outputs/bem-raffle-2075/production-v3/preserved-v1-v2.sha256.json
 !outputs/bem-raffle-2075/production-v3/verification-own-container.json
+
+# Public V4 development artifacts (not a production registration).
+!outputs/bem-raffle-2075/production-v4/
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool100BSC.abi.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool100BSC.artifact.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool100BSC.build-info.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool100BSC.compile-input.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool10BSC.abi.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool10BSC.artifact.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool10BSC.build-info.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool10BSC.compile-input.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool50BSC.abi.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool50BSC.artifact.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool50BSC.build-info.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool50BSC.compile-input.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool5BSC.abi.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool5BSC.artifact.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool5BSC.build-info.json
+!outputs/bem-raffle-2075/production-v4/BemOwnContainer13061Pool5BSC.compile-input.json
+!outputs/bem-raffle-2075/production-v4/preserved-v1-v3.sha256.json
