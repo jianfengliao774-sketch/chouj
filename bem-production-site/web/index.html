@@ -59,7 +59,6 @@
           <button id="approve" type="button" hidden class="accent-outline" disabled data-en="1 · Approve exact amount">1 · 授权本次金额</button><button id="buy" type="button" class="primary" disabled data-en="Approve & buy">授权并购买</button><p id="purchase-state" class="fine-print">待正式启动</p><p class="fine-print" data-en="Each approval or purchase submitted by this page has a maximum network fee of 0.001 BNB; actual usage is charged. Wallet fee edits or smart-account wrapping may change it.">网页提交的授权、购买交易，每笔网络费上限 0.001 BNB，按实际用量收费；钱包手动调费或智能账户包装可能改变费用。</p><p class="fine-print" data-en="One button. If allowance is insufficient, confirm approval, then purchase in your wallet. Sufficient allowance skips approval.">一个按钮完成操作；额度不足时，钱包先确认授权，再确认购买。已有足够额度则直接购买。</p>
           <div class="my-tickets"><span data-en="My tickets this round">我的本期持票</span><strong id="my-count">—</strong></div><p id="my-numbers" class="mono muted"></p>
         </section>
-        <section class="card timing-card"><h3 data-en="Round rules">每期规则</h3><p id="rule-funding">售出 9,500 份启动一次性 30 分钟倒计时，满额提前封盘；到期按实售份额开奖，最晚不超过原 24 小时募集期限。</p><p id="rule-refunds">未封盘超过 24 小时，或封盘后 24 小时未完成开奖，开放 24 小时退款期。奖金也须在结算后 24 小时内领取，过期余额可通过链上交易销毁。</p><p data-en="Future drand randomness is verified onchain, then evaluated by processor 2075.">未来 drand 随机数先在链上验签，再由 2075 处理器计算。</p></section>
         <section class="card refund-card" id="refund-card" aria-labelledby="refund-title">
           <h3 id="refund-title" data-en="Return principal">退回本金</h3>
           <p class="fine-print" data-en="Connecting your wallet automatically finds all refundable principal and combines claims to your current wallet.">连接钱包会自动查询全部可退本金，并合并领取到当前钱包。</p>
@@ -67,6 +66,11 @@
           <button id="refund" type="button" class="accent-outline">连接钱包查询退款</button>
         </section>
       </aside>
+      <section class="card timing-card round-rules-card" id="round-rules" aria-labelledby="round-rules-heading"><h3 id="round-rules-heading" data-en="Round rules">每期规则</h3><ol class="round-rules-list">
+        <li><p id="rule-funding">售出 9,500 份启动一次性 30 分钟倒计时，满额提前封盘；到期按实售份额开奖，最晚不超过原 24 小时募集期限。</p></li>
+        <li><p id="rule-refunds">未封盘超过 24 小时，或封盘后 24 小时未完成开奖，开放 24 小时退款期。奖金也须在结算后 24 小时内领取，过期余额可通过链上交易销毁。</p></li>
+        <li><p data-en="Future drand randomness is verified onchain, then evaluated by processor 2075.">未来 drand 随机数先在链上验签，再由 2075 处理器计算。</p></li>
+      </ol></section>
       <section class="card about-card" id="processor-details"><div class="eyebrow" data-en="ONCHAIN · VERIFIABLE">链上开奖 · 公开可验</div><h2 data-en="Every draw, publicly verifiable">每期开奖，公开可验</h2><p class="onchain-copy" data-en="Every draw is computed by an onchain circuit. The result of every round is publicly verifiable.">每次开奖都由链上执行电路计算，每期结果公开可验。</p></section>
     </div>
   </section>
@@ -78,7 +82,6 @@
   <label><span data-en="Pool">场次</span><select id="personal-pool"><option value="all" data-en="All pools">全部场次</option><option value="5">5 BEM</option><option value="10">10 BEM</option><option value="50">50 BEM</option><option value="100">100 BEM</option></select></label>
   <label><span data-en="Round (optional)">期号（可选）</span><input id="personal-round" inputmode="numeric" placeholder="1" maxlength="21"></label><button id="personal-search" type="button" data-en="Search records">查询记录</button></div>
   <p id="personal-status" aria-live="polite"></p><div id="personal-list"></div><div class="history-pagination"><button id="personal-prev" data-en="Previous">上一页</button><span id="personal-page">1 / 1</span><button id="personal-next" data-en="Next">下一页</button></div></div></section>
-  <section class="card verification-card"><div class="section-heading"><h3 data-en="Public contract details">合约公开资料</h3><span id="snapshot-label" class="muted"></span></div><dl class="contract-links" id="contract-links"></dl><details><summary data-en="How fairness and settlement work">开奖与结算如何验证</summary><p data-en="Closing fixes a future drand beacon. The shared verifier checks its signature onchain. Processor 2075 and rejection sampling select only sold tickets with equal probability per ticket. Proofs, contract code and winning wallets are public.">封盘时固定未来 drand 轮次，共用验证合约在链上验签。2075 处理器配合拒绝采样，只从已售出的号码中等概率选出中奖号码。随机数证明、合约源码及中奖钱包均公开可查。</p><p id="community-allocation">每期成功开奖，1% 进入容器，用于社区运营与维护。后续支出由容器对应电路的当前持有人控制。</p></details></section>
   <section id="transactions" class="card" hidden><div class="section-heading"><h3 data-en="Your submitted transactions">您已提交的交易</h3><button id="check-transactions" type="button" data-en="Check transactions">重新核查</button></div><div id="transaction-list"></div><div id="unknown-test-transaction" hidden><label for="unknown-test-hash" data-en="Transaction hash from your wallet">钱包中的交易哈希</label><input id="unknown-test-hash" type="text" maxlength="66" placeholder="0x…"><button id="attach-test-hash" type="button" data-en="Verify transaction">核验交易</button></div></section>
 
   <footer><span id="footer-rules">每期 10,000 份 · 单笔最多 5,000 份</span><span data-en="Tapeout SparkDraw · ONCHAIN">Tapeout 芯火夺宝 · ONCHAIN</span></footer>

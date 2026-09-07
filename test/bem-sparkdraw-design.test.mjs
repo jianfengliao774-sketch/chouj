@@ -35,9 +35,31 @@ test('rounded values are used only for wallet text and full precision remains av
   assert.doesNotMatch(read('sparkdraw-transactions.js'), /formatWalletBalance3|balance-display/);
 });
 
-test('personal participation is displayed before secondary contract details', () => {
+test('player tabs omit duplicate contract details while the guide retains them', () => {
   const html = read('index.html');
-  assert.ok(html.indexOf('id="panel-mine"') < html.indexOf('class="card verification-card"'));
+  assert.ok(html.includes('id="panel-mine"'));
+  for(const isBurnPage of [false,true]){
+    const page=playerPageHtml(html,read('burns.html'),isBurnPage);
+    assert.doesNotMatch(page,/verification-card|id="contract-links"|id="snapshot-label"|id="community-allocation"/);
+  }
+  assert.match(read('draw-guide.html'),/id="contracts"/);
+  assert.doesNotMatch(player,/\$\('(?:contract-links|snapshot-label|community-allocation)'\)/);
+});
+
+test('refund follows purchasing and numbered rules have a separate full-width row',()=>{
+  const html=read('index.html'),aside=html.match(/<aside class="side-column">([\s\S]*?)<\/aside>/)[1];
+  assert.match(aside,/id="refund-card"/);assert.doesNotMatch(aside,/timing-card/);
+  const list=html.match(/<ol class="round-rules-list">([\s\S]*?)<\/ol>/)[1];
+  assert.equal((list.match(/<li>/g)||[]).length,3);
+  assert.match(list,/id="rule-funding"/);assert.match(list,/id="rule-refunds"/);assert.match(list,/drand/);
+  assert.match(read('sparkdraw.css'),/"rules rules"/);
+});
+
+test('draw guide uses the same supplied masthead artwork and readable typography',()=>{
+  const html=read('draw-guide.html'),css=read('draw-guide.css');
+  assert.match(html,/src="\.\/assets\/sparkdraw-brand-banner\.png"/);
+  assert.match(html,/>Tapeout·芯火夺宝</);
+  assert.match(css,/:root \{ font-size:18px/);assert.match(css,/\.hash,code \{ font-size:16px/);
 });
 
 test('requested display removals preserve application hooks and the site clock', () => {

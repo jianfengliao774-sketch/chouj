@@ -72,7 +72,6 @@ function render(){
   $('purchase-card').hidden=!p.salesEnabled;
   $('prize-bem').textContent=money(prize);$('payout-burn').textContent=money(gross*BigInt(p.burnPercent)/100n)+' BEM';$('payout-container').textContent=money(gross/100n)+' BEM';$('payout-winner').textContent=money(prize)+' BEM';
   $('community-copy').textContent=t('您的每一份参与，都在为 Tapeout 生态建设添一份力量。\n每次成功开奖，实收金额的 {burn}% 转入销毁地址，1% 进入容器，其余为中奖奖金。','Every entry contributes to the Tapeout ecosystem.\nEach completed draw burns {burn}% of actual receipts, sends 1% to the container and reserves the remainder for the winner.',{burn:p.burnPercent});
-  $('community-allocation').textContent=t('收款固定进入 13061 容器，用于社区运营与维护；按实际售出份数分配。','Revenue goes to container 13061 for community operations; allocation uses the actual tickets sold.');
   $('purchase-rules').textContent=t('每份 {unit} BEM · 00001–10000 · 单笔及单钱包每期最多 5,000 份','{unit} BEM per ticket · 00001–10000 · Maximum 5,000 per transaction and wallet per round',{unit:money(p.ticketPrice)});
   $('rule-funding').textContent=t('售出 9,500 份启动一次性 30 分钟倒计时，满额提前封盘；到期按实售份额开奖，最晚不超过原 24 小时募集期限。','9,500 sold starts a single 30-minute countdown. Sellout closes early. The deadline never exceeds the original 24-hour funding window.');
   $('rule-refunds').textContent=t('未封盘超过 24 小时，或封盘后 24 小时未完成开奖，开放 24 小时退款期。奖金也须在结算后 24 小时内领取，过期余额可通过链上交易销毁。','Unsealed funding after 24 hours, or a draw unfinished for 24 hours after closing, opens a 24-hour refund window. Prizes have a 24-hour claim window after settlement. Expired balances can be burned onchain.');
@@ -86,8 +85,6 @@ function render(){
   $('my-count').textContent=account?String(held):'—';
   $('round-label').textContent=roundName(r);$('purchase-round-label').textContent=roundName(r);
   $('round-phase').textContent=r?statusText(r.status):t('读取中','Loading');$('funding-amount').textContent=`${money(BigInt(r?.sold||0)*p.ticketPrice)} / ${pool} BEM`;$('funding-tickets').textContent=`${r?.sold||0} / 10,000`;$('funding-progress').firstElementChild.style.width=((r?.sold||0)/100)+'%';
-  $('contract-links').replaceChildren(...[[t('场次合约','Pool contract'),p.address],['BEM',F.bem],[t('收款容器','Revenue container'),F.revenue],[t('随机数验证合约','Randomness verifier'),VERIFIER],[t('开奖处理器','Draw processor'),'0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C']].flatMap(([label,address])=>{const dd=el('dd','');dd.append(links('address',address));return[el('dt',label),dd];}));
-  $('snapshot-label').textContent=snapshot?t('已核验 · 区块 {block}','Verified · Block {block}',{block:snapshot.blockNumber}):'';
   window.dispatchEvent(new CustomEvent('bem:poolchange',{detail:{pool:{winnerBaseUnits:prize.toString()}}}));
   renderDraw();renderPending();renderSelector();renderRefund();
 }
