@@ -30,7 +30,12 @@ function fixture(){
     const event=GAME.encodeEventLog(GAME.getEvent('PurchaseResult'),[1,account,1000,800,800n*p.ticketPrice,200n*p.ticketPrice]);
     receipts.set(tx.hash,{transactionHash:tx.hash,blockHash,blockNumber:'0xc',status,logs:logs?[{...event,address:p.address}]:[]});return tx;
   }
-  return{m,manager,buy,replace,sent,storage,values,txs,receipts,mined,advance:()=>{tick+=11000;},offline:()=>{nonceFailure=true;},switchWallet:()=>{ctx={account:other,key:'wallet-b'};},claim:(method='claimPrizes',rounds=[1])=>m.execute({poolId:'0.1',method,args:[rounds,ctx.account],kind:method})};
+  function mine(index,filled){
+    const tx={...sent[index],blockNumber:toQuantity(head),blockHash};txs.set(tx.hash,tx);mined.push(tx);
+    const event=GAME.encodeEventLog(GAME.getEvent('PurchaseResult'),[1,account,1000,filled,BigInt(filled)*p.ticketPrice,BigInt(1000-filled)*p.ticketPrice]);
+    receipts.set(tx.hash,{transactionHash:tx.hash,blockHash,blockNumber:tx.blockNumber,status:'0x1',logs:[{...event,address:p.address}]});
+  }
+  return{m,manager,buy,replace,mine,sent,storage,values,txs,receipts,mined,staleNonce:()=>{next=5n;},advance:()=>{tick+=11000;},offline:()=>{nonceFailure=true;},switchWallet:()=>{ctx={account:other,key:'wallet-b'};},claim:(method='claimPrizes',rounds=[1])=>m.execute({poolId:'0.1',method,args:[rounds,ctx.account],kind:method})};
 }
 test('speedup resolves the replacement hash and actual partial fill after a reload',async()=>{
   const f=fixture(),original=await f.buy();const replacement=f.replace({gasPrice:'0x5f5e100'}),reloaded=f.manager();
@@ -44,8 +49,25 @@ test('unrelated replacement, including a reverted replacement, consumes nonce wi
 });
 test('pending purchase does not lock prizes or refunds; duplicate and overlapping claims are blocked',async()=>{
   const f=fixture();await f.buy();await f.claim();await f.claim('refundMany',[1]);assert.equal(f.sent.length,3);
-  assert.deepEqual(f.sent.map(t=>BigInt(t.nonce)),[5n,6n,7n]);await assert.rejects(f.buy(),{code:'TRANSACTION_PENDING'});
-  await assert.rejects(f.claim('claimPrizes',[1,2]),{code:'TRANSACTION_PENDING'});await f.claim('claimPrizes',[2]);assert.equal(f.sent.length,4);
+  await f.buy();assert.deepEqual(f.sent.map(t=>BigInt(t.nonce)),[5n,6n,7n,8n]);
+  await assert.rejects(f.claim('claimPrizes',[1,2]),{code:'TRANSACTION_PENDING'});await f.claim('claimPrizes',[2]);assert.equal(f.sent.length,5);
+});
+test('identical purchases remain independent through reload and out-of-order receipt discovery',async()=>{
+  const f=fixture(),first=await f.buy();f.staleNonce();const second=await f.buy();
+  assert.equal(f.sent[0].data,f.sent[1].data);assert.notEqual(first,second);
+  assert.deepEqual(f.sent.map(t=>BigInt(t.nonce)),[5n,6n]);
+  assert.equal(new Set(f.m.pendings.map(r=>r.id)).size,2);
+  const reloaded=f.manager();assert.equal(reloaded.pendings.length,2);assert.equal(await reloaded.check(),null);
+  for(const method of ['approve','buy','buySelected'])assert.equal(reloaded.blocked({method}),false);
+  await reloaded.execute({poolId:'0.1',method:'approve',args:[p.address,1000n*p.ticketPrice],kind:'approve'});
+  assert.equal(reloaded.pendings.length,3);
+  f.mine(1,700);assert.equal((await reloaded.check()).originalHash,second);
+  assert.equal(reloaded.result(second).result.filled,700);assert.equal(reloaded.result(first),null);
+  assert.ok(reloaded.pendings.some(r=>r.hash===first));
+  f.mine(0,1000);assert.equal((await reloaded.check()).originalHash,first);
+  assert.equal(reloaded.result(first).result.filled,1000);
+  assert.equal(reloaded.history.length,2);assert.equal(reloaded.pendings.length,1);
+  assert.equal(reloaded.pending.kind,'approve');assert.equal(f.sent.length,3,'checking never submits another transaction');
 });
 test('switching wallet scopes pending records instead of blocking the new account',async()=>{
   const f=fixture();await f.buy();f.switchWallet();assert.equal(f.m.pending,null);await f.claim();assert.equal(f.sent[1].from,other);assert.equal(JSON.parse(f.storage.getItem(key)).pending.length,2);

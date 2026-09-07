@@ -100,11 +100,10 @@ function render(){
   let valid=true,selectedCount=0;try{const s=selection();selectedCount=s.count;$('purchase-total').textContent=money(BigInt(s.count)*p.ticketPrice)+' BEM';$('selection-note').textContent=t('申请 {count} 份，仅按实际分配份数扣款。','Requesting {count} tickets; only allocated tickets are charged.',{count:s.count});}catch{valid=false;$('purchase-total').textContent='— BEM';}
   if(limit===0){$('purchase-total').textContent='0 BEM';$('selection-note').textContent=t('本场暂无可购份数。','No tickets available for this purchase.');}
   const now=chainNow(),open=r&&(r.status===0||r.status===1&&now<Math.min(r.fundingDeadline,r.earlyDrawDeadline||Infinity));
-  const pendingPurchase=manager.pendings.find(row=>['approve','buy','buySelected'].includes(row.method||row.kind));
-  const purchaseBlocked=manager.blocked({method:'buy'});
-  $('buy').disabled=!p.salesEnabled||connectingWallet||!account&&limit===0||!!account&&(chain!==56||flow||manager.busy||!purchaseBlocked&&(!valid||!open||limit===0));
-  $('buy').textContent=flow?walletProgress||t('正在打开钱包…','Opening your wallet…'):!account?t('连接钱包并购买','Connect wallet to buy'):purchaseBlocked?(pendingPurchase?.kind==='approve'?t('核对授权结果','Check approval result'):t('核对购买结果','Check purchase result')):allowance>=BigInt(selectedCount)*p.ticketPrice?t('购买','Buy'):t('授权并购买','Approve & buy');
-  $('purchase-state').textContent=!account?t('点击购买会连接钱包。','Click buy to connect your wallet.'):purchaseBlocked?(pendingPurchase?.kind==='approve'?t('授权结果核对中。可点击按钮重新核对，不会重复授权。','Checking approval. Click to recheck; no duplicate approval will be sent.'):t('购买已提交，正在核对结果。点击按钮可重新核对，不会重复扣款。','Purchase submitted. Click to recheck its result; no duplicate charge will be sent.')):!open?t('读取状态中，或本期购买时间已结束。','Loading state, or sales for this round have ended.'):t('本钱包本期还可购买 {count} 份。','This wallet may buy {count} more tickets this round.',{count:String(5000n-held)});
+  const pendingPurchases=manager.pendings.filter(row=>['approve','buy','buySelected'].includes(row.method||row.kind)).length;
+  $('buy').disabled=!p.salesEnabled||connectingWallet||!account&&limit===0||!!account&&(chain!==56||flow||manager.busy||!valid||!open||limit===0);
+  $('buy').textContent=flow?walletProgress||t('正在打开钱包…','Opening your wallet…'):!account?t('连接钱包并购买','Connect wallet to buy'):allowance>=BigInt(selectedCount)*p.ticketPrice?t('购买','Buy'):t('授权并购买','Approve & buy');
+  $('purchase-state').textContent=!account?t('点击购买会连接钱包。','Click buy to connect your wallet.'):!open?t('读取状态中，或本期购买时间已结束。','Loading state, or sales for this round have ended.'):pendingPurchases?t('有 {count} 笔交易待确认，可继续发起新的购买。','{count} transactions are pending. You can submit another purchase.',{count:pendingPurchases}):t('本钱包本期还可购买 {count} 份。','This wallet may buy {count} more tickets this round.',{count:String(5000n-held)});
   $('my-count').textContent=account?String(held):'—';
   $('round-label').textContent=roundName(r);$('purchase-round-label').textContent=roundName(r);
   $('round-phase').textContent=r?statusText(r.status):t('读取中','Loading');$('funding-amount').textContent=`${money(BigInt(r?.sold||0)*p.ticketPrice)} / ${pool} BEM`;$('funding-tickets').textContent=`${r?.sold||0} / 10,000`;$('funding-progress').firstElementChild.style.width=((r?.sold||0)/100)+'%';
@@ -184,7 +183,7 @@ function renderPending(){
   for(const p of rows){const card=el('article','');card.append(el('p',`${poolLabel(p.poolId)} · ${names[p.kind]||p.kind}`),el('p',p.recoveryNeeded?t('nonce 已被使用，原单结果待核实。请填写钱包中的最新交易哈希。','The nonce was used, but the original outcome is unverified. Enter the latest hash from your wallet.'):p.hash?t('等待确认；自动核对加速、取消和替换交易。','Pending; checking for speedups, cancellations and replacements.'):manager.busy?t('请在钱包中确认，网页正在等待钱包返回。','Confirm in your wallet; waiting for its response.'):t('钱包未返回哈希，请查看钱包活动恢复。','No hash returned. Restore from your wallet activity.')));
     if(p.hash)card.append(links('tx',p.hash));if(p.candidateHash)card.append(el('br',''),links('tx',p.candidateHash,t('钱包最新交易','Latest wallet transaction')));
     const details=el('details',''),summary=el('summary',t('恢复交易 / 移出等待','Recover / stop waiting')),input=el('input','');input.placeholder='0x…';input.maxLength=66;input.setAttribute('aria-label',t('钱包最新交易哈希','Latest wallet transaction hash'));
-    details.append(summary,input,button(t('核验最新哈希','Verify latest hash'),async()=>{const r=await manager.attach(input.value.trim(),p.id);if(r)showTransactionResult(r);refresh();refreshRecords();}),el('p',t('移出等待只移除本页阻塞，不会撤销链上交易。结果未明时，请勿重复购买。','Stopping the wait does not cancel an onchain transaction. Avoid buying again while the outcome is unknown.')),button(t('已核对钱包，移出等待','Wallet checked: stop waiting'),async()=>{await manager.stopTracking(p.id);render();}));card.append(details);$('transaction-list').append(card);
+    details.append(summary,input,button(t('核验最新哈希','Verify latest hash'),async()=>{const r=await manager.attach(input.value.trim(),p.id);if(r)showTransactionResult(r);refresh();refreshRecords();}),el('p',t('移出等待只停止跟踪这条记录，不会撤销链上交易。','Stopping tracking only affects this record; it does not cancel the onchain transaction.')),button(t('已核对钱包，移出等待','Wallet checked: stop waiting'),async()=>{await manager.stopTracking(p.id);render();}));card.append(details);$('transaction-list').append(card);
   }
   for(const r of history){const row=el('p',`${names[r.kind]||r.kind} · ${transactionStatus(r.status)}`);if(r.hash)row.append(' ',links('tx',r.hash));$('transaction-list').append(row);}
 }
@@ -213,7 +212,7 @@ async function preparePurchase(){
 const purchasePreparation=createPurchasePreparation({context,load:preparePurchase});
 function schedulePurchasePreparation(){
   clearTimeout(preparationTimer);
-  if(!account||chain!==56||!snapshot||flow||manager.busy||!poolSalesEnabled(pool)||manager.blocked({method:'buy'}))return;
+  if(!account||chain!==56||!snapshot||flow||manager.busy||!poolSalesEnabled(pool))return;
   preparationTimer=setTimeout(()=>purchasePreparation.warm(),180);
 }
 function purchaseProgress(zh,en){walletProgress=t(zh,en);note(walletProgress);render();}
@@ -222,12 +221,6 @@ async function buy(){
   if(!account)return picker.open();if(flow)return;
   flow=true;const key=context().key;
   try{
-    if(manager.blocked({method:'buy'})){
-      purchaseProgress('正在核对交易结果…','Checking transaction result…');
-      const result=await poll(true);
-      if(!result)note(t('仍在核对，请查看下方交易记录；结果确认前不会重复购买。','Still checking. See the transaction record below; no duplicate purchase will be sent.'));
-      return;
-    }
     purchaseProgress('正在打开钱包…','Opening your wallet…');
     let plan=await purchasePreparation.get();
     if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});
