@@ -10,7 +10,7 @@
   "scripts": {
     "build": "node bem-production-site/build.mjs",
     "start": "node bem-production-site/server.mjs",
-    "test": "node --test test/bem-sparkdraw-service.test.mjs test/bem-sparkdraw-player.test.mjs test/bem-refund-public-notices.test.mjs test/bem-purchase-gas-budget.test.mjs test/bem-sparkdraw-automation.test.mjs test/bem-sparkdraw-replay.test.mjs",
+    "test": "node --test test/bem-sparkdraw-service.test.mjs test/bem-sparkdraw-player.test.mjs test/bem-refund-public-notices.test.mjs test/bem-purchase-gas-budget.test.mjs test/bem-sparkdraw-automation.test.mjs test/bem-sparkdraw-replay.test.mjs test/bem-sparkdraw-design.test.mjs",
     "compile:contracts": "node scripts/compile_bem_production.mjs",
     "check:chain": "node scripts/check_bem_production_dependencies.mjs",
     "keeper:inspect": "node scripts/run_bem_production_keeper.mjs --rpc https://bsc-dataseed.bnbchain.org",

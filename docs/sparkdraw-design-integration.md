@@ -3,7 +3,8 @@
 ## Scope
 
 Integrates the approved `codex/sparkdraw-design` work (`146d61e`) into the
-current mainline application at `6105df4`. The user explicitly requested that
+current mainline application, initially `6105df4` and synchronized again with
+`aca389f` (backend automation and replay fixes). The user explicitly requested that
 the completed integration be merged into `main`.
 
 - Preserve the ivory/vermilion/gold theme, chip/fire artwork and larger typography.
@@ -28,7 +29,8 @@ or mainnet transaction was performed.
 ## Verification
 
 - `pnpm run build`: passed.
-- `pnpm test`: 10 current production tests passed.
+- `pnpm test`: 19 tests passed, including all 15 current production tests and
+  4 design regressions now included in the default test command.
 - `node --test test/bem-sparkdraw-design.test.mjs`: 4 design regression tests passed.
 - Browser verification on the actual production build with isolated synthetic API
   fixtures: five pools, both languages, four tabs and five widths (320, 390, 768,
@@ -40,6 +42,9 @@ or mainnet transaction was performed.
 - Compared the active player to the baseline: runtime code outside community
   text, round label and selector markup is byte-for-byte unchanged after newline
   normalization. The selector's original click handler is also unchanged.
+- The latest upstream automation, vault, wallet and replay implementations were
+  retained without modification. The net diff against `aca389f` remains only
+  presentation files, design tests, their test-command registration and this note.
 
 ## Existing legacy-suite failures
 
