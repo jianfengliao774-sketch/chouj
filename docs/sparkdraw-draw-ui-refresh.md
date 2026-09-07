@@ -1,6 +1,8 @@
 # Draw-page presentation refresh
 
-Baseline: `a05a54c`, verified against the active 111-P frontend source before editing.
+Baseline: `a05a54c`, then synchronized with `ecde75b` as the owner updated the
+live application. Upstream global round IDs, countdown labels and claim-button
+visibility are retained unchanged.
 
 ## Requested presentation changes
 
@@ -23,7 +25,8 @@ Baseline: `a05a54c`, verified against the active 111-P frontend source before ed
 
 ## Checks
 
-- Build passes. Default suite: 61 tests pass, including sequential reveal timing,
+- Build passes. Default suite after synchronizing upstream: 66 tests pass,
+  1 upstream Unix-permission test is skipped on Windows, and none fail. Includes sequential reveal timing,
   wallet-copy success/failure, hidden controls, market-time formatting and the
   existing recovery, claim, automation and contract-parameter tests.
 - Actual built UI checked with a synthetic wallet and isolated read-only API
@@ -38,8 +41,10 @@ Baseline: `a05a54c`, verified against the active 111-P frontend source before ed
 
 ## Publication boundary
 
-111-P backup: `/srv/crowdfund/backups/frontend-111-P-20260907T125357Z/` contains
-the previous complete dist and the affected frontend source files with checksums.
+Initial 111-P backup: `/srv/crowdfund/backups/frontend-111-P-20260907T125357Z/`
+contains the previous complete dist and affected frontend sources with checksums.
+When the active release changes, the frontend publisher takes a fresh backup
+of that exact release and verifies expected source hashes before replacing files.
 Publish only index/burns entry pages, their new hashed assets and the four edited
 frontend source files. Keep old hashed assets for open browser sessions; do not
 replace admin/deployment pages, switch the application release symlink, restart
