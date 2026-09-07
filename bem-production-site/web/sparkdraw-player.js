@@ -80,19 +80,17 @@ function renderDraw(){
   const deadline=draw&&[3,4].includes(draw.status)?draw.beaconAvailableAt:current?.earlyDrawDeadline||current?.fundingDeadline;
   $('countdown-label').textContent=draw&&[3,4].includes(draw.status)?t('随机数可提交倒计时','Randomness available in'):t('本期募集倒计时','Funding countdown');
   if(deadline)countdown($('countdown-value'),deadline);else{$('countdown-value').textContent='—';delete $('countdown-value').dataset.deadline;}
-  $('countdown-note').textContent=draw&&[3,4].includes(draw.status)?t('随机数到时后可提交证明，再执行结算；链上确认时间会影响实际开奖时间。','Submit the beacon proof when available, then settle. Chain confirmation affects completion time.'):t('首次购买开始计时；到期操作仍需提交链上交易。','Timing starts with the first purchase. Deadline actions require an onchain transaction.');
+  const worker=snapshot?.keeper?.worker,automatic=worker?.online&&worker.enabled&&BigInt(worker.balanceWei||0)>0n;
+  $('countdown-note').textContent=draw&&[3,4].includes(draw.status)?automatic?t('后台自动处理随机数证明与开奖结算，完成后公布中奖号码。','The backend handles the randomness proof and settlement, then publishes the winning number.'):t('等待开奖服务就绪，结果确认后公布。','Waiting for the draw service; the confirmed result will be published.'):t('首次购买开始计时，开奖操作由后台处理。','Timing starts with the first purchase; the backend handles the draw.');
   const win=draw?.status===5?draw:null;activeResult=win;
   revealReels(win);
   $('reel-caption').textContent=draw?t('第 {round} 期 · {status}','Round {round} · {status}',{round:draw.roundId,status:statusText(draw.status)}):'';
   $('reel-message').replaceChildren(win?links('address',win.winner,t('中奖钱包：','Winner: ')+win.winner):el('span',t('尚未产生中奖号码。','No winning number yet.')));$('replay').disabled=!win;
   const actions=$('draw-actions');actions.replaceChildren();const now=chainNow();
-  for(const r of snapshot?.rounds||[]){const trigger=r.drawDeadline||r.fundingDeadline;
-    if([1,2,3,4].includes(r.status)&&trigger&&now>=trigger){actions.append(button(t('开放第 {r} 期退款','Open refunds for round {r}',{r:r.roundId}),()=>action(pool,'openRefunds',[r.roundId])));continue;}
-    if(r.status===1&&r.sold>=9500&&r.earlyDrawDeadline&&now>=r.earlyDrawDeadline)actions.append(button(t('封盘并准备开奖','Close sales for draw'),()=>action(pool,'closeRound',[r.roundId])));
-    if(r.status===3&&now>=r.beaconAvailableAt)actions.append(button(t('提交随机数证明','Submit randomness proof'),async()=>{if(!account)return picker.open();const proof=await api(`/api/sparkdraw/beacon?pool=${pool}&round=${r.roundId}`);await action(pool,'fulfillRandomness',[r.roundId,proof.signature]);}));
-    if(r.status===4)actions.append(button(t('执行开奖结算','Settle draw'),()=>action(pool,'settle',[r.roundId])));
+  for(const r of snapshot?.rounds||[]){
     if(r.status===5&&r.prize.amount!=='0'&&!r.prize.claimed&&!r.prize.burned)actions.append(claimButton({...r,prize:{...r.prize,winner:r.winner}},pool));
   }
+
 }
 // Animation only presents the confirmed result. Polling never restarts a reveal.
 let reelKey=null,reelRevealed=false,reelGeneration=0,reelAnimations=[];
@@ -112,7 +110,8 @@ function revealReels(win, replay=false){
   $('reels').setAttribute('aria-label',win?t('中奖号码 {number}','Winning number {number}',{number:digits}):t('尚未开奖','Awaiting draw'));
   if(!win||reelRevealed||!$('reels').getClientRects().length||document.hidden)return;
   reelRevealed=true;
-  if(window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  if(!replay&&window.matchMedia('(prefers-reduced-motion: reduce)').matches)return;
+  $('replay').textContent=t('卷轴滚动中…','Reels spinning…');
   const generation=reelGeneration;
   for(const [i,reel] of reels.entries()){
     const strip=reel.querySelector('.reel-strip'),placeholder=reel.querySelector('.placeholder');
@@ -125,7 +124,7 @@ function revealReels(win, replay=false){
     animation.finished.then(()=>{
       if(generation!==reelGeneration)return;
       placeholder.textContent=digits[i];placeholder.hidden=false;reel.classList.remove('rolling');
-      animation.cancel();strip.replaceChildren();
+      animation.cancel();strip.replaceChildren();if(i===reels.length-1)$('replay').textContent=t('回放卷轴','Replay reels');
     }).catch(()=>{});
   }
 }

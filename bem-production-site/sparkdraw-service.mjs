@@ -7,12 +7,13 @@ import {SPARKDRAW as F} from './web/sparkdraw-config.js';
 import {POOL_IDS,POOLS,profile,VERIFIER,VERIFIER_HASH} from './web/sparkdraw-profiles.js';
 import {createReadRpc,validateReadRequest} from './rpc.mjs';
 import {createSparkDrawIndex} from './sparkdraw-index.mjs';
+import {createSparkDrawVault} from './sparkdraw-vault.mjs';
 import {createAdminAuth} from './auth.mjs';
 import {createMarketPriceService} from './market-price.mjs';
 const SITE=path.dirname(fileURLToPath(import.meta.url));
 const json=x=>JSON.stringify(x,(_,v)=>typeof v==='bigint'?v.toString():v);
 const int=x=>Number(BigInt(x));
-export async function createSparkDrawService({rpc=createReadRpc(),directory,credential,origin='http://127.0.0.1:8788',staticRoot=path.join(SITE,'dist'),verify=true}={}){
+export async function createSparkDrawService({rpc=createReadRpc(),directory,credential,origin='http://127.0.0.1:8788',staticRoot=path.join(SITE,'dist'),verify=true,vaultSecret=null,automationStatusFile='/run/sparkdraw-keeper/status.json',automationControlFile=process.env.SPARKDRAW_CONTROL}={}){
   const abi=JSON.parse(await fs.readFile(path.join(SITE,'web/sparkdraw-abi.json'),'utf8')),game=new Interface(abi);
   const call=async(id,name,args=[],block='latest')=>game.decodeFunctionResult(name,await rpc('eth_call',[{to:profile(id).address,data:game.encodeFunctionData(name,args)},block]));
   if(verify){
@@ -23,6 +24,7 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
     }
   }
   const index=await createSparkDrawIndex({rpc,abi,directory}),auth=createAdminAuth({credential}),market=createMarketPriceService();
+  const vault=await createSparkDrawVault({directory,secret:vaultSecret,statusFile:automationStatusFile,...(automationControlFile?{controlFile:automationControlFile}:{})});
   const evidence=JSON.parse(await fs.readFile(path.join(SITE,'web/public/sparkdraw/deployed-contracts.json'),'utf8'));
   const registry={version:5,chainId:56,verifier:evidence.deployments[0],pools:Object.fromEntries(evidence.deployments.slice(1).map(x=>[x.kind,x]))};
   const cache=new Map();
@@ -38,7 +40,7 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
     const b=await rpc('eth_getBlockByNumber',['latest',false]),current=(await call(id,'currentRoundId',[],b.number))[0];
     const ids=[current];if(current>1n)ids.push(current-1n);
     const rounds=await Promise.all(ids.map(n=>readRound(id,n,b.number)));
-    return{version:5,chainId:56,poolId:id,address:profile(id).address,blockNumber:int(b.number),blockHash:b.hash,time:int(b.timestamp),currentRoundId:String(current),rounds,index:index.metadata(id),keeper:{configured:false}};
+    return{version:5,chainId:56,poolId:id,address:profile(id).address,blockNumber:int(b.number),blockHash:b.hash,time:int(b.timestamp),currentRoundId:String(current),rounds,index:index.metadata(id),keeper:await vault.status()};
   });
   function selected(params){const id=params.get('pool')||'all';if(id==='all')return POOL_IDS;profile(id);return[id];}
   function pageRows(rows,params){const page=Number(params.get('page')||1);if(!Number.isSafeInteger(page)||page<1||page>1000000)throw Error('Invalid page');
@@ -94,6 +96,9 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
         if(url.pathname==='/api/admin/login'&&req.method==='POST'){const d=await body(req),login=await auth.login({...d,ip});auth.logout(req.headers.cookie);return respond(res,200,{username:login.username},{'set-cookie':`bem2075_admin=${login.token}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=900${origin.startsWith('https:')?'; Secure':''}`});}
         if(url.pathname==='/api/admin/logout'&&req.method==='POST'){auth.logout(req.headers.cookie);return respond(res,200,{signedOut:true},{'set-cookie':'bem2075_admin=; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=0'});}
         const session=await auth.session(req.headers.cookie);if(!session)return respond(res,401,{error:'请先登录'});
+        if(url.pathname==='/api/admin/vault'&&req.method==='GET')return respond(res,200,await vault.status());
+        if(url.pathname==='/api/admin/vault/setup'&&req.method==='POST')return respond(res,200,await vault.setup(session.username));
+        if(url.pathname==='/api/admin/vault/control'&&req.method==='POST'){const d=await body(req);return respond(res,200,await vault.update({code:d.code,enabled:d.enabled,enroll:d.enroll===true,username:session.username}));}
         if(url.pathname==='/api/admin/overview'){
           const day=new Date(Date.now()+8*3600000).toISOString().slice(0,10);
           return respond(res,200,{session,day,pools:POOL_IDS.map(id=>{const rounds=index.view(id).publicRounds,events=index.events(id);return{poolId:id,address:profile(id).address,index:index.metadata(id),todayCompleted:events.filter(e=>e.name==='Settled'&&new Date(Date.parse(e.timeUtc)+8*3600000).toISOString().startsWith(day)).length,rounds:rounds.slice(0,100).map(r=>({...r,startedAt:events.find(e=>e.name==='RoundStarted'&&e.args.roundId===r.roundId)?.timeUtc,lockedAt:events.find(e=>e.name==='RoundLocked'&&e.args.roundId===r.roundId)?.timeUtc}))};})});
@@ -118,7 +123,8 @@ export async function startSparkDraw(){
   const port=Number(process.argv[3]||8788);if(!Number.isSafeInteger(port)||port<1024||port>65535)throw Error('Invalid port');
   const directory=process.env.BEM_DATA_DIR;if(!directory||!path.isAbsolute(directory))throw Error('Absolute data directory required');
   const credential=JSON.parse(await fs.readFile(process.env.BEM_ADMIN_CREDENTIALS_FILE,'utf8'));
-  const {server}=await createSparkDrawService({directory,credential,origin:process.env.BEM_PUBLIC_ORIGIN,rpc:createReadRpc({endpoint:process.env.BEM_RPC_URL,logsEndpoint:process.env.BEM_LOGS_RPC_URL})});
+  let vaultSecret=null;try{if(process.env.CREDENTIALS_DIRECTORY)vaultSecret=(await fs.readFile(path.join(process.env.CREDENTIALS_DIRECTORY,'sparkdraw-totp'),'utf8')).trim();}catch{throw Error('Vault credential unavailable');}
+  const {server}=await createSparkDrawService({directory,credential,vaultSecret,origin:process.env.BEM_PUBLIC_ORIGIN,rpc:createReadRpc({endpoint:process.env.BEM_RPC_URL,logsEndpoint:process.env.BEM_LOGS_RPC_URL})});
   await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(port,'127.0.0.1',resolve);});
   for(const signal of ['SIGINT','SIGTERM'])process.once(signal,()=>server.close(()=>process.exit(0)));
   console.log('SparkDraw V5 serving five verified pools; signing remains in user wallets.');
