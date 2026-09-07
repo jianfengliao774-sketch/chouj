@@ -196,3 +196,16 @@ test('recent V2 burn and winner remain unpublished until the configured confirma
   assert.equal(s.history.listAnnouncements().rows[0].amountBaseUnits, '95000000');
   assert.equal(s.history.getAdminSummary().completedCount, 1);
 });
+
+
+test('personal purchases survive an index restart and include only receipt-confirmed records for that wallet and round', async t => {
+  const s = await fixture(t, '1'); s.completeRound(); await s.history.sync();
+  const records = s.history.walletParticipation(ALICE);
+  assert.equal(records.length, 1); assert.equal(records[0].tickets, 5000); assert.equal(records[0].purchaseCount, 5);
+  assert.equal(records[0].paidBaseUnits, '50000000');
+  assert.ok(records[0].purchases.every(row => row.buyer === ALICE));
+  assert.deepEqual(s.history.walletParticipation(ALICE, '2'), []);
+  const restarted = s.make(); assert.deepEqual(restarted.walletParticipation(ALICE), records);
+  s.add(39, [['TicketsPurchased', [2, ALICE, 0, 100, 1000000n]]]);
+  await restarted.sync(); assert.deepEqual(restarted.walletParticipation(ALICE, '2'), []);
+});

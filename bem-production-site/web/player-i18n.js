@@ -47,9 +47,9 @@ function original(element, name, read) {
 
 export function updatePageTitle() {
   const section = document.body?.dataset?.activeTab ?? document.body?.dataset?.initialTab;
-  document.title = section === 'burns' ? t('销毁记录 · 芯火夺宝', 'Burn records · 芯火夺宝')
-    : globalThis.location?.pathname === '/legacy.html' ? t('原合约记录 · 芯火夺宝', 'Original contract records · 芯火夺宝')
-    : t('芯火夺宝 · BNB 主网', '芯火夺宝 · BNB Mainnet');
+  document.title = section === 'burns' ? t('销毁记录 · Tapeout 芯火夺宝', 'Burn records · Tapeout SparkDraw')
+    : globalThis.location?.pathname === '/legacy.html' ? t('原合约记录 · Tapeout 芯火夺宝', 'Original contract records · Tapeout SparkDraw')
+    : t('Tapeout 芯火夺宝 · BNB 主网', 'Tapeout SparkDraw · BNB Mainnet');
 }
 
 export function applyStaticLanguage() {

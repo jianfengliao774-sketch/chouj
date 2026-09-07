@@ -1,3 +1,4 @@
+import { participationQuery } from './participation.mjs';
 // Mainnet website: chain reads only. Wallets sign and broadcast directly in the browser.
 import { createServer } from 'node:http';
 import { isIP } from 'node:net';
@@ -113,6 +114,10 @@ export async function createProductionServer({ port = 8788, rpc = createReadRpc(
           registry.pools.find(row => row.id === '1').salesEnabled = status.salesEnabled;
         } catch { /* A failed chain read keeps the test pool unavailable. */ }
         return json(res, 200, registry);
+      }
+      if (req.method === 'GET' && url.pathname === '/api/participation') {
+        try { return json(res, 200, participationQuery(url.searchParams, { legacy100: history, ...poolHistories })); }
+        catch { return json(res, 400, { error: '请填写正确的钱包地址、场次和期号。' }); }
       }
       const poolStatus = /^\/api\/pools\/(1|10|50|100)\/status$/.exec(url.pathname);
       if (req.method === 'GET' && poolStatus) return json(res, 200, await readPoolStatus(poolStatus[1]));

@@ -3,7 +3,7 @@ import {validateRecords,transactionUrl} from './public-record-guards.js';
 import {formatUnits} from 'ethers';
 import './winner-broadcast.js';
 const $=id=>document.getElementById(id);
-let page=1,selectedPool='100',requestVersion=0,history=null;
+let page=1,selectedPool=new URLSearchParams(location.search).get('pool')||'100',requestVersion=0,history=null;
 const amount=value=>Number(formatUnits(value,8)).toLocaleString(getLocale(),{maximumFractionDigits:8});
 const shortened=value=>`${value.slice(0,8)}…${value.slice(-6)}`;
 function external(hash,label){const a=document.createElement('a');a.href=transactionUrl(hash);a.textContent=label;a.target='_blank';a.rel='noopener noreferrer';return a;}
@@ -16,9 +16,11 @@ function renderHistory(){
   $('history-prev').disabled=page<=1;$('history-next').disabled=!history||page>=history.totalPages;$('history-page').textContent=`${page} / ${Math.max(1,history?.totalPages??1)}`;
 }
 async function get(path){const response=await fetch(path,{cache:'no-store',signal:AbortSignal.timeout(12000)});if(!response.ok)throw Error();return validateRecords(await response.json(),'winner');}
-async function refreshHistory(next=page){const epoch=++requestVersion,pool=selectedPool;page=next;try{const result=await get(`/api/announcements?pool=${pool}&page=${page}`);if(epoch!==requestVersion)return;history=result;}catch{if(epoch!==requestVersion)return;history=null;}renderHistory();}
+async function refreshHistory(next=page){const epoch=++requestVersion,pool=selectedPool;page=next;try{const result=await get(`/api/announcements?pool=${pool}&page=${page}`);if(epoch!==requestVersion)return;history=result;}catch{if(epoch!==requestVersion)return;history=null;}renderHistory();window.dispatchEvent(new CustomEvent('bem:drawrecords',{detail:{poolId:pool,records:history?.rows??[]}}));}
 window.addEventListener('bem:poolchange',event=>{selectedPool=String(event.detail?.pool?.id??'100');history=null;page=1;renderHistory();refreshHistory(1);});
 window.addEventListener('bem:historyrefresh',()=>refreshHistory());
 window.addEventListener('bem:languagechange',renderHistory);
 $('refresh-history')?.addEventListener('click',()=>refreshHistory());$('history-prev')?.addEventListener('click',()=>{if(page>1)refreshHistory(page-1);});$('history-next')?.addEventListener('click',()=>{if(page<(history?.totalPages??0))refreshHistory(page+1);});
 refreshHistory();
+
+setInterval(()=>{if(!document.hidden)refreshHistory();},10000);

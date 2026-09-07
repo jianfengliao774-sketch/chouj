@@ -13,7 +13,7 @@ const tier = row => row.poolId === 'legacy100' ? t('原 100 BEM 场', 'Original 
 function renderTicker() {
   if (!target || !pause) return;
   target.replaceChildren();
-  const rows = feed?.index?.state === 'ready' ? feed.rows : [];
+  const rows = feed?.rows ?? []; // Each indexed row already has a confirmed receipt.
   pause.hidden = rows.length < 2;
   pause.setAttribute('aria-pressed', String(paused));
   pause.textContent = paused ? t('继续', 'Resume') : t('暂停', 'Pause');

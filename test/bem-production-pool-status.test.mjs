@@ -53,6 +53,7 @@ function harness(overrides = {}) {
         case 'currentRoundId': result = [state.roundId]; break;
         case 'nextRoundOpensAt': result = [state.nextRound]; break;
         case 'totalLiability': result = [state.liability]; break;
+        case 'drawTiming': result = [1799999990n,1800000050n,1800000010n,0n]; break;
         case 'rounds': result = state.rounds.get(parsed.args[0].toString()); assert.ok(result, 'Only the actual current and previous rounds may be queried'); break;
         default: throw Error(`Unexpected game read ${parsed.name}`);
       }

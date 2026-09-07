@@ -94,11 +94,11 @@ for (const page of ['index.html', 'legacy.html']) {
   });
 }
 
-test('an index still syncing never displays rows as confirmed winners, in either language', async () => {
+test('confirmed indexed winners remain visible while the index catches up with newer blocks', async () => {
   const app = harness({ fetchReply: () => response([ROW], 'syncing') }); await tick();
-  assert.equal(app.$('winner-ticker').textContent, '链上记录同步中…');
-  app.switchTo('en'); assert.equal(app.$('winner-ticker').textContent, 'Syncing onchain records…');
-  assert.equal(app.$('winner-ticker').querySelectorAll('a').length, 0);
+  assert.match(app.$('winner-ticker').textContent, /中了 9.5 BEM/);
+  app.switchTo('en'); assert.match(app.$('winner-ticker').textContent, /won 9.5 BEM/);
+  assert.equal(app.$('winner-ticker').querySelectorAll('a').length, 1);
 });
 
 test('unavailable and invalid responses have translated error states and recover on the read-only refresh', async () => {

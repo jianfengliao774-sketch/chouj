@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#fbf7ed"><title>芯火夺宝 · BNB 主网</title>
+  <meta name="theme-color" content="#fbf7ed"><title>Tapeout 芯火夺宝 · BNB 主网</title>
   <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/festive.css"><link rel="stylesheet" href="/production.css"><link rel="stylesheet" href="/wallet-picker.css"><link rel="stylesheet" href="/pool-selection.css"><link rel="stylesheet" href="/lobby.css"><link rel="stylesheet" href="/player-readability.css"><link rel="stylesheet" href="/draft-layout.css"><link rel="stylesheet" href="/partial-fill-result.css">
 </head>
 <body class="player-page">
@@ -17,7 +17,7 @@
     <div id="browser-help" class="wallet-browser-help"><span data-en="Paste this URL into Chrome or Edge with MetaMask installed. The embedded preview usually cannot connect to wallet extensions.">请将本页网址粘贴到已安装 MetaMask 的 Chrome / Edge。内置预览通常无法连接钱包扩展。</span><input id="browser-url" type="text" readonly aria-label="本页网址" data-en-aria-label="Page URL"></div>
   </section>
   <div id="notice" class="notice" role="status" aria-live="polite">正在核对正式合约与 BNB 主网…</div>
-  <div id="pool-selection"></div><p><a id="test-start-link" href="/start-test.html" hidden data-en="Configure the 1 BEM test pool">配置并启动 1 BEM 测试场次 →</a></p><nav class="tabs" aria-label="玩家导航" data-en-aria-label="Player navigation"><button id="tab-draw" aria-controls="panel-draw" aria-selected="true" data-tab="draw" data-en="Draw">开奖舱</button><button id="tab-proof" aria-controls="panel-proof" aria-selected="false" data-tab="proof" data-en="Winning records">中奖记录</button><a id="tab-burns" href="/burns.html" aria-controls="panel-burns" aria-selected="false" data-tab="burns" data-en="Burn records">销毁记录</a></nav>
+  <div id="pool-selection"></div><p><a id="test-start-link" href="/start-test.html" hidden data-en="Configure the 1 BEM test pool">配置并启动 1 BEM 测试场次 →</a></p><nav class="tabs" aria-label="玩家导航" data-en-aria-label="Player navigation"><button id="tab-draw" aria-controls="panel-draw" aria-selected="true" data-tab="draw" data-en="Draw">开奖舱</button><button id="tab-proof" aria-controls="panel-proof" aria-selected="false" data-tab="proof" data-en="Winning records">中奖记录</button><a id="tab-burns" href="/burns.html" aria-controls="panel-burns" aria-selected="false" data-tab="burns" data-en="Burn records">销毁记录</a><button id="tab-mine" aria-controls="panel-mine" aria-selected="false" data-en="My entries">我的参与</button></nav>
   <section id="panel-draw" role="tabpanel" aria-labelledby="tab-draw">
     <div class="draw-layout">
       <section class="reactor card">
@@ -79,7 +79,7 @@
               <span class="processor-chip-caption" aria-hidden="true"><i></i> BNB · ONCHAIN</span>
             </div>
 
-          <div class="hero-content"><div class="hero-heading"><div class="eyebrow" data-en="ONCHAIN PROCESSOR · DRAW TERMINAL">链上处理器 · 开奖终端</div><h1>芯火夺宝</h1><p class="community-slogan" data-en="Burn BEM. Build the Tapeout ecosystem together.">销毁 BEM，共建 Tapeout 生态。</p></div></div>
+          <div class="hero-content"><div class="hero-heading"><div class="eyebrow" data-en="ONCHAIN PROCESSOR · DRAW TERMINAL">链上处理器 · 开奖终端</div><h1 data-en="Tapeout SparkDraw">Tapeout 芯火夺宝</h1><p class="community-slogan" data-en="Burn BEM. Build the Tapeout ecosystem together.">销毁 BEM，共建 Tapeout 生态。</p></div></div>
           <div class="hero-awards"><a class="rank-feature" href="#processor-details"><span class="rank-medal" aria-hidden="true">Ⅰ</span><span><b data-en="HASHPOWER LEADERBOARD">算力榜第一</b><small id="rank-scope" data-en="Task 260 best slot · Snapshot">任务 260 最优槽位 · 快照</small></span></a><section class="prize prize-card" aria-label="单期奖金与参考市值" data-en-aria-label="Prize and estimated market value">
   <div class="prize-card-label" data-en="PRIZE PER ROUND">单期中奖金额</div><div class="prize-main"><strong id="prize-bem">95</strong><span>BEM</span></div>
   <div class="prize-equivalents"><div><small data-en="Estimated USDT">约合 USDT</small><b id="prize-usdt">— U</b></div><div><small data-en="Estimated BNB">约合 BNB</small><b id="prize-bnb">— BNB</b></div></div>
@@ -99,7 +99,7 @@
           <div id="auto-fields"><label for="ticket-count" data-en="Number of tickets">购买份数</label><input id="ticket-count" type="number" inputmode="numeric" min="1" max="1000" step="1" value="1"><div class="quick-picks"><button type="button" data-count="1">1</button><button type="button" data-count="100">100</button><button type="button" data-count="500">500</button><button type="button" data-count="1000">1000</button></div></div>
           <div id="selected-fields" hidden><label for="selected-tickets" data-en="Your numbers">自选号码</label><textarea id="selected-tickets" rows="3" maxlength="7000" placeholder="例如：1, 88, 100-110" data-en-placeholder="Example: 1, 88, 100-110"></textarea><small id="selected-help" class="fine-print" data-en="Sold numbers are skipped and replaced with later available numbers. Actual tickets are determined onchain. Insufficient remaining tickets prevent the purchase.">已售号码自动顺延补足，成交后以链上实际分配号码为准。剩余份数不足则无法购买。</small></div>
           <div class="purchase-summary"><span data-en="This purchase">本次投入</span><strong id="purchase-total">0.01 <small>BEM</small></strong></div><p id="selection-note" class="muted"></p>
-          <button id="approve" type="button" class="accent-outline" disabled data-en="1 · Approve exact amount">1 · 授权本次金额</button><button id="buy" type="button" class="primary" disabled data-en="2 · Confirm purchase">2 · 确认购买</button><p id="purchase-state" class="fine-print">待正式启动</p><p class="fine-print" data-en="Two separate wallet confirmations. Approval alone buys no tickets.">授权与购买分别确认，授权不会购票。</p>
+          <button id="approve" type="button" hidden class="accent-outline" disabled data-en="1 · Approve exact amount">1 · 授权本次金额</button><button id="buy" type="button" class="primary" disabled data-en="Approve & buy">授权并购买</button><p id="purchase-state" class="fine-print">待正式启动</p><p class="fine-print" data-en="One button. If allowance is insufficient, confirm approval, then purchase in your wallet. Sufficient allowance skips approval.">一个按钮完成操作；额度不足时，钱包先确认授权，再确认购买。已有足够额度则直接购买。</p>
           <div class="my-tickets"><span data-en="My tickets this round">我的本期持票</span><strong id="my-count">—</strong></div><p id="my-numbers" class="mono muted"></p>
         </section>
         <section class="card timing-card"><h3 data-en="Round rules">每期规则</h3><p id="rule-funding">凑满 100 BEM 封盘，目标在一分钟内开奖；VRF 与网络确认可能延迟。</p><p id="rule-refunds">24 小时未凑满，开放 24 小时本金领取期。用户自行领取；到期未领取的本金可统一转入销毁地址。结算后冷却 60 秒可开下一期。</p><p data-en="Anyone can verify the outcome. 2075 computes every draw using Chainlink VRF inputs.">每次开奖都由 2075 执行电路计算，输入来自 Chainlink VRF，结果公开可验。</p></section>
@@ -118,10 +118,17 @@
   <!-- burn-panel -->
   <section class="card verification-card"><div class="section-heading"><h3 data-en="Public contract details">合约公开资料</h3><span id="snapshot-label" class="muted"></span></div><dl class="contract-links" id="contract-links"></dl><details><summary data-en="How fairness and settlement work">开奖与结算如何验证</summary><p data-en="Chainlink VRF supplies verifiable randomness. The fixed 2075 circuit evaluates inputs, and rejection sampling maps outputs to 10,000 equally eligible ticket numbers. Contract code, input/output events, transactions and winning wallets are public.">Chainlink VRF 提供可验证随机数，固定的 2075 电路执行输入计算，再通过拒绝采样映射至 10,000 个票号。合约源码、输入输出事件、交易和中奖钱包均可公开查询。</p><p id="community-allocation">每期成功开奖，1% 进入容器，用于社区运营与维护。后续支出由容器对应电路的当前持有人控制。</p></details></section>
   <section id="transactions" class="card" hidden><div class="section-heading"><h3 data-en="Your submitted transactions">您已提交的交易</h3><button id="check-transactions" type="button" data-en="Check transactions">重新核查</button></div><div id="transaction-list"></div><div id="unknown-test-transaction" hidden><label for="unknown-test-hash" data-en="Transaction hash from your wallet">钱包中的交易哈希</label><input id="unknown-test-hash" type="text" maxlength="66" placeholder="0x…"><button id="attach-test-hash" type="button" data-en="Verify transaction">核验交易</button></div></section>
-  <footer><span id="footer-rules">每期 10,000 份 · 单笔最多 1,000 份</span><a href="/legacy.html" data-en="Original contract records & refunds">原合约记录与退款</a><span>芯火夺宝 · ONCHAIN</span></footer>
+
+  <section id="panel-mine" role="tabpanel" aria-labelledby="tab-mine" hidden><div class="card history-card">
+  <h2 data-en="My participation records">个人参与记录</h2><p data-en="Confirmed purchases are stored on the server. Look up the same wallet on any device. Wallet records are public onchain data.">已确认购买记录保存在服务器，更换设备也可查询。钱包记录属于公开链上数据。</p>
+  <div class="personal-filters"><label><span data-en="Wallet address">钱包地址</span><input id="personal-wallet" placeholder="0x…" maxlength="42" autocomplete="off"></label>
+  <label><span data-en="Pool">场次</span><select id="personal-pool"><option value="all" data-en="All pools">全部场次</option><option value="1">1 BEM</option><option value="10">10 BEM</option><option value="50">50 BEM</option><option value="100">100 BEM</option><option value="legacy100" data-en="Original 100 BEM">原 100 BEM</option></select></label>
+  <label><span data-en="Round (optional)">期号（可选）</span><input id="personal-round" inputmode="numeric" placeholder="1" maxlength="21"></label><button id="personal-search" type="button" data-en="Search records">查询记录</button></div>
+  <p id="personal-status" aria-live="polite"></p><div id="personal-list"></div><div class="history-pagination"><button id="personal-prev" data-en="Previous">上一页</button><span id="personal-page">1 / 1</span><button id="personal-next" data-en="Next">下一页</button></div></div></section>
+  <footer><span id="footer-rules">每期 10,000 份 · 单笔最多 1,000 份</span><a href="/legacy.html" data-en="Original contract records & refunds">原合约记录与退款</a><span data-en="Tapeout SparkDraw · ONCHAIN">Tapeout 芯火夺宝 · ONCHAIN</span></footer>
 </main>
 <dialog id="wallet-picker" class="wallet-picker" aria-labelledby="wallet-picker-title" aria-describedby="wallet-picker-hint">
-  <div class="wallet-picker-heading"><div><span class="eyebrow">芯火夺宝</span><h2 id="wallet-picker-title" data-en="Choose your wallet">选择钱包</h2></div><button id="wallet-picker-close" type="button" aria-label="关闭钱包选择" data-en-aria-label="Close wallet selection" autofocus>×</button></div>
+  <div class="wallet-picker-heading"><div><span class="eyebrow" data-en="Tapeout SparkDraw">Tapeout 芯火夺宝</span><h2 id="wallet-picker-title" data-en="Choose your wallet">选择钱包</h2></div><button id="wallet-picker-close" type="button" aria-label="关闭钱包选择" data-en-aria-label="Close wallet selection" autofocus>×</button></div>
   <p id="wallet-picker-hint" class="wallet-picker-hint"></p>
   <div id="wallet-options" class="wallet-options"></div>
   <div class="wallet-picker-footer"><span data-en="Connecting does not authorize spending or make a purchase.">连接不会授权扣款或购买。</span><button id="wallet-picker-refresh" type="button" data-en="Detect again">重新检测</button></div>

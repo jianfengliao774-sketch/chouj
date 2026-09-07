@@ -312,7 +312,7 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
   function listAnnouncements(options = {}) {
     const rows = rounds().filter(row => row.status === 5 && row.settlementTxHash && row.winner)
       .map(row => ({ poolId, poolBaseUnits: (BigInt(poolId === 'legacy100' ? '100' : poolId) * 100000000n).toString(), roundId: row.roundId,
-        winner: row.winner, amountBaseUnits: (BigInt(poolId === 'legacy100' ? '100' : poolId) * 95000000n).toString(), timeUtc: row.settledAt,
+        winner: row.winner, winningTicket: row.winningTicket, amountBaseUnits: (BigInt(poolId === 'legacy100' ? '100' : poolId) * 95000000n).toString(), timeUtc: row.settledAt,
         transactionHash: row.settlementTxHash, gameAddress: historyGame }));
     return options.all === true ? { rows, total: rows.length } : paginate(rows, options);
   }
@@ -345,6 +345,14 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
       purchases: { ...paginate(row.purchases.filter(item => selected === null || same(item.buyer, selected)),
         { page: transactionPage, pageSize }), wallet: selected } });
   }
+  function walletParticipation(wallet, roundId = null) {
+    const selected = getAddress(wallet);
+    return clone(adminRounds().filter(row => roundId === null || row.roundId === roundId).flatMap(row => {
+      const summary = row.wallets.find(item => same(item.address, selected));
+      return summary ? [{ ...summary, roundId: row.roundId, status: row.status, winner: row.winner,
+        fillSeconds: row.fillSeconds, purchases: row.purchases.filter(item => same(item.buyer, selected)) }] : [];
+    }));
+  }
   return { sync, getStatus, listRounds, getRound, listTransactions, listAnnouncements, listBurns,
-    getAdminSummary, listAdminRounds, getAdminRound };
+    getAdminSummary, listAdminRounds, getAdminRound, walletParticipation };
 }

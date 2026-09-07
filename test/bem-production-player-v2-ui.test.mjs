@@ -1,3 +1,4 @@
+import { createApprovalPurchaseFlow, purchaseContextKey } from '../bem-production-site/web/approval-purchase-flow.js';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -47,9 +48,9 @@ test('burn records share the player shell and preserve the connected wallet and 
   assert.equal(app.$('wallet-address').textContent, A);
   assert.equal(app.$('ticket-count').value, '1000');
   assert.equal(app.context.location.pathname, '/burns.html');
-  assert.match(app.context.document.title, /销毁记录 · 芯火夺宝/);
+  assert.match(app.context.document.title, /销毁记录 · Tapeout 芯火夺宝/);
   await app.$('language-en').emit('click');
-  assert.match(app.context.document.title, /Burn records · 芯火夺宝/);
+  assert.match(app.context.document.title, /Burn records · Tapeout SparkDraw/);
   assert.equal(app.$('burn-refresh').textContent, 'Refresh records');
   await app.$('tab-draw').emit('click');
   assert.equal(app.$('panel-draw').hidden, false);
@@ -253,7 +254,11 @@ async function harness({ language = 'zh', search = '', balanceHook = null, annou
   const storage = new Map([['bem2075-player-language', language]]), quote = { chainId: 56, token: poolRegistry().bemAddress,
     source: 'DEX Screener', stale: false, updatedAt: new Date().toISOString(),
     usdt: { price: '2', pairAddress: A }, bnb: { price: '0.001', pairAddress: B } };
-  const sandbox = { createTestPlayerTransactions: testFactory ?? createTestPlayerTransactions, createFormalPlayerTransactions: formalFactory ?? createFormalPlayerTransactions,
+  // Public draw/personal DOM is exercised in the real-browser integration checks;
+  // this minimal DOM harness isolates wallet, balance and transaction regression cases.
+  const sandbox = { createApprovalPurchaseFlow, purchaseContextKey,
+    createPublicDrawDisplay: () => ({ render() {} }), initPersonalRecords() {},
+    createTestPlayerTransactions: testFactory ?? createTestPlayerTransactions, createFormalPlayerTransactions: formalFactory ?? createFormalPlayerTransactions,
     createPartialFillResult, hasFastPendingRead, createPendingReadPoller: options => createPendingReadPoller({ ...options, document, ...(pendingTimers ?? {}) }),
     Interface, formatUnits, getAddress, toQuantity, quoteView, validateRecords, transactionUrl,
     document, window: surface, location: { href: `https://example.invalid/${search}`, origin: 'https://example.invalid', pathname: '/', hash: '', search },
@@ -384,4 +389,24 @@ test('shared winner announcements render only validated rows, preserve pause acr
   assert.match(ticker.textContent, /中了 9.5 BEM/);
   assert.equal(app.calls.filter(call => call.path === '/api/announcements?pageSize=20').length, 1, 'one shared feed request, no duplicate ticker initialization');
   assert.equal(app.wallet.calls.length, 0);
+});
+
+
+test('the single visible purchase button confirms its approval then submits the same purchase without a second page click', async () => {
+  const actions = []; let pending = null, records = [], allowance = 0n;
+  const getState = () => ({busy:false, blocking:!!pending, records:pending?[pending]:records});
+  const app = await harness({search:'?pool=1', testFactory: options => ({
+    getState,
+    readState: async account => ({account,blockNumber:120000001,roundId:1n,currentRoundId:1n,timestamp:100n,
+      round:{status:1,sold:0n,fundingDeadline:10000n},myCount:0n,allowance,bemBalance:100000000n,
+      seriesAuthorized:true,consumerAuthorized:true,canBuy:true,canRefund:false,canSettle:false}),
+    execute:async (kind,input) => { actions.push({kind,input}); pending={id:kind,hash:'0x'+(kind==='approve'?'a':'b').repeat(64),kind,input,account:A,status:'pending'}; options.onUpdate(); return {...pending}; },
+    checkPending:async()=>{if(pending){records=[{...pending,status:'confirmed'}];if(pending.kind==='approve')allowance=10000n;pending=null;options.onUpdate();}return getState();},
+  })});
+  await app.connect();await until(()=>!app.$('buy').disabled,'single purchase available');
+  assert.equal(app.$('approve').hidden,true);
+  await app.$('buy').emit('click');await until(()=>actions.length===2,'automatic purchase continuation');
+  assert.deepEqual(actions.map(x=>x.kind),['approve','buy']);
+  assert.equal(actions[0].input.roundId,actions[1].input.roundId);assert.equal(actions[1].input.quantity,1);
+  await app.surface.emit('beforeunload');
 });

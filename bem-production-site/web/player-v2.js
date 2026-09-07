@@ -1,3 +1,6 @@
+import { createApprovalPurchaseFlow, purchaseContextKey } from './approval-purchase-flow.js';
+import { initPersonalRecords } from './personal-records.js';
+import { createPublicDrawDisplay } from './public-draw-display.js';
 import { Interface, formatUnits, getAddress, toQuantity } from 'ethers';
 import { t, getLocale, initLanguage, translateKnown, updatePageTitle } from './player-i18n.js';
 import { showBurnRecords } from './burns.js';
@@ -28,6 +31,26 @@ const state = { wallet: null, wallets: new Map(), connecting: false, connectVers
 let pools = null;
 let testTransactions = null;
 let pendingPoller = null;
+const purchaseFlow = createApprovalPurchaseFlow({
+  getKey: () => purchaseContextKey(model.getState()),
+  send: async (kind, input) => {
+    const result = await currentTransactions().execute(kind, input);
+    if (kind === 'approve') notice(t('授权已提交，确认后自动请求购买；请继续在钱包中确认。', 'Approval submitted. Once confirmed, the purchase will be requested in your wallet.'));
+    return result;
+  },
+  waitForApproval: async (record, unchanged) => {
+    const deadline = Date.now() + 180000;
+    while (Date.now() < deadline) {
+      unchanged();
+      const result = await pendingPoller.checkNow(); unchanged();
+      const approval = result?.records.find(row => row.id === record.id && row.hash === record.hash);
+      if (approval && ['confirmed','reverted'].includes(approval.status)) return approval;
+      await new Promise(resolve => setTimeout(resolve, 1500));
+    }
+    throw Object.assign(new Error('Approval pending'), { code: 'TRANSACTION_UNRESOLVED' });
+  }
+});
+const publicDraw = createPublicDrawDisplay({ getSnapshot: () => state.poolStatus, getPoolId: () => model.getState().poolId });
 const formalTransactions = new Map();
 const partialFillResult = createPartialFillResult({ getLanguage: () => getLocale().startsWith('en') ? 'en' : 'zh' });
 const batchedRead = createReadRpcBatcher();
@@ -92,7 +115,7 @@ function onPoolChange(selection) {
   const before = model.getState();
   model.selectPool(selection.id);
   if (before.poolId === selection.id) model.invalidate();
-  if (before.poolId !== selection.id) model.setSelection({ mode: 'auto', count: '1', text: '' });
+  if (before.poolId !== selection.id) { purchaseFlow.cancel(); model.setSelection({ mode: 'auto', count: '1', text: '' }); }
   const url = new URL(location.href); url.searchParams.set('pool', selection.id);
   history.replaceState(null, '', url);
   $('tab-burns')?.setAttribute('href', `/burns.html?pool=${selection.id}`);
@@ -188,8 +211,10 @@ function render() {
     put('purchase-total', `${money(selection.amountBaseUnits)} BEM`);
     put('selection-note', t('预选 {count} 份 · 成交号码以链上实际分配为准', '{count} tickets previewed · Final assigned numbers are recorded onchain', { count: selection.quantity.toLocaleString(getLocale()) }));
   } catch (error) { put('purchase-total', '— BEM'); put('selection-note', errorCopy(error)); }
-  renderContractLinks(); renderTestControls();
+  renderContractLinks(); renderTestControls(); publicDraw.render();
   if (!current.account) { disabled('approve', state.connecting); disabled('buy', state.connecting); }
+  put('buy', purchaseFlow.busy ? t('正在授权并购买…', 'Approval and purchase in progress…') : t('授权并购买', 'Approve & buy'));
+  if (purchaseFlow.busy) disabled('buy', true);
   pendingPoller?.update();
 }
 async function rpc(method, params, signal) {
@@ -308,7 +333,7 @@ function renderTestControls() {
         const payable = fill * BigInt(context.rules.ticketPriceBaseUnits);
         const allowed = view.canBuy && !txState.blocking && view.bemBalance >= payable &&
           (!internal || qty + view.myCount <= 5000n && qty + view.round.sold <= 10000n);
-        disabled('approve', !allowed || (internal && view.bemBalance < amount) || view.allowance >= payable); disabled('buy', !allowed || view.allowance < payable);
+        disabled('approve', !allowed || (internal && view.bemBalance < amount) || view.allowance >= payable); disabled('buy', !allowed);
         if (txState.blocking) {
           const pending = txState.records.find(record => !['confirmed', 'reverted'].includes(record.status));
           put('purchase-state', txState.storageError ? errorCopy({ code: 'PENDING_STORAGE_UNAVAILABLE' })
@@ -401,6 +426,22 @@ async function executeTestAction(kind) {
   } catch (error) { notice(errorCopy(error), true); }
   finally { render(); }
 }
+async function approveAndBuy() {
+  if (!model.getState().account) { if (!state.connecting) picker.open(); return; }
+  try {
+    const view = state.testView, manager = currentTransactions();
+    if (!manager || !testViewCurrent(view)) throw Object.assign(new Error(), { code: 'CONTEXT_CHANGED' });
+    const selection = model.preview();
+    const input = { roundId: view.roundId, quantity: selection.quantity, tickets: selection.tickets };
+    const fill = model.getState().poolId === '1' ? BigInt(selection.quantity) : [BigInt(selection.quantity), 10000n-view.round.sold, 5000n-view.myCount].reduce((a,b)=>a<b?a:b);
+    const payable = fill * BigInt(model.getState().rules.ticketPriceBaseUnits);
+    const run = purchaseFlow.run({ needsApproval: view.allowance < payable, input });
+    render(); await run;
+    notice(t('购买已提交，正在查询上链结果。', 'Purchase submitted. Checking its onchain result.'));
+    await checkPlayerTransactions();
+  } catch (error) { notice(errorCopy(error), true); }
+  finally { render(); }
+}
 async function checkPlayerTransactions() {
   const wasBlocking = currentTransactions()?.getState().blocking;
   await pendingPoller.checkNow();
@@ -439,15 +480,17 @@ async function connect(entry) {
   }
 }
 function selectTab(tab) {
-  if (!['draw', 'proof', 'burns'].includes(tab)) return;
+  if (!['draw', 'proof', 'burns', 'mine'].includes(tab)) return;
   state.tab = tab;
   document.body.dataset.activeTab = tab;
-  for (const name of ['draw', 'proof', 'burns']) { hidden('panel-' + name, name !== tab); $('tab-' + name)?.setAttribute('aria-selected', String(name === tab)); }
+  for (const name of ['draw', 'proof', 'burns', 'mine']) { hidden('panel-' + name, name !== tab); $('tab-' + name)?.setAttribute('aria-selected', String(name === tab)); }
   updatePageTitle();
   if (tab === 'burns') showBurnRecords();
   if (tab === 'proof') refreshHistory();
+  if (tab === 'mine') window.dispatchEvent(new Event('bem:personalshow'));
 }
 
+initPersonalRecords({ getAccount: () => model.getState().account });
 initLanguage();
 testTransactions = createTestPlayerTransactions({ wallet: () => state.wallet, getContext: () => model.getState(), readRpc: rpc, onUpdate: () => render() });
 for (const poolId of ['10', '50', '100']) formalTransactions.set(poolId,
@@ -485,37 +528,38 @@ $('switch-network')?.addEventListener('click', async () => {
   finally { model.setWallet(null, null); state.connecting = false; render(); }
 });
 for (const mode of ['auto', 'selected']) $('mode-' + mode)?.addEventListener('click', () => {
-  model.setSelection({ mode }); applySelectionFields(); render();
+  purchaseFlow.cancel(); model.setSelection({ mode }); applySelectionFields(); render();
 });
-if ($('ticket-count')) { $('ticket-count').max = '1000'; $('ticket-count').addEventListener('input', () => { model.setSelection({ count: $('ticket-count').value }); render(); }); }
-if ($('selected-tickets')) { $('selected-tickets').maxLength = 8000; $('selected-tickets').addEventListener('input', () => { model.setSelection({ text: $('selected-tickets').value }); render(); }); }
+if ($('ticket-count')) { $('ticket-count').max = '1000'; $('ticket-count').addEventListener('input', () => { purchaseFlow.cancel(); model.setSelection({ count: $('ticket-count').value }); render(); }); }
+if ($('selected-tickets')) { $('selected-tickets').maxLength = 8000; $('selected-tickets').addEventListener('input', () => { purchaseFlow.cancel(); model.setSelection({ text: $('selected-tickets').value }); render(); }); }
 for (const button of document.querySelectorAll('[data-count]')) button.addEventListener('click', () => {
-  model.setSelection({ count: button.dataset.count, mode: 'auto' }); applySelectionFields(); render();
+  purchaseFlow.cancel(); model.setSelection({ count: button.dataset.count, mode: 'auto' }); applySelectionFields(); render();
 });
-for (const id of ['approve', 'buy', 'refund']) $(id)?.addEventListener('click', event => { event.preventDefault(); executeTestAction(id); });
+$('buy')?.addEventListener('click', event => { event.preventDefault(); approveAndBuy(); });
+for (const id of ['approve', 'refund']) $(id)?.addEventListener('click', event => { event.preventDefault(); executeTestAction(id); });
 $('check-refund')?.addEventListener('click', queryTestRefund);
 $('refund-round')?.addEventListener('input', () => { state.refundView = null; render(); });
 $('settle-test')?.addEventListener('click', () => executeTestAction('settle'));
 $('check-transactions')?.addEventListener('click', async () => { try { await checkPlayerTransactions(); } catch(error) { notice(errorCopy(error), true); } });
 $('attach-test-hash')?.addEventListener('click', async () => { try { await currentTransactions()?.attachHash($('unknown-test-hash')?.value.trim()); await refreshTestState(); } catch(error) { notice(errorCopy(error), true); } });
-for (const tab of ['draw', 'proof', 'burns']) $('tab-' + tab)?.addEventListener('click', event => {
+for (const tab of ['draw', 'proof', 'burns', 'mine']) $('tab-' + tab)?.addEventListener('click', event => {
   if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
   event.preventDefault(); selectTab(tab);
   const url = new URL(location.href);
   url.pathname = tab === 'burns' ? '/burns.html' : '/';
   url.searchParams.set('pool', model.getState().poolId);
-  url.hash = tab === 'proof' ? 'proof' : '';
+  url.hash = tab === 'proof' ? 'proof' : tab === 'mine' ? 'mine' : '';
   history.pushState(null, '', url);
 });
 window.addEventListener('popstate', () => {
   const pool = new URLSearchParams(location.search).get('pool') ?? '100';
   if (pools?.getState().visibleIds.includes(pool) && pool !== model.getState().poolId) pools.select(pool);
-  selectTab(location.pathname === '/burns.html' ? 'burns' : location.hash === '#proof' ? 'proof' : 'draw');
+  selectTab(location.pathname === '/burns.html' ? 'burns' : location.hash === '#proof' ? 'proof' : location.hash === '#mine' ? 'mine' : 'draw');
 });
 window.addEventListener('bem:languagechange', () => { render(); partialFillResult.refreshLanguage(); if (!state.noticeError) notice(t('请核对所选场次与钱包，交易需在钱包中确认。', 'Review the selected pool and wallet. Confirm transactions in your wallet.')); else put('notice', translateKnown($('notice')?.textContent ?? '')); });
 put('history-summary', t('本场次暂无已确认的往期开奖。', 'No confirmed past draws are available for this pool.'));
 notice(t('正在读取场次信息。连接钱包后可查看余额与参与状态。', 'Reading pool information. Connect your wallet to view balances and participation status.'));
-applySelectionFields(); selectTab(document.body.dataset.initialTab === 'burns' || location.pathname === '/burns.html' ? 'burns' : location.hash === '#proof' ? 'proof' : 'draw'); render(); dispatchPool(); pools.load();
+applySelectionFields(); selectTab(document.body.dataset.initialTab === 'burns' || location.pathname === '/burns.html' ? 'burns' : location.hash === '#proof' ? 'proof' : location.hash === '#mine' ? 'mine' : 'draw'); render(); dispatchPool(); pools.load();
 setInterval(() => { if (document.visibilityState === 'visible') {
   refreshBalance(); refreshPoolStatus(); refreshTestState();
   const transactions = currentTransactions();

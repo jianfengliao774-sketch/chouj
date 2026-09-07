@@ -7,6 +7,7 @@ const gameAbi = new Interface([
   'function currentRoundId() view returns(uint256)',
   'function nextRoundOpensAt() view returns(uint64)',
   'function totalLiability() view returns(uint256)',
+  'function drawTiming(uint256) view returns(uint64 lockedAt,uint64 targetDrawBy,uint64 scheduledDrawAt,uint64 settledAt)',
   'function rounds(uint256) view returns(uint8 status,uint32 sold,uint64 fundingDeadline,uint64 drawDeadline,uint256 requestId,uint256 ticketWord,uint256 circuitWord,uint32 drawCursor,uint32 winningTicket,address winner)'
 ]);
 const externalAbi = new Interface([
@@ -38,6 +39,10 @@ export function createPoolStatusReader({ rpc }) {
       if (BigInt(chain) !== 56n || keccak256(code) !== deployment.runtimeCodeHash) throw new Error('Pool code or chain mismatch');
       const currentRound = await call(deployment.address, gameAbi, 'rounds', [roundId[0]]);
       const previousRound = roundId[0] > 1n ? await call(deployment.address, gameAbi, 'rounds', [roundId[0] - 1n]) : null;
+      const [currentDrawTiming, previousDrawTiming] = await Promise.all([
+        call(deployment.address, gameAbi, 'drawTiming', [roundId[0]]),
+        roundId[0] > 1n ? call(deployment.address, gameAbi, 'drawTiming', [roundId[0] - 1n]) : null
+      ]);
       const canonical = await rpc('eth_getBlockByNumber', [block.number, false]);
       if (canonical.hash !== block.hash) throw new Error('Pool snapshot changed');
       const consumerAuthorized = sub.consumers.some(a => a.toLowerCase() === deployment.address.toLowerCase());
@@ -46,6 +51,7 @@ export function createPoolStatusReader({ rpc }) {
         snapshot: { blockNumber: Number(BigInt(block.number)), blockHash: block.hash,
           timeUtc: new Date(Number(BigInt(block.timestamp)) * 1000).toISOString() },
         seriesAuthorized: authorized[0], currentRoundId: roundId[0].toString(), nextRoundOpensAt: next[0].toString(),
+        currentDrawTiming: currentDrawTiming.toObject(), previousDrawTiming: previousDrawTiming?.toObject() ?? null,
         totalLiability: liability[0].toString(), currentRound: currentRound.toObject(), previousRound: previousRound?.toObject() ?? null,
         vrf: { subscriptionId: SUBSCRIPTION, owner: sub.owner, consumerAuthorized,
           consumers: [...sub.consumers], nativeBalanceWei: sub.nativeBalance.toString(), requestCount: sub.reqCount.toString() },
