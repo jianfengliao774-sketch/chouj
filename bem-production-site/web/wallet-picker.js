@@ -1,5 +1,20 @@
 import { t } from './player-i18n.js';
 
+function legacyBrand(provider, {okx, binance}) {
+  if (provider === okx || provider === okx?.ethereum) return ['OKX Wallet', 'com.okx.wallet'];
+  if (provider === binance) return ['Binance Wallet', 'com.binance.wallet'];
+  // Several wallets also set isMetaMask for protocol compatibility. Resolve
+  // their own flags first; labels never replace the provider selected by users.
+  if (provider.isOkxWallet === true || provider.isOKExWallet === true) return ['OKX Wallet', 'com.okx.wallet'];
+  if (provider.isBinance === true) return ['Binance Wallet', 'com.binance.wallet'];
+  if (provider.isTokenPocket === true || provider.isTp === true) return ['TokenPocket', 'pro.tokenpocket'];
+  if (provider.isTrust === true || provider.isTrustWallet === true) return ['Trust Wallet', 'com.trustwallet.app'];
+  if (provider.isRabby === true) return ['Rabby Wallet', 'io.rabby'];
+  if (provider.isCoinbaseWallet === true) return ['Coinbase Wallet', 'com.coinbase.wallet'];
+  if (provider.isMetaMask === true) return ['MetaMask', 'io.metamask'];
+  return null;
+}
+
 // EIP-6963 metadata takes priority only for the same provider object.
 // Discovery never asks for accounts; only an explicit wallet choice connects.
 export function createWalletRegistry(target, onChange) {
@@ -43,10 +58,9 @@ export function createWalletRegistry(target, onChange) {
     for (const provider of providers) {
       if (!isProvider(provider) || legacy.has(provider) || legacy.size >= 32) continue;
       const id = providerId(provider);
-      const isOkx = provider === okx || provider === okx?.ethereum || provider.isOkxWallet === true || provider.isOKExWallet === true;
-      const isBinance = provider === binance || provider.isBinance === true;
-      legacy.set(provider, { id, provider, name: isOkx ? 'OKX Wallet' : isBinance ? 'Binance Wallet' : t('浏览器钱包', 'Browser wallet') + ` ${legacy.size + 1}`,
-        rdns: isOkx ? 'com.okx.wallet' : isBinance ? 'com.binance.wallet' : '', icon: null });
+      const brand = legacyBrand(provider, {okx, binance});
+      legacy.set(provider, { id, provider, name: brand?.[0] ?? t('浏览器钱包', 'Browser wallet') + ` ${legacy.size + 1}`,
+        rdns: brand?.[1] ?? '', icon: null });
     }
     target.dispatchEvent(new Event('eip6963:requestProvider'));
     publish();
@@ -61,6 +75,7 @@ export function createWalletRegistry(target, onChange) {
 const COMMON_WALLETS = [
   { name: 'MetaMask', rdns: ['io.metamask'], icon: '/wallet-icons/metamask.svg', monogram: 'M' },
   { name: 'OKX Wallet', rdns: ['com.okex.wallet', 'com.okx.wallet'], icon: '/wallet-icons/okx.png', monogram: 'OK' },
+  { name: 'TokenPocket', rdns: ['pro.tokenpocket', 'com.tokenpocket'], icon: new URL('./assets/tokenpocket.png', import.meta.url).href, monogram: 'TP' },
   { name: 'Binance Wallet', rdns: ['com.binance.wallet', 'com.binance'], icon: '/wallet-icons/binance.svg', monogram: 'B' },
   { name: 'Trust Wallet', rdns: ['com.trustwallet.app', 'com.trustwallet'], icon: '/wallet-icons/trust.svg', monogram: 'T' },
   { name: 'Rabby Wallet', rdns: ['io.rabby'], icon: '/wallet-icons/rabby.png', monogram: 'R' },
