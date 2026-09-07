@@ -1,6 +1,6 @@
-# 容器收款候选合约
+# 容器收款合约
 
-这些是待独立部署的新合约。已有 `Bem2075RaffleBSC` 的地址、源码、规则和资金不受影响。
+四份合约已在 BNB Chain 主网部署，并核对部署交易、运行时代码和固定参数。地址见 [发布说明](WEBSITE-RELEASE.md)，完整公开证据见 [链上核验记录](../../outputs/bem-raffle-2075/production-v2/recovered-deployments-verified.json)。网站仅提供 1 BEM 的钱包启动与测试入口；10、50、100 BEM 场次保持关闭。已有 `Bem2075RaffleBSC` 的地址、源码、规则和资金不受影响。
 
 四个固定版本共用 `BemSelectableRaffleV2.sol`、BNB Chain 参数层和容器授权层。最终合约的构造参数只有 VRF 订阅编号、确认数、回调 Gas 上限；不能通过部署参数改变奖池金额或收款地址。
 

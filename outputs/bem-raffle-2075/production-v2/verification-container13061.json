@@ -1,6 +1,6 @@
 {
   "status": "passed",
-  "checkedAt": "2026-09-07T02:09:27.757Z",
+  "checkedAt": "2026-09-07T03:44:55.587Z",
   "scope": "local_mocks",
   "compilerVersion": "0.8.36+commit.8a079791.Emscripten.clang",
   "sourceSha256s": {
@@ -82,7 +82,7 @@
       "poolBem": "50",
       "refundBaseUnits": "5000000",
       "claimedByParticipant": true,
-      "gasPaidBaseUnits": "4270791675305"
+      "gasPaidBaseUnits": "4270200512695"
     },
     {
       "name": "100 BEM production: all 10000 tickets settle 4% / 1% / 95% with no residual BEM",
@@ -101,7 +101,7 @@
       "poolBem": "100",
       "refundBaseUnits": "10000000",
       "claimedByParticipant": true,
-      "gasPaidBaseUnits": "4270795210120"
+      "gasPaidBaseUnits": "4270798572505"
     }
   ],
   "mainnetTransactionsSent": 0,

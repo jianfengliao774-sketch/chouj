@@ -26,8 +26,8 @@ export function previewPoolSelection({ poolId, mode = 'auto', count = '1', text 
     maxTicketsPerAddress: rules.maxTicketsPerAddress, writeEnabled: false });
 }
 
-/** The V2 registry currently contains no deployed game addresses. This state model has
- * no transaction path and never falls back to the old game's address or history. */
+/** Selection and wallet state stay read-only. The isolated test transaction module
+ * verifies its own deployment; this model never falls back to the old game. */
 export function createPendingPlayerState({ poolId = '100' } = {}) {
   getPoolRules(poolId);
   let epoch = 0, account = null, chainId = null, selection = { mode: 'auto', count: '1', text: '' }, balance = null;

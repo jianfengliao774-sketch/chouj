@@ -315,14 +315,15 @@ async function httpFixture({ publicOrigin } = {}) {
 test('new pool, burn, announcement and price endpoints remain read-only and distinguish undeployed pools', async()=>{
   const f=await httpFixture();
   const pools=await f.send({url:'/api/pools',method:'GET'});assert.equal(pools.status,200);assert.equal(pools.body.schemaVersion,2);
-  assert.ok(pools.body.pools.every(p=>p.deployment===null&&p.salesEnabled===false));
+  assert.ok(pools.body.pools.every(p=>p.deployment?.verified===true&&p.salesEnabled===false));
   for(const endpoint of ['/api/burns','/api/announcements']){
-    const current=await f.send({url:endpoint+'?pool=100',method:'GET'});assert.equal(current.status,200);assert.equal(current.body.deploymentPending,true);assert.equal(current.body.index.state,'awaiting_deployment');assert.deepEqual(current.body.rows,[]);
+    const current=await f.send({url:endpoint+'?pool=100',method:'GET'});assert.equal(current.status,200);assert.equal(current.body.deploymentPending,false);assert.equal(current.body.index.state,'syncing');assert.deepEqual(current.body.rows,[]);
     const original=await f.send({url:endpoint+'?pool=legacy100',method:'GET'});assert.equal(original.body.deploymentPending,false);assert.equal(original.body.index.state,'ready');
     for(const query of ['?pool=untrusted','?page=-1','?pageSize=100000'])assert.equal((await f.send({url:endpoint+query,method:'GET'})).status,400);
   }
   const price=await f.send({url:'/api/market',method:'GET'});assert.equal(price.status,200);assert.equal(price.body.stale,true);assert.equal(price.body.usdt,null);
-  assert.deepEqual(f.forwarded,[]);
+  assert.ok(f.forwarded.length > 0);
+  assert.ok(f.forwarded.every(call=>['eth_getBlockByNumber','eth_chainId','eth_getCode','eth_call','eth_getBalance'].includes(call.method)));
 });
 
 test('HTTP envelope blocks foreign hosts/origins and refuses write methods inside a mixed batch', async () => {

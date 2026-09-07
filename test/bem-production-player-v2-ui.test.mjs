@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 import { Interface, formatUnits, getAddress, toQuantity } from 'ethers';
+import { createTestPlayerTransactions } from '../bem-production-site/web/test-player-transactions.js';
 import { poolRegistry } from '../bem-production-site/pools.mjs';
 import { quoteView } from '../bem-production-site/web/market-guards.js';
 import { validateRecords, transactionUrl } from '../bem-production-site/web/public-record-guards.js';
@@ -13,6 +14,73 @@ const token = new Interface(['function balanceOf(address) view returns(uint256)'
 const tick = () => new Promise(resolve => setImmediate(resolve));
 async function until(condition, label) { for (let n = 0; n < 100; n++) { if (condition()) return; await tick(); } throw new Error(`Timed out: ${label}`); }
 const deferred = () => { let resolve; const promise = new Promise(done => { resolve = done; }); return { promise, resolve }; };
+
+test('the player accepts the first permission accountsChanged event without requiring another connection', async () => {
+  for (const timing of ['during-request', 'after-request']) {
+    const app = await harness(), request = app.wallet.request; let emitted = false;
+    app.wallet.request = async input => {
+      const result = await request(input);
+      if (!emitted && input.method === (timing === 'during-request' ? 'eth_requestAccounts' : 'eth_chainId')) {
+        emitted = true; await app.wallet.emitAccounts([A]);
+      }
+      return result;
+    };
+    await app.connect();
+    assert.equal(app.$('wallet-address').textContent, A, timing);
+    assert.equal(app.wallet.calls.filter(call => call.method === 'eth_requestAccounts').length, 1, timing);
+    assert.ok(app.wallet.calls.every(call => !['eth_sendTransaction', 'personal_sign', 'eth_signTypedData_v4'].includes(call.method)));
+  }
+});
+
+test('the player rejects a different account emitted while initial permission is still pending', async () => {
+  const app = await harness(), request = app.wallet.request;
+  app.wallet.request = async input => {
+    const result = await request(input);
+    if (input.method === 'eth_requestAccounts') { app.wallet.account = B; await app.wallet.emitAccounts([B]); }
+    return result;
+  };
+  await app.$('connect-wallet').emit('click');
+  await until(() => !app.$('connect-wallet').disabled, 'rejected initial permission identity');
+  assert.equal(app.$('wallet-address').textContent, '');
+  assert.equal(app.wallet.calls.filter(call => call.method === 'eth_sendTransaction').length, 0);
+});
+
+test('a wallet account-change event during the last connect response cannot restore the old account', async () => {
+  const app=await harness(), gate=deferred(); let chainReads=0;
+  const request=app.wallet.request;
+  app.wallet.request=async input=>{
+    if(input.method==='eth_chainId'&&++chainReads===2){await gate.promise;return '0x38';}
+    return request(input);
+  };
+  await app.$('connect-wallet').emit('click');
+  await until(()=>chainReads===2,'last chain response');
+  app.wallet.account=B;await app.wallet.emitAccounts([B]);
+  gate.resolve();await tick();await tick();
+  assert.equal(app.$('wallet-address').textContent,'');
+  assert.equal(app.$('connect-wallet').disabled,false);
+});
+
+test('the real player entry forwards only explicit test actions and keeps a new funding round active after the prior settlement', async () => {
+  const actions=[], reads=[];let allowance=0n;
+  const app=await harness({search:'?pool=1',testFactory: options=>({
+    getState:()=>({busy:false,blocking:false,records:[]}),checkPending:async()=>{},attachHash:async()=>{},
+    readState:async(account,{roundId}={})=>{
+      reads.push(roundId);return {account,roundId:2n,currentRoundId:2n,blockNumber:120000001,timestamp:100n,
+        round:{status:1,sold:1000n,fundingDeadline:10000n},myCount:0n,allowance,bemBalance:100000000n,bnbBalance:1000000000000000n,
+        seriesAuthorized:true,consumerAuthorized:true,canBuy:true,canRefund:false,canSettle:false,refundAmount:0n,refundDeadline:96400n};
+    },
+    execute:async(kind,payload)=>{actions.push({kind,payload,context:options.getContext()});if(kind==='approve')allowance=10000n;},
+  })});
+  await app.connect();await until(()=>app.$('approve').disabled===false,'test approve enabled');
+  assert.match(app.$('round-phase').textContent,/购买中/);assert.ok(reads.every(id=>id===undefined));
+  assert.equal(actions.length,0);await app.$('approve').emit('click');
+  await until(()=>app.$('buy').disabled===false,'exact approval permits explicit purchase');
+  assert.deepEqual(actions.map(a=>a.kind),['approve']);
+  await app.$('buy').emit('click');await until(()=>actions.length===2,'purchase action');
+  assert.equal(actions[1].context.poolId,'1');assert.equal(actions[1].payload.roundId,2n);assert.equal(actions[1].payload.quantity,1);
+  await app.choose('10');await app.$('buy').emit('click');await tick();
+  assert.equal(app.$('buy').disabled,true);assert.equal(actions.length,2);
+});
 
 class Element {
   constructor(tag = 'div') { this.tagName = tag; this.children = []; this.listeners = new Map(); this.dataset = {}; this.style = {}; this.attributes = {};
@@ -36,7 +104,7 @@ class Element {
   focus() {} scrollIntoView() {} select() {}
 }
 
-async function harness({ language = 'zh', search = '', balanceHook = null } = {}) {
+async function harness({ language = 'zh', search = '', balanceHook = null, announcements = [], testFactory = null } = {}) {
   const html = fs.readFileSync(new URL('index.html', WEB), 'utf8'), elements = new Map(), all = [];
   for (const match of html.matchAll(/<([\w-]+)\b([^>]*)>([^<]*)/g)) {
     const node = new Element(match[1]); node.textContent = match[3];
@@ -57,6 +125,7 @@ async function harness({ language = 'zh', search = '', balanceHook = null } = {}
   elements.get('funding-progress').append(new Element('i'));
   const calls = [], events = [], wallet = new Element('wallet'); wallet.account = A; wallet.chain = '0x38'; wallet.calls = [];
   wallet.on = wallet.addEventListener.bind(wallet); wallet.removeListener = wallet.removeEventListener.bind(wallet);
+  wallet.emitAccounts = async accounts => { for (const listener of wallet.listeners.get('accountsChanged') ?? []) await listener(accounts); };
   wallet.request = async ({ method, params }) => { wallet.calls.push({ method, params });
     if (['eth_accounts', 'eth_requestAccounts'].includes(method)) return [wallet.account];
     if (method === 'eth_chainId') return wallet.chain;
@@ -66,7 +135,7 @@ async function harness({ language = 'zh', search = '', balanceHook = null } = {}
   const storage = new Map([['bem2075-player-language', language]]), quote = { chainId: 56, token: poolRegistry().bemAddress,
     source: 'DEX Screener', stale: false, updatedAt: new Date().toISOString(),
     usdt: { price: '2', pairAddress: A }, bnb: { price: '0.001', pairAddress: B } };
-  const sandbox = { Interface, formatUnits, getAddress, toQuantity, quoteView, validateRecords, transactionUrl,
+  const sandbox = { createTestPlayerTransactions: testFactory ?? createTestPlayerTransactions, Interface, formatUnits, getAddress, toQuantity, quoteView, validateRecords, transactionUrl,
     document, window: surface, location: { href: `https://example.invalid/${search}`, origin: 'https://example.invalid', search },
     navigator: { clipboard: { writeText: async () => {} } }, localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
     createWalletPicker: options => { options.onChange(new Map([['fixture', { provider: wallet, name: 'Synthetic wallet' }]])); return { open: () => options.onSelect({ provider: wallet }) }; },
@@ -74,7 +143,7 @@ async function harness({ language = 'zh', search = '', balanceHook = null } = {}
       calls.push({ path, options }); let result;
       if (path === '/api/pools') result = poolRegistry();
       else if (path === '/api/market') result = quote;
-      else if (path.startsWith('/api/announcements')) result = { schemaVersion: 2, chainId: 56, rows: [], page: 1, totalPages: 0, total: 0, deploymentPending: true, index: { state: 'ready' } };
+      else if (path.startsWith('/api/announcements')) result = { schemaVersion: 2, chainId: 56, rows: announcements, page: 1, totalPages: announcements.length ? 1 : 0, total: announcements.length, deploymentPending: true, index: { state: 'ready' } };
       else if (path === '/rpc') {
         const request = JSON.parse(options.body); let value;
         if (request.method === 'eth_chainId') value = '0x38';
@@ -101,7 +170,11 @@ async function harness({ language = 'zh', search = '', balanceHook = null } = {}
   evaluate('player-v2-state.js', ['createPendingPlayerState']);
   const entries = [...html.matchAll(/<script type="module" src="\/([^"]+)"/g)].map(match => match[1]);
   assert.deepEqual(entries, ['prize-market.js', 'public-records.js', 'player-v2.js'], 'actual module order installs price/history listeners before the pool event');
-  for (const file of entries) evaluate(file);
+  for (const file of entries) {
+    // Execute the shared side-effect dependency that a browser imports for public-records.js.
+    if (file === 'public-records.js') evaluate('winner-broadcast.js');
+    evaluate(file);
+  }
   await until(() => elements.get('prize-usdt').textContent.includes('U') && calls.some(call => call.path === '/api/pools'), 'initial rendering');
   await tick();
   return { $: id => elements.get(id), calls, events, wallet, surface, context,
@@ -143,4 +216,27 @@ test('a late old-account balance cannot overwrite the newly connected wallet in 
   older.resolve(99900000000n); await tick(); await tick();
   assert.equal(app.$('wallet-address').textContent, B); assert.match(app.$('wallet-balances').textContent, /^2 BEM/);
   assert.doesNotMatch(app.$('wallet-balances').textContent, /999/);
+});
+
+test('shared winner announcements render only validated rows, preserve pause across language changes and stay read-only', async () => {
+  const row = { poolId: '10', gameAddress: A, transactionHash: '0x' + 'ab'.repeat(32), roundId: '1', amountBaseUnits: '950000000', timeUtc: '2026-09-07T12:00:00Z', winner: B };
+  const app = await harness({ language: 'en', announcements: [row, { ...row, roundId: '2' }, { ...row, transactionHash: 'javascript:alert(1)', winner: '<script>bad</script>' }] });
+  const ticker = app.$('winner-ticker'), pause = app.$('ticker-pause');
+  assert.match(ticker.textContent, /won 9.5 BEM/);
+  assert.doesNotMatch(ticker.textContent, /bad|javascript/);
+  assert.equal(pause.hidden, false);
+  const [original, duplicate] = ticker.children[0].children;
+  assert.equal(original.children.length, 2);
+  assert.ok(original.querySelectorAll('a').every(link => link.href === `https://bscscan.com/tx/${row.transactionHash}` && link.rel === 'noopener noreferrer'));
+  assert.equal(duplicate.getAttribute('aria-hidden'), 'true');
+  assert.ok(duplicate.querySelectorAll('a').every(link => link.tabIndex === -1));
+  await pause.emit('click');
+  assert.equal(pause.getAttribute('aria-pressed'), 'true');
+  assert.equal(pause.textContent, 'Resume');
+  await app.$('language-zh').emit('click');
+  assert.equal(pause.textContent, '继续');
+  assert.equal(pause.getAttribute('aria-pressed'), 'true');
+  assert.match(ticker.textContent, /中了 9.5 BEM/);
+  assert.equal(app.calls.filter(call => call.path === '/api/announcements?pageSize=20').length, 1, 'one shared feed request, no duplicate ticker initialization');
+  assert.equal(app.wallet.calls.length, 0);
 });

@@ -3,6 +3,7 @@ import { t, getLocale, initLanguage, translateKnown } from './player-i18n.js';
 import { createWalletPicker } from './wallet-picker.js';
 import { createPoolSelection, poolMetadata } from './pool-selection.js';
 import { createPendingPlayerState } from './player-v2-state.js';
+import { createTestPlayerTransactions } from './test-player-transactions.js';
 
 const BEM = '0x5ce033B2bFCa3Af30b3e8C8457DeaF776A8b695a';
 const PROCESSOR = '0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C';
@@ -16,9 +17,11 @@ const selectedQuery = new URLSearchParams(location.search).get('pool');
 const initialPool = ['1', '10', '50', '100'].includes(selectedQuery) ? selectedQuery : '100';
 const model = createPendingPlayerState({ poolId: initialPool });
 const tokenInterface = new Interface(['function balanceOf(address) view returns(uint256)']);
-const state = { wallet: null, wallets: new Map(), connecting: false, connectVersion: 0, balanceGeneration: 0,
-  balanceAbort: null, refreshing: false, noticeError: false, rpcId: 0, tab: 'draw' };
+const state = { wallet: null, wallets: new Map(), connecting: false, connectVersion: 0, connectAttempt: null, balanceGeneration: 0,
+  balanceAbort: null, refreshing: false, noticeError: false, rpcId: 0, tab: 'draw', poolStatus: null, poolGeneration: 0,
+  testView: null, refundView: null, settlementView: null, testGeneration: 0, testRefreshing: false };
 let pools = null;
+let testTransactions = null;
 
 function notice(message, error = false) { put('notice', message); $('notice')?.classList.toggle('error-copy', error); state.noticeError = error; }
 function errorCopy(error) {
@@ -28,6 +31,25 @@ function errorCopy(error) {
     TICKET_FORMAT: ['请用逗号分隔号码，连续号段如 100-110。', 'Use comma-separated ticket numbers or ranges such as 100-110.'],
     NO_TICKETS: ['请输入您要选择的票号。', 'Enter the ticket numbers you want.'],
     POOL_NOT_LAUNCHED: ['该场次暂未开放，暂不接受授权、购买或退款交易。', 'This pool is not open yet. Approvals, purchases and refund transactions are unavailable.'],
+    TEST_POOL_ONLY: ['交易入口仅供 1 BEM 测试场次。', 'Transactions are limited to the 1 BEM test pool.'],
+    CONTEXT_CHANGED: ['钱包、场次或选号已变化，请核对后重新操作。', 'The wallet, pool or selection changed. Review and try again.'],
+    WALLET_CHANGED: ['钱包已变化，请重新连接。', 'The wallet changed. Reconnect.'],
+    WALLET_NETWORK: ['请连接钱包并切换到 BNB 主网。', 'Connect your wallet on BNB Chain.'],
+    PURCHASE_UNAVAILABLE: ['当前不可购买，请核对启动状态、剩余份数和期限。', 'Purchases are unavailable. Check activation, remaining tickets and deadline.'],
+    APPROVAL_REQUIRED: ['请先授权本次购买金额，确认后再购买。', 'Approve this purchase amount first, then buy after confirmation.'],
+    ALLOWANCE_SUFFICIENT: ['当前额度已足够，可直接确认购买。', 'The allowance is sufficient. You can confirm the purchase.'],
+    INSUFFICIENT_BEM: ['钱包 BEM 余额不足。', 'Insufficient BEM balance.'],
+    INSUFFICIENT_BNB: ['钱包 BNB 不足以支付本次网络费用。', 'Insufficient BNB for this transaction’s network fee.'],
+    INSUFFICIENT_TICKETS: ['剩余份数不足，请减少数量。', 'Too few tickets remain. Reduce the quantity.'],
+    ADDRESS_TICKET_LIMIT: ['每个地址每期最多购买 5,000 份。', 'Each address can buy at most 5,000 tickets per round.'],
+    ROUND_CHANGED: ['期号已变化，请刷新后重新选择。', 'The round changed. Refresh and select again.'],
+    REFUND_UNAVAILABLE: ['该期目前不可领取本金，请核对期号和领取期限。', 'A refund is unavailable for this round. Check the round and claim deadline.'],
+    SETTLEMENT_NOT_DUE: ['尚未到结算时间，或该期已结算。', 'Settlement is not due or the round is already settled.'],
+    GAS_LIMIT_EXCEEDED: ['该组合所需 Gas 过高，请减少份数或选择更连续的号码。', 'This selection requires too much gas. Reduce the quantity or choose more consecutive numbers.'],
+    TRANSACTION_UNRESOLVED: ['上一笔交易结果尚未确认，请先核查交易记录。', 'The previous transaction is unresolved. Check its record first.'],
+    TRANSACTION_IN_FLIGHT: ['正在处理交易，请先完成钱包中的请求。', 'A transaction is being processed. Resolve the wallet request first.'],
+    TRANSACTION_LOCK_UNAVAILABLE: ['请在支持安全连接的新版 Chrome 或 Edge 中打开本页。', 'Open this HTTPS page in a current Chrome or Edge browser.'],
+    PENDING_STORAGE_UNAVAILABLE: ['浏览器无法保存交易记录，请允许本站存储后重试。', 'Transaction storage is unavailable. Allow storage for this site.'],
   };
   if (copies[error.code]) return t(...copies[error.code]);
   if (error.code === 4001 || error.code === 'ACTION_REJECTED') return t('您取消了钱包请求。', 'You cancelled the wallet request.');
@@ -36,7 +58,7 @@ function errorCopy(error) {
 }
 function poolSnapshot() {
   const current = model.getState();
-  return { ...current.rules, id: current.poolId, deployment: null, salesEnabled: false, available: false, epoch: current.epoch };
+  return { ...current.rules, id: current.poolId, deployment: pools?.getState().deployment ?? null, salesEnabled: false, available: false, epoch: current.epoch };
 }
 function dispatchPool() { window.dispatchEvent(new CustomEvent('bem:poolchange', { detail: { pool: poolSnapshot() } })); }
 function refreshHistory() { window.dispatchEvent(new CustomEvent('bem:historyrefresh', { detail: { pool: poolSnapshot() } })); }
@@ -54,16 +76,19 @@ function onPoolChange(selection) {
   if (before.poolId === selection.id) model.invalidate();
   model.setSelection({ mode: 'auto', count: '1', text: '' });
   state.balanceAbort?.abort(); applySelectionFields();
+  state.poolStatus = null; state.poolGeneration++;
+  clearTestViews();
   put('refund-round', ''); if ($('refund-round')) $('refund-round').value = '';
   hidden('proof-detail', true); render();
-  notice(t('已切换至 {amount} BEM 场次。该场次暂未开放，选号已重置。',
-    'Selected the {amount} BEM pool. It is not open yet; ticket selection has been reset.', { amount: selection.id }));
-  dispatchPool(); refreshBalance();
+  notice(t('已切换至 {amount} BEM 场次，正在读取状态，选号已重置。',
+    'Selected the {amount} BEM pool. Checking its state; ticket selection has been reset.', { amount: selection.id }));
+  dispatchPool(); refreshBalance(); refreshPoolStatus(); refreshTestState();
 }
 function renderContractLinks() {
   const target = $('contract-links'); if (!target) return;
   const rules = model.getState().rules;
-  const rows = [[t('场次合约', 'Pool contract'), t('待部署并核验', 'Awaiting deployment and verification'), false],
+  const deployment = pools?.getState().deployment;
+  const rows = [[t('场次合约', 'Pool contract'), deployment?.address ?? t('正在读取部署记录', 'Loading deployment record'), Boolean(deployment)],
     ['BEM', BEM, true], [t('收款容器', 'Receiving container'), rules.revenueContainer, true],
     [t('开奖处理器', 'Draw processor'), PROCESSOR, true]];
   target.replaceChildren(...rows.flatMap(([label, value, linked]) => {
@@ -75,11 +100,13 @@ function renderContractLinks() {
 }
 function render() {
   const current = model.getState(), rules = current.rules;
+  const deployment = pools?.getState().deployment;
+  const launch = state.poolStatus?.poolId === current.poolId ? state.poolStatus : null;
+  const configured = launch?.seriesAuthorized && launch?.vrf?.consumerAuthorized;
   const meta = poolMetadata({ rules, message: t('该场次暂未开放', 'This pool is not open yet') });
-  put('launch-status', t('新场次待开放', 'New pools awaiting launch'));
-  put('sale-note', rules.testOnly ? t('1 BEM 内部测试场次，使用 BNB 主网真实 BEM，待部署核验后开放。',
-    'Internal 1 BEM test pool using real BEM on BNB Chain. It will open after deployment verification.')
-    : t('{amount} BEM 场次待部署与链上核验，当前暂不接受购买。', 'The {amount} BEM pool awaits deployment and onchain verification. Purchases are not open yet.', { amount: rules.id }));
+  put('launch-status', deployment ? t('合约已部署', 'Contract deployed') : t('读取部署记录', 'Loading deployment records'));
+  put('sale-note', rules.testOnly ? t('1 BEM 内部测试场次，使用 BNB 主网真实 BEM。', 'Internal 1 BEM test pool using real BEM on BNB Chain.')
+    : t('{amount} BEM 正式场次合约已部署，暂未开放购买。', 'The {amount} BEM production contract is deployed. Purchases are not open yet.', { amount: rules.id }));
   put('prize-bem', meta.winnerAmount);
   put('purchase-rules', t('每份 {price} BEM · 00001–10000 · 单笔最多 1,000 份',
     '{price} BEM each · 00001–10000 · Up to 1,000 per purchase', { price: meta.unitPrice }));
@@ -97,14 +124,19 @@ function render() {
   put('footer-rules', t('{price} BEM / 份 · 每期 10,000 份', '{price} BEM per ticket · 10,000 per round', { price: meta.unitPrice }));
   put('payout-burn', `${meta.blackholeAmount} BEM`); put('payout-container', `${meta.organizerAmount} BEM`); put('payout-winner', `${meta.winnerAmount} BEM`);
   put('round-label', t('{amount} BEM 场次', '{amount} BEM pool', { amount: rules.id }));
-  put('round-phase', t('待开放', 'Not open yet'));
-  put('funding-amount', `— / ${meta.poolTotal} BEM`); put('funding-tickets', t('— / 10,000 份', '— / 10,000 tickets'));
-  const progress = $('funding-progress')?.firstElementChild; if (progress) progress.style.width = '0%';
+  put('round-phase', configured ? t('已启动', 'Started') : deployment ? t('已部署 · 待启动', 'Deployed · Awaiting start') : t('读取中', 'Loading'));
+  const sold = launch ? Number(launch.currentRound.sold) : null;
+  put('funding-amount', `${sold == null ? '—' : money(BigInt(sold) * BigInt(rules.ticketPriceBaseUnits))} / ${meta.poolTotal} BEM`);
+  put('funding-tickets', t('{count} / 10,000 份', '{count} / 10,000 tickets', { count: sold == null ? '—' : sold.toLocaleString(getLocale()) }));
+  const progress = $('funding-progress')?.firstElementChild; if (progress) progress.style.width = `${sold == null ? 0 : sold / 100}%`;
   hidden('countdown-panel', true); put('reel-caption', t('等待本场次开放', 'Awaiting this pool’s launch'));
-  put('reel-message', t('本场次尚未部署，暂无链上中奖号码。', 'This pool is not deployed yet. There is no onchain winning number.'));
+  put('reel-message', t('等待本场次产生已确认的中奖号码。', 'Awaiting a confirmed winning number for this pool.'));
   for (const step of ['lock', 'random', 'circuit', 'settle']) $('step-' + step)?.classList.remove('active');
   for (const id of ['approve', 'buy', 'refund', 'check-refund', 'replay', 'check-transactions']) disabled(id, true);
-  put('purchase-state', t('该场次暂未开放，选号仅用于预览。', 'This pool is not open yet. Ticket selection is a preview.'));
+  put('purchase-state', launch && !launch.vrf.consumerAuthorized ? t('合约已部署，需先添加 VRF 消费者并完成容器启动。', 'Contract deployed. Add the VRF consumer and activate it through the container.')
+    : launch && !launch.seriesAuthorized ? t('合约已部署，等待容器授权启动。', 'Contract deployed. Awaiting container activation.')
+    : t('该场次暂未开放，选号仅用于预览。', 'This pool is not open yet. Ticket selection is a preview.'));
+  hidden('test-start-link', !rules.testOnly);
   put('my-count', '—'); put('my-numbers', t('场次开放后可查询本期持票。', 'Your tickets will be available to query after this pool opens.'));
   put('refund-amount', '— BEM'); put('refund-state', t('该场次暂未开放，尚无可查询的退款期号。', 'This pool is not open yet. There are no refundable rounds to query.'));
   hidden('transactions', true);
@@ -119,21 +151,37 @@ function render() {
   put('wallet-balances', current.balance ? `${money(current.balance.bem)} BEM · ${money(current.balance.bnb, 18)} BNB` : 'BEM — · BNB —');
   put('connection-status', current.account && current.chainId !== 56 ? t('请切换 BNB 主网', 'Switch to BNB Chain') :
     current.balance ? t('BNB 主网 · 区块 {block}', 'BNB Chain · Block {block}', { block: current.balance.block.toLocaleString(getLocale()) }) : t('BNB 主网 · 场次待开放', 'BNB Chain · Pools awaiting launch'));
-  put('snapshot-label', t('新场次配置 · 待部署核验', 'New pool configuration · Awaiting deployment verification'));
+  put('snapshot-label', launch ? t('已部署核验 · 区块 {block}', 'Deployment verified · Block {block}', { block: launch.snapshot.blockNumber.toLocaleString(getLocale()) })
+    : deployment ? t('部署已核验 · 正在读取启动状态', 'Deployment verified · Checking activation') : t('正在读取部署记录', 'Loading deployment record'));
   try {
     const selection = model.preview();
     put('purchase-total', `${money(selection.amountBaseUnits)} BEM`);
     put('selection-note', t('预选 {count} 份 · 成交号码以链上实际分配为准', '{count} tickets previewed · Final assigned numbers are recorded onchain', { count: selection.quantity.toLocaleString(getLocale()) }));
   } catch (error) { put('purchase-total', '— BEM'); put('selection-note', errorCopy(error)); }
-  renderContractLinks();
+  renderContractLinks(); renderTestControls();
 }
 async function rpc(method, params, signal) {
-  if (!['eth_chainId', 'eth_blockNumber', 'eth_getBalance', 'eth_call'].includes(method)) throw new Error('Read-only method required');
+  if (!['eth_chainId', 'eth_blockNumber', 'eth_getBlockByNumber', 'eth_getCode', 'eth_getBalance', 'eth_call', 'eth_estimateGas', 'eth_gasPrice', 'eth_getTransactionCount', 'eth_getTransactionByHash', 'eth_getTransactionReceipt'].includes(method)) throw new Error('Read-only method required');
   const response = await fetch('/rpc', { method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ jsonrpc: '2.0', id: ++state.rpcId, method, params }), signal });
   if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw new Error(t('主网余额读取暂时不可用。', 'Mainnet balances are temporarily unavailable.'));
   const result = await response.json(); if (result.error || result.result == null) throw new Error(t('主网余额读取暂时不可用。', 'Mainnet balances are temporarily unavailable.'));
   return result.result;
+}
+async function refreshPoolStatus() {
+  const generation = ++state.poolGeneration, poolId = model.getState().poolId;
+  try {
+    const response = await fetch(`/api/pools/${poolId}/status`, { cache: 'no-store', signal: AbortSignal.timeout(15000) });
+    if (!response.ok) throw new Error('Pool status unavailable');
+    const result = await response.json();
+    if (generation !== state.poolGeneration || poolId !== model.getState().poolId) return;
+    const deployment = pools?.getState().deployment;
+    if (result.schemaVersion !== 2 || result.chainId !== 56 || result.poolId !== poolId || !result.runtimeVerified ||
+      !same(result.gameAddress, deployment?.address) || !Number.isSafeInteger(result.snapshot?.blockNumber)) throw new Error('Invalid pool state');
+    state.poolStatus = result; render();
+  } catch {
+    if (generation === state.poolGeneration) { state.poolStatus = null; render(); }
+  }
 }
 async function refreshBalance() {
   const version = ++state.balanceGeneration; state.balanceAbort?.abort();
@@ -155,29 +203,157 @@ async function refreshBalance() {
     if (error.name !== 'AbortError') notice(errorCopy(error), true);
   } finally { clearTimeout(timeout); if (version === state.balanceGeneration) state.refreshing = false; }
 }
-function walletChanged() {
-  model.setWallet(null, null); state.balanceAbort?.abort(); render();
+function walletChanged(accounts) {
+  const attempt = state.connectAttempt;
+  if (Array.isArray(accounts) && attempt && state.connecting && attempt.wallet === state.wallet && attempt.version === state.connectVersion) {
+    // Initial permission commonly emits accountsChanged before requestAccounts resolves.
+    // Record that identity, then require it to agree with the request and final reads.
+    if (attempt.waitingForApproval) { attempt.observedAccounts = [...accounts]; return; }
+    if (accounts.length && same(accounts[0], attempt.account)) return;
+  }
+  state.connectAttempt = null;
+  state.connectVersion++; state.connecting = false;
+  model.setWallet(null, null); clearTestViews(); state.balanceAbort?.abort(); render();
   notice(t('钱包或网络已变化，请重新连接。选号预览不会提交交易。', 'The wallet or network changed. Reconnect to continue. Ticket previews never submit transactions.'));
 }
 function detachWallet() { for (const event of ['accountsChanged', 'chainChanged', 'disconnect']) state.wallet?.removeListener?.(event, walletChanged); }
+function clearTestViews() {
+  state.testGeneration++; state.testRefreshing = false;
+  state.testView = null; state.refundView = null; state.settlementView = null;
+}
+const testViewCurrent = view => view && model.isCurrent(view.context);
+async function refreshTestState() {
+  const context = model.getState();
+  if (!testTransactions || context.poolId !== '1' || !context.account || context.chainId !== 56 || state.testRefreshing) return;
+  const generation = ++state.testGeneration; state.testRefreshing = true;
+  try {
+    const result = await testTransactions.readState(context.account);
+    if (generation !== state.testGeneration || !model.isCurrent(context)) return;
+    state.testView = { ...result, context }; state.settlementView = null;
+    if (result.currentRoundId > 1n && result.round.status === 0) {
+      const previous = await testTransactions.readState(context.account, { roundId: result.currentRoundId - 1n });
+      if (generation !== state.testGeneration || !model.isCurrent(context)) return;
+      state.settlementView = { ...previous, context };
+    }
+    if (result.canSettle) state.settlementView = { ...result, context };
+    render();
+  } catch (error) {
+    if (generation === state.testGeneration && model.isCurrent(context)) { state.testView = null; state.settlementView = null; render(); notice(errorCopy(error), true); }
+  } finally { if (generation === state.testGeneration) state.testRefreshing = false; }
+}
+function renderTestControls() {
+  const context = model.getState(), internal = context.poolId === '1';
+  hidden('settle-test', true);
+  if (!internal || !testTransactions) return;
+  const txState = testTransactions.getState(), view = testViewCurrent(state.testView) ? state.testView : null;
+  const refund = testViewCurrent(state.refundView) ? state.refundView : null;
+  const settlement = testViewCurrent(state.settlementView) ? state.settlementView : null;
+  const connected = Boolean(context.account && context.chainId === 56);
+  disabled('check-refund', !connected || txState.busy);
+  disabled('refund', !refund?.canRefund || txState.blocking);
+  if (refund) {
+    put('refund-amount', `${money(refund.refundAmount)} BEM`);
+    put('refund-state', refund.canRefund ? t('请在 {time} 前领取到当前钱包。', 'Claim to your connected wallet before {time}.', { time: new Date(Number(refund.refundDeadline)*1000).toLocaleString(getLocale()) }) : t('该期目前没有可领取本金。', 'No principal is claimable for this round right now.'));
+  }
+  if (view) {
+    put('my-count', view.myCount.toLocaleString(getLocale()));
+    put('my-numbers', t('第 {round} 期 · 已持有 {count} 份。具体号码可查看已确认购买交易。', 'Round {round} · You hold {count} tickets. Check confirmed purchase transactions for their numbers.', { round: view.roundId.toString(), count: view.myCount.toString() }));
+    put('round-label', t('1 BEM 测试 · 第 {round} 期', '1 BEM test · Round {round}', { round: view.roundId.toString() }));
+    if (view.seriesAuthorized && view.consumerAuthorized && view.round.status === 1 && view.timestamp < view.round.fundingDeadline) {
+      put('launch-status', t('1 BEM 测试已开放', '1 BEM test open'));
+      put('round-phase', t('购买中', 'Funding'));
+      put('purchase-state', t('单笔最多 1,000 份（0.1 BEM），本地址本期还可购买 {count} 份。', 'Up to 1,000 tickets (0.1 BEM) per transaction. This address can buy {count} more this round.', { count: (5000n-view.myCount).toLocaleString(getLocale()) }));
+      try {
+        const selection = model.preview(), amount = BigInt(selection.amountBaseUnits), qty = BigInt(selection.quantity);
+        const allowed = view.canBuy && !txState.blocking && view.bemBalance >= amount && qty + view.myCount <= 5000n && qty + view.round.sold <= 10000n;
+        disabled('approve', !allowed || view.allowance >= amount); disabled('buy', !allowed || view.allowance < amount);
+      } catch { disabled('approve', true); disabled('buy', true); }
+    }
+    if (view.round.status === 1) {
+      hidden('countdown-panel', false); put('countdown-label', t('本期购买截止', 'Funding closes'));
+      put('countdown-value', new Date(Number(view.round.fundingDeadline)*1000).toLocaleString(getLocale()));
+      put('countdown-note', t('未售满时，截止后的 24 小时内可自行领取本金。', 'If unfilled, claim your principal within 24 hours after this deadline.'));
+    }
+  }
+  if (settlement && [3,4,5].includes(settlement.round.status)) {
+    put('round-phase', settlement.round.status === 5 ? t('已结算', 'Settled') : settlement.round.status === 4 ? t('等待结算', 'Awaiting settlement') : t('等待 VRF', 'Awaiting VRF'));
+    put('reel-message', settlement.round.status === 5 ? t('本期已结算，确认后的中奖记录将显示在播报和历史中。', 'Settled. Confirmed winnings will appear in announcements and history.') : t('本期已封盘，等待随机数确认及结算。', 'Sales are closed. Awaiting randomness and settlement.'));
+    hidden('settle-test', settlement.round.status !== 4); disabled('settle-test', !settlement.canSettle || txState.blocking);
+    put('settle-test', t('结算第 {round} 期测试', 'Settle test round {round}', { round: settlement.roundId.toString() }));
+  }
+  hidden('transactions', txState.records.length === 0 && !txState.storageError);
+  disabled('check-transactions', txState.busy);
+  hidden('unknown-test-transaction', !txState.records.some(r => !r.hash));
+  const target = $('transaction-list'); if (!target) return;
+  target.replaceChildren();
+  if (txState.storageError) { const p = document.createElement('p'); p.textContent = t('无法读取本地交易记录，已暂停交易，请检查浏览器存储权限。', 'Local transaction records are unavailable. Transactions are paused; check browser storage permissions.'); target.append(p); }
+  for (const record of txState.records) {
+    const row = document.createElement('article'); row.className = 'tx-entry';
+    const labels = { approve: t('授权', 'Approval'), buy: t('购买', 'Purchase'), refund: t('领取本金', 'Refund'), settle: t('结算', 'Settlement') };
+    const label = document.createElement('strong'); label.textContent = `${labels[record.kind] ?? ''} · ${record.status === 'confirmed' ? t('已确认', 'Confirmed') : record.status === 'reverted' ? t('交易失败', 'Reverted') : t('核对中，请勿重复提交', 'Checking; do not submit again')}`;
+    row.append(label);
+    const who = document.createElement('p'); who.textContent = t('钱包 {account} · 第 {round} 期', 'Wallet {account} · Round {round}', { account: record.account ?? '—', round: record.input?.roundId ?? '—' }); row.append(who);
+    if (record.hash) { const a = document.createElement('a'); a.href = `https://bscscan.com/tx/${record.hash}`; a.textContent = record.hash; a.target = '_blank'; a.rel = 'noopener noreferrer'; row.append(a); }
+    if (record.evidence?.tickets?.length) { const p=document.createElement('p'); p.textContent=t('实际分配号码：{numbers}', 'Assigned numbers: {numbers}', { numbers:record.evidence.tickets.join(', ') }); row.append(p); }
+    if (record.evidence?.progress) { const p=document.createElement('p');p.textContent=t('已推进计算，还需继续点击结算。', 'Computation progressed. Click settlement again to continue.');row.append(p); }
+    target.append(row);
+  }
+}
+async function queryTestRefund() {
+  const context = model.getState(); state.refundView = null; render();
+  if (context.poolId !== '1' || !context.account || context.chainId !== 56) return;
+  const text = $('refund-round')?.value.trim();
+  if (!/^[1-9][0-9]{0,76}$/.test(text ?? '')) { notice(t('请输入正确的期号。', 'Enter a valid round number.'), true); return; }
+  try {
+    const result = await testTransactions.readState(context.account, { roundId: text });
+    if (!model.isCurrent(context) || text !== $('refund-round')?.value.trim()) return;
+    state.refundView = { ...result, context }; render();
+  } catch (error) { if (model.isCurrent(context)) notice(errorCopy(error), true); }
+}
+async function executeTestAction(kind) {
+  if (model.getState().poolId !== '1') { notice(errorCopy({ code: 'POOL_NOT_LAUNCHED' }), true); return; }
+  try {
+    const view = kind === 'refund' ? state.refundView : kind === 'settle' ? state.settlementView : state.testView;
+    if (!testViewCurrent(view)) throw Object.assign(new Error(), { code: 'CONTEXT_CHANGED' });
+    const selection = ['approve','buy'].includes(kind) ? model.preview() : null;
+    notice(t('正在核对本次交易，随后请在钱包中确认。', 'Checking the transaction. Then confirm it in your wallet.'));
+    await testTransactions.execute(kind, { roundId: view.roundId, ...(selection ? { quantity: selection.quantity, tickets: selection.tickets } : {}) });
+    notice(t('请查看下方交易记录；链上确认后会更新。', 'See the transaction record below. It will update after onchain confirmation.'));
+    await testTransactions.checkPending(); await refreshTestState();
+    if (kind === 'refund') await queryTestRefund();
+  } catch (error) { notice(errorCopy(error), true); }
+  finally { render(); }
+}
 async function connect(entry) {
   if (state.connecting) return; state.connecting = true; const version = ++state.connectVersion;
   detachWallet(); state.wallet = entry.provider; model.setWallet(null, null); state.balanceAbort?.abort();
+  clearTestViews();
   const wallet = state.wallet;
+  const attempt = { version, wallet, waitingForApproval: true, observedAccounts: null, account: null };
+  state.connectAttempt = attempt;
   for (const event of ['accountsChanged', 'chainChanged', 'disconnect']) wallet.on?.(event, walletChanged);
   render();
   try {
     const requested = await wallet.request({ method: 'eth_requestAccounts' });
+    attempt.waitingForApproval = false; attempt.account = requested?.[0] ?? null;
+    if (version !== state.connectVersion || wallet !== state.wallet || !requested?.length ||
+      (attempt.observedAccounts !== null && !same(attempt.observedAccounts[0], requested[0]))) {
+      throw new Error(t('钱包发生变化，请重新连接。', 'The wallet changed. Please reconnect.'));
+    }
     const chain = await wallet.request({ method: 'eth_chainId' });
     const accounts = await wallet.request({ method: 'eth_accounts' });
     const finalChain = await wallet.request({ method: 'eth_chainId' });
     if (version !== state.connectVersion || wallet !== state.wallet || !requested?.length || !accounts?.length ||
       !same(requested[0], accounts[0]) || BigInt(chain) !== BigInt(finalChain)) throw new Error(t('钱包发生变化，请重新连接。', 'The wallet changed. Please reconnect.'));
     model.setWallet(getAddress(accounts[0]), Number(BigInt(finalChain)));
-    notice(t('钱包已连接。您可以查看余额与场次规则；该场次暂未开放。', 'Wallet connected. View balances and pool rules; this pool is not open yet.'));
+    notice(t('钱包已连接，正在读取余额和场次状态。', 'Wallet connected. Reading balances and pool status.'));
     refreshBalance();
-  } catch (error) { notice(errorCopy(error), true); }
-  finally { if (version === state.connectVersion) state.connecting = false; render(); }
+    refreshTestState();
+  } catch (error) { if (version === state.connectVersion) notice(errorCopy(error), true); }
+  finally {
+    if (state.connectAttempt === attempt) state.connectAttempt = null;
+    if (version === state.connectVersion) state.connecting = false; render();
+  }
 }
 function selectTab(tab) {
   state.tab = tab;
@@ -186,6 +362,7 @@ function selectTab(tab) {
 }
 
 initLanguage();
+testTransactions = createTestPlayerTransactions({ wallet: () => state.wallet, getContext: () => model.getState(), readRpc: rpc, onUpdate: () => render() });
 pools = createPoolSelection({ mount: $('pool-selection'), search: location.search, autoLoad: false, onChange: onPoolChange });
 const picker = createWalletPicker({ dialog: $('wallet-picker'), onSelect: connect, onChange: wallets => { state.wallets = wallets; render(); } });
 $('connect-wallet')?.addEventListener('click', () => { if (!state.connecting) picker.open(); });
@@ -209,13 +386,20 @@ if ($('selected-tickets')) { $('selected-tickets').maxLength = 8000; $('selected
 for (const button of document.querySelectorAll('[data-count]')) button.addEventListener('click', () => {
   model.setSelection({ count: button.dataset.count, mode: 'auto' }); applySelectionFields(); render();
 });
-for (const id of ['approve', 'buy', 'refund', 'check-refund']) $(id)?.addEventListener('click', event => {
-  event.preventDefault(); try { model.requireWriteAllowed(); } catch (error) { notice(errorCopy(error), true); }
-});
+for (const id of ['approve', 'buy', 'refund']) $(id)?.addEventListener('click', event => { event.preventDefault(); executeTestAction(id); });
+$('check-refund')?.addEventListener('click', () => { if (model.getState().poolId === '1') queryTestRefund(); });
+$('refund-round')?.addEventListener('input', () => { state.refundView = null; render(); });
+$('settle-test')?.addEventListener('click', () => executeTestAction('settle'));
+$('check-transactions')?.addEventListener('click', async () => { try { await testTransactions.checkPending(); await refreshTestState(); } catch(error) { notice(errorCopy(error), true); } });
+$('attach-test-hash')?.addEventListener('click', async () => { try { await testTransactions.attachHash($('unknown-test-hash')?.value.trim()); await refreshTestState(); } catch(error) { notice(errorCopy(error), true); } });
 for (const tab of ['draw', 'proof']) $('tab-' + tab)?.addEventListener('click', () => selectTab(tab));
-window.addEventListener('bem:languagechange', () => { render(); if (!state.noticeError) notice(t('该场次暂未开放，可先查看场次规则并连接钱包查看余额。', 'This pool is not open yet. Review its rules and connect to view balances.')); else put('notice', translateKnown($('notice')?.textContent ?? '')); });
-put('history-summary', t('新场次尚未部署，暂无往期开奖记录。', 'New pools are not deployed yet. No past draw records are available.'));
-notice(t('该场次暂未开放，可先查看场次规则并连接钱包查看余额。', 'This pool is not open yet. Review its rules and connect to view balances.'));
+window.addEventListener('bem:languagechange', () => { render(); if (!state.noticeError) notice(t('请核对所选场次与钱包，交易需在钱包中确认。', 'Review the selected pool and wallet. Confirm transactions in your wallet.')); else put('notice', translateKnown($('notice')?.textContent ?? '')); });
+put('history-summary', t('本场次暂无已确认的往期开奖。', 'No confirmed past draws are available for this pool.'));
+notice(t('正在读取场次信息。连接钱包后可查看余额与参与状态。', 'Reading pool information. Connect your wallet to view balances and participation status.'));
 applySelectionFields(); render(); dispatchPool(); pools.load();
-setInterval(() => { if (document.visibilityState === 'visible') refreshBalance(); }, 15000);
+setInterval(() => { if (document.visibilityState === 'visible') {
+  refreshBalance(); refreshPoolStatus(); refreshTestState();
+  if (testTransactions.getState().records.some(r => !['confirmed','reverted'].includes(r.status))) testTransactions.checkPending().catch(error => notice(errorCopy(error), true));
+} }, 15000);
+window.addEventListener('storage', () => { if (model.getState().poolId === '1') testTransactions.checkPending().catch(error => notice(errorCopy(error), true)); });
 window.addEventListener('beforeunload', () => { state.balanceAbort?.abort(); pools.destroy(); detachWallet(); });

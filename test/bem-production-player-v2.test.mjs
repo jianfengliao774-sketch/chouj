@@ -42,10 +42,10 @@ test('wallet and network changes invalidate pending balances and never enable tr
     assert.throws(() => model.requireWriteAllowed(), { code: 'POOL_NOT_LAUNCHED' });
   }
 });
-test('pending player entry contains no financial signing API, old game address or old history endpoint', async () => {
+test('player entry delegates test transactions without direct signing, old game addresses or old history endpoints', async () => {
   const source = await fs.readFile(new URL('../bem-production-site/web/player-v2.js', import.meta.url), 'utf8');
   assert.doesNotMatch(source, /eth_sendTransaction|eth_sendRawTransaction|eth_sign|personal_sign|\.sendTransaction\(|0xBee0848D|\/api\/history/i);
-  assert.match(source, /model\.requireWriteAllowed\(\)/);
+  assert.match(source, /import \{ createTestPlayerTransactions \} from '\.\/test-player-transactions\.js'/);
   assert.match(source, /bem:poolchange/); assert.match(source, /bem:historyrefresh/);
   assert.doesNotMatch(source, /BEM (?:进入|转入) 2075 容器|BEM to the 2075 container/);
 });

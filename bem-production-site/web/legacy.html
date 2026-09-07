@@ -3,15 +3,16 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#fbf7ed"><title>原合约记录 · BNB 主网</title>
-  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/festive.css"><link rel="stylesheet" href="/production.css"><link rel="stylesheet" href="/wallet-picker.css">
+  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/festive.css"><link rel="stylesheet" href="/production.css"><link rel="stylesheet" href="/wallet-picker.css"><link rel="stylesheet" href="/player-readability.css">
 </head>
-<body>
+<body class="player-page">
 <div class="simulation-banner"><span class="status-dot"></span><b data-en="BNB MAINNET">BNB 主网</b><span id="launch-status">已部署，待启动</span></div>
+<div class="winner-broadcast-dock"><div class="shell"><section class="winner-broadcast" aria-label="中奖播报" data-en-aria-label="Winner announcements"><b data-en="WINNERS">中奖播报</b><div id="winner-ticker" class="ticker-window"><span data-en="Reading confirmed draws…">正在读取已确认开奖…</span></div><button type="button" id="ticker-pause" hidden aria-pressed="false" aria-controls="winner-ticker" data-en="Pause">暂停</button></section></div></div>
 <main class="shell"><p class="notice">原合约记录与退款 · 原合约规则仍适用。<a href="/">返回新场次</a></p>
-  <header class="header"><a class="brand" href="/"><span class="brand-chip">▦</span><span>BEHEMOTH <b>/ 2075</b><small>ONCHAIN DRAW TERMINAL</small></span></a><div class="chain-indicator"><span class="status-dot" id="connection-dot"></span><span id="connection-status">核对链上状态…</span></div><div class="language-switch" role="group" aria-label="语言" data-en-aria-label="Language"><button id="language-zh" type="button" aria-pressed="true">中文</button><button id="language-en" type="button" aria-pressed="false">EN</button></div></header>
+  <div hidden aria-hidden="true"><span class="status-dot" id="connection-dot"></span><span id="connection-status">核对链上状态…</span></div>
   <section class="wallet-bar" aria-label="钱包" data-en-aria-label="Wallet">
     <div><span class="eyebrow" data-en="YOUR WALLET">您的钱包</span><div id="wallet-label">连接钱包，查看余额与持票</div><div id="wallet-address" class="mono wallet-address"></div></div>
-    <div class="wallet-actions"><button id="connect-wallet" type="button" aria-haspopup="dialog" aria-controls="wallet-picker" data-en="Connect wallet">连接钱包</button><button id="copy-browser-url" type="button" data-en="Copy URL for your browser">复制网址到浏览器</button><button id="switch-network" type="button" hidden data-en="Switch to BNB Chain">切换 BNB 主网</button></div>
+    <div class="wallet-actions"><div class="language-switch" role="group" aria-label="语言" data-en-aria-label="Language"><button id="language-zh" type="button" aria-pressed="true">中文</button><button id="language-en" type="button" aria-pressed="false">EN</button></div><button id="connect-wallet" type="button" aria-haspopup="dialog" aria-controls="wallet-picker" data-en="Connect wallet">连接钱包</button><button id="copy-browser-url" type="button" data-en="Copy URL for your browser">复制网址到浏览器</button><button id="switch-network" type="button" hidden data-en="Switch to BNB Chain">切换 BNB 主网</button></div>
     <div class="wallet-foot"><span id="wallet-balances">BEM —　BNB —</span><span data-en="Connecting never spends funds. Every transaction needs your confirmation.">连接不会扣款，每笔交易均由您确认。</span></div>
     <div id="browser-help" class="wallet-browser-help"><span data-en="Paste this URL into Chrome or Edge with MetaMask installed. The embedded preview usually cannot connect to wallet extensions.">请将本页网址粘贴到已安装 MetaMask 的 Chrome / Edge。内置预览通常无法连接钱包扩展。</span><input id="browser-url" type="text" readonly aria-label="本页网址" data-en-aria-label="Page URL"></div>
   </section>
@@ -120,5 +121,5 @@
   <div id="wallet-options" class="wallet-options"></div>
   <div class="wallet-picker-footer"><span data-en="Connecting does not authorize spending or make a purchase.">连接不会授权扣款或购买。</span><button id="wallet-picker-refresh" type="button" data-en="Detect again">重新检测</button></div>
 </dialog>
-<script type="module" src="/app.js"></script>
+<script type="module" src="/winner-broadcast.js"></script><script type="module" src="/app.js"></script>
 </body></html>

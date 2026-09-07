@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "preparedAt": "2026-09-07T02:11:41.952Z",
+  "preparedAt": "2026-09-07T03:48:03.528Z",
   "copiedFiles": [
     {
       "path": "bem-production-site/auth.mjs",
@@ -9,13 +9,13 @@
     },
     {
       "path": "bem-production-site/build.mjs",
-      "bytes": 653,
-      "sha256": "0459ace3a53a7ad15616d99dbb709e263ebaae3f7328f4ffc68eb3102cd4c905"
+      "bytes": 704,
+      "sha256": "b543782740f463055037de4272e67e12d854dead884cd169c9f9fc103df8f51c"
     },
     {
       "path": "bem-production-site/chain-history.mjs",
-      "bytes": 20979,
-      "sha256": "ca84de2cddc46a126287b215f8a8673972ecfdc4172c5b85b39ff48f478bb3aa"
+      "bytes": 21962,
+      "sha256": "21d396ee6ec561bab58aadfe58718013a4376f315ded4008cba1a564242fceb2"
     },
     {
       "path": "bem-production-site/config.mjs",
@@ -28,19 +28,24 @@
       "sha256": "522f4fde0bcc7cb32b6ff28fa9bf279ca8364fbc58eae72b996f2d8e4467e164"
     },
     {
+      "path": "bem-production-site/pool-status.mjs",
+      "bytes": 4391,
+      "sha256": "9b03b8f8bcac38846707b3cb29d32c0da73ff7d2253455ede81fc3a92e68f38f"
+    },
+    {
       "path": "bem-production-site/pools.mjs",
-      "bytes": 1210,
-      "sha256": "155b483d8b33f45669e24788d0d1176556dd4a6e54803e788a9edaa20b9f35d2"
+      "bytes": 1306,
+      "sha256": "42c05932aa4bb20e6a3b672dabb2146f9d60e39846758d6693dc85abefcc31db"
     },
     {
       "path": "bem-production-site/rpc.mjs",
-      "bytes": 6919,
-      "sha256": "46d7c89a82ec92ce117e55e27305e0fe91effbd6bc15a8195542af44ab28da3f"
+      "bytes": 7109,
+      "sha256": "bb8549d1da1bb9d2c46f01611e82d9540ece662446d54f6d4144c11cb400b4ae"
     },
     {
       "path": "bem-production-site/server.mjs",
-      "bytes": 16524,
-      "sha256": "189f8583d56ad7564089778a81644fb256cfeddd4546fa49fce9476bf428f34e"
+      "bytes": 18551,
+      "sha256": "dfaac824f778a8a199e6039290238150d1ca7b4acc59be35e9f4c495be7483c7"
     },
     {
       "path": "bem-production-site/web/admin.css",
@@ -64,8 +69,8 @@
     },
     {
       "path": "bem-production-site/web/burns.html",
-      "bytes": 3011,
-      "sha256": "e9812337c6adcbc8a0773981229912aa6a7e73b9e469ee51df2af06bcf986c74"
+      "bytes": 3376,
+      "sha256": "bd29694d10b8df820ec5fdcf7e101e8c81f5518fde6ec2a198b39ccd1e7d8c8a"
     },
     {
       "path": "bem-production-site/web/burns.js",
@@ -104,13 +109,13 @@
     },
     {
       "path": "bem-production-site/web/index.html",
-      "bytes": 25533,
-      "sha256": "a2ec781fe43627af332e86c625ca3f8c06cfac892d8693a456b53e7c91abdea1"
+      "bytes": 26014,
+      "sha256": "42457bca55e4d7377b0a84cfee8cac40a21b64e5a9ef9a5bce001b9ef19c65df"
     },
     {
       "path": "bem-production-site/web/legacy.html",
-      "bytes": 24562,
-      "sha256": "deef5555588ec07b79f29a55777bc8d128262554034c1a9157db6412457215f8"
+      "bytes": 25005,
+      "sha256": "2b573a059a3acf39313c4bf541caa1c8a94bdf7c942663e0846aed4d61705bc4"
     },
     {
       "path": "bem-production-site/web/lobby.css",
@@ -128,14 +133,24 @@
       "sha256": "66b8f36af4f220ba22fa8bae9c90896983f27a920976f7c7e0779e9f4ffff551"
     },
     {
+      "path": "bem-production-site/web/player-readability.css",
+      "bytes": 10634,
+      "sha256": "74797e1db9b4f36c6835f2ec18a2546f3ccdee1b70ecd12bef8d14e5bcc43da7"
+    },
+    {
       "path": "bem-production-site/web/player-v2-state.js",
-      "bytes": 3808,
-      "sha256": "e6b4c3107016713f51ef1175698f4941978168389002621f70e7821ddf3cfc99"
+      "bytes": 3799,
+      "sha256": "eed54a41b255b62f5b37ffc6bb451e46d6a4d18c50beeffc2423f30fbdbb32e1"
     },
     {
       "path": "bem-production-site/web/player-v2.js",
-      "bytes": 19642,
-      "sha256": "13b95126ef68b3487ac4f35078a5c67faaac82650c10b4ea44289d42c65b7caa"
+      "bytes": 36689,
+      "sha256": "236a918145eb38b008fae7ea7e86cf1761cde2f775d2887a1cc1623c7ef6f805"
+    },
+    {
+      "path": "bem-production-site/web/pool-deployments.js",
+      "bytes": 1646,
+      "sha256": "196ae53fc3b3aa56d087b343eae0ed4f188a1ad4d7a5186ac884e73b97aea729"
     },
     {
       "path": "bem-production-site/web/pool-selection.css",
@@ -169,8 +184,8 @@
     },
     {
       "path": "bem-production-site/web/public-records.js",
-      "bytes": 5186,
-      "sha256": "542e359f65bfc6cfd8957cee49075d0a9a6a23d85acb55cb7db88f364e539cef"
+      "bytes": 3516,
+      "sha256": "f3c80e8fe60b7c78d40183396b237c7ee33d4b97d6c1fcca32a9acc3a17d8121"
     },
     {
       "path": "bem-production-site/web/public/wallet-icons/binance.svg",
@@ -208,9 +223,34 @@
       "sha256": "9266a5ef0621c05789a05f0e06db88bb2051d1d02047d57da0fada1fc38a42c5"
     },
     {
+      "path": "bem-production-site/web/start-test-guards.js",
+      "bytes": 9801,
+      "sha256": "b4e6aa9a904f3955accdd0ef7fcd25e3f530bf25224804f2d4a2192d04020c01"
+    },
+    {
+      "path": "bem-production-site/web/start-test.css",
+      "bytes": 1165,
+      "sha256": "3e3c74e00e702dd039fd6c653dcbbf6f01c480a6aa8a53b51e44bc5df83d3f6b"
+    },
+    {
+      "path": "bem-production-site/web/start-test.html",
+      "bytes": 5696,
+      "sha256": "d2e6f0156bf446322884344b6b613653f6b1ad60e35c05c39ff69c4f9dd8acf1"
+    },
+    {
+      "path": "bem-production-site/web/start-test.js",
+      "bytes": 26630,
+      "sha256": "40919693af4b321ae3ad169432efde76ead560f05c7581a72f9817b2090debe8"
+    },
+    {
       "path": "bem-production-site/web/styles.css",
       "bytes": 32306,
       "sha256": "d8f55cf7cbb381ee4e894cb97a2c85a419fc8bb2b389b8d7c40a4dee19f9d49c"
+    },
+    {
+      "path": "bem-production-site/web/test-player-transactions.js",
+      "bytes": 28299,
+      "sha256": "7f077a2a98db54f962b2e11f0b535c30a9ac465f92acd2206e07895c802b610e"
     },
     {
       "path": "bem-production-site/web/transaction-tracker.js",
@@ -226,6 +266,11 @@
       "path": "bem-production-site/web/wallet-picker.js",
       "bytes": 6671,
       "sha256": "bd8c1650bf692e745531e703a43760ef879edff16cc2c2de125611a4111af7ae"
+    },
+    {
+      "path": "bem-production-site/web/winner-broadcast.js",
+      "bytes": 2969,
+      "sha256": "7a06f908dd2887b61edafbd580ae84ccef2409a778313f86d151c19263fa4f47"
     },
     {
       "path": "contracts/BemCircuitRaffle.sol",
@@ -264,13 +309,13 @@
     },
     {
       "path": "contracts/production-v2/README.md",
-      "bytes": 3248,
-      "sha256": "dee4aa7348442d1f7f4d7b57b0fd2aa3607f5a3a867aa8bed4731e97af3d7f60"
+      "bytes": 3571,
+      "sha256": "df1e89739f9048801b9394058d47cc93c0d17263ff419a9e978f57a4ff3d3889"
     },
     {
       "path": "contracts/production-v2/WEBSITE-RELEASE.md",
-      "bytes": 3629,
-      "sha256": "99b6953cd6b5c7b0ae5f44bdaa918c254d46f7c53f061f6f0121e9185d39c2c6"
+      "bytes": 4015,
+      "sha256": "53d6d30b045c0af7c01dd0b519451bb53a5142e7e87628af0a648d402a222bdc"
     },
     {
       "path": "contracts/production-v2/pool10/Bem2075Raffle13061Pool10BSC.sol",
@@ -408,9 +453,19 @@
       "sha256": "7f715c6e10cb18ee0eb98d1491362aa4b6366aa6fc76c9db3227351ff5c407e1"
     },
     {
+      "path": "outputs/bem-raffle-2075/production-v2/deployment-discovery-readonly.json",
+      "bytes": 2116,
+      "sha256": "bf137b051ab2d5598b91d2420206518349900e05b89784f9b82d45782afd846b"
+    },
+    {
+      "path": "outputs/bem-raffle-2075/production-v2/recovered-deployments-verified.json",
+      "bytes": 28954,
+      "sha256": "bb5d3e367318ba7e2f17f6b0e3a8be235e13fc0f1ee74f03d8cea21147ccf092"
+    },
+    {
       "path": "outputs/bem-raffle-2075/production-v2/verification-container13061.json",
       "bytes": 4590,
-      "sha256": "9713a101972b6ee252f28574905fe51aa6b075776f7e9c419aec28ed4d459fa7"
+      "sha256": "3265f3fcd56d5ec1cda329cfe3da527adbb354d43be7bb63e6031a19bd0baa92"
     },
     {
       "path": "outputs/bem-raffle-2075/production/Bem2075RaffleBSC.abi.json",
@@ -485,17 +540,17 @@
     {
       "path": "outputs/bem-raffle-2075/production/verification-keeper.json",
       "bytes": 3354,
-      "sha256": "f84f27574d572b88f98ff564984ca2d1d5839171a65c9a6805da8458f774569f"
+      "sha256": "7ec5eae50a697757b5512a89200a6eff912ab54aee556364734076b42ff949d2"
     },
     {
       "path": "outputs/bem-raffle-2075/production/verification-selectable.json",
       "bytes": 2829,
-      "sha256": "795e524d1ee4c66a6da783364e9affebfd0124793eda9b9f5374a9d2c2f69242"
+      "sha256": "a9de1b777825b74296fdfd281154f794a3f7bdc7a7a53cb9a1cdb8680a751e0c"
     },
     {
       "path": "outputs/bem-raffle-2075/production/verification-series.json",
       "bytes": 3302,
-      "sha256": "30b5b6ae49e7be5547c4cf1c2d5fa032b398fbe5d00fd48c436d395bb45a32a5"
+      "sha256": "31d27ed925c8aebc3efb77264a0975c55d3a89a9f13c8ca7aa4d3eb2448f681c"
     },
     {
       "path": "outputs/bem-raffle-2075/subscription-readonly.json",
@@ -533,6 +588,11 @@
       "sha256": "3f24888fed7e3d604bd6f4c85c83f1f48c3d1c433c11a9b3b264efbb0022be09"
     },
     {
+      "path": "scripts/discover_bem_deployments.mjs",
+      "bytes": 3229,
+      "sha256": "4267dad567d6a675d7e41a326d3f3da0ee9e6f1590c4d22da6a734cc874cd2ec"
+    },
+    {
       "path": "scripts/prepare_bem_production_deployment.mjs",
       "bytes": 12849,
       "sha256": "81304b8b228532ef6694b580f245d7d3b65ca2579372620290800189f8e176c5"
@@ -551,6 +611,11 @@
       "path": "scripts/run_bem_raffle_keeper.mjs",
       "bytes": 10304,
       "sha256": "0934a4ff40e02d1d6a9b14b6c44e6b6bc9fd5550bdf2fdcec9e50ffec1cb5393"
+    },
+    {
+      "path": "scripts/verify_bem_recovered_deployments.mjs",
+      "bytes": 14881,
+      "sha256": "14e72d5b56ec48f2d0683c149c12f5fd1ff68aeddf4ff9b43488e3fcd742b7bc"
     },
     {
       "path": "test/bem-production-container-deploy.test.mjs",
@@ -574,8 +639,8 @@
     },
     {
       "path": "test/bem-production-lobby.test.mjs",
-      "bytes": 3173,
-      "sha256": "b213261a53240ba83126dcd81beffb1b6d94ec4fff2d9d21bd77ad67c144ee5a"
+      "bytes": 3410,
+      "sha256": "b05a548b94d5851fa7ef00b890d968a72423549686e8c8f7045e14c2a19a9754"
     },
     {
       "path": "test/bem-production-market-price.test.mjs",
@@ -594,18 +659,23 @@
     },
     {
       "path": "test/bem-production-player-v2-ui.test.mjs",
-      "bytes": 12383,
-      "sha256": "201ce4a29ed8739c923b2235ee89f0fb16e54eb7ac3bb8066a79f504e394aaae"
+      "bytes": 18683,
+      "sha256": "64d30eca2914c52e4800a89342b1c2ae992790ffb6be676d7b7ba587c1dfd36c"
     },
     {
       "path": "test/bem-production-player-v2.test.mjs",
-      "bytes": 3912,
-      "sha256": "d163ace95b340f0ad82fdeb8c33fdd0609e6e4cb6d0ba76d4f3df9ab43f93945"
+      "bytes": 3975,
+      "sha256": "a649b87207e2fd391fd969493dc9bd759812118c847c58af63eb0bb2276d8a29"
     },
     {
       "path": "test/bem-production-pool-selection.test.mjs",
-      "bytes": 5496,
-      "sha256": "d583fea01144d56361caff58a5a6c265a864f4fed6143a5745f46ef198ff9b20"
+      "bytes": 5583,
+      "sha256": "a559a9051e9a4b7c92ad62b8663573d6fc75e97f8fe97d762bce9fff30235afb"
+    },
+    {
+      "path": "test/bem-production-pool-status.test.mjs",
+      "bytes": 9831,
+      "sha256": "9ff8eba81b95074dcdb3f306339800b10ca743ca994ec5aa76594fa9fcf01436"
     },
     {
       "path": "test/bem-production-refund-guards.test.mjs",
@@ -614,8 +684,8 @@
     },
     {
       "path": "test/bem-production-rpc.test.mjs",
-      "bytes": 25568,
-      "sha256": "cb16a0ab6e40112f8136630d1adf7376bcc905666f2c70bef40c911143f8058d"
+      "bytes": 25710,
+      "sha256": "52decd2349e19024d397ec7731341df18682de6571f12e98e43205b523cd7fb6"
     },
     {
       "path": "test/bem-production-selectable.test.mjs",
@@ -631,6 +701,11 @@
       "path": "test/bem-production-transaction-tracker.test.mjs",
       "bytes": 13805,
       "sha256": "f3a19ec682780df256138936f572cd0420718f871baec63f233a8de3fbf7d1e0"
+    },
+    {
+      "path": "test/bem-production-v2-history.test.mjs",
+      "bytes": 13213,
+      "sha256": "affa4abaaca3af1ec0f892b861e2c7b0325d35669adb868fb177499646d4d5ea"
     },
     {
       "path": "test/bem-production-v2-keeper.test.mjs",
@@ -656,6 +731,26 @@
       "path": "test/bem-raffle-keeper.test.mjs",
       "bytes": 2096,
       "sha256": "ce14ec7404871117af5c29fbcf25fa8bdbd28ca6167a3249c78e1f02af560320"
+    },
+    {
+      "path": "test/bem-start-test-guards.test.mjs",
+      "bytes": 4795,
+      "sha256": "cc8b0765cc4a12278ccb31045fe0f8f7ff8b2a9b6e468107d358bd2ce10d134d"
+    },
+    {
+      "path": "test/bem-start-test-ui.test.mjs",
+      "bytes": 16823,
+      "sha256": "e9295b9df1c6e133a70dc64c9dea2ac32d54c4b371c6ac8e5e993538e7859ae2"
+    },
+    {
+      "path": "test/bem-test-player-transactions.test.mjs",
+      "bytes": 23098,
+      "sha256": "c4fd59403907b9a676154813b570885c443cd5a669d610ed722558e61f8f9fb0"
+    },
+    {
+      "path": "test/fixtures/start-test-runtime.hex",
+      "bytes": 37279,
+      "sha256": "20a18595221781d074547080a62ec7ebed29f05cc066182bfd1eb0b2891a6deb"
     },
     {
       "path": "test/helpers/bem-container-v2-fixture.mjs",
@@ -688,5 +783,5 @@
     "legacy demo pages",
     "legacy deployment and status page tests"
   ],
-  "verification": "2026-09-07: 196 full local tests plus 3 actual-index DOM tests passed; five-page build passed. All four V2 deployments pending; sales disabled. See PACKAGE-VERIFICATION.md. Deployed V1 source hashes preserved."
+  "verification": "2026-09-07: Four V2 deployments recovered and independently verified. Wallet-only 1 BEM activation/test entry, confirmed multi-pool records and aligned bilingual UI. Formal pools remain disabled; see PACKAGE-VERIFICATION.md for validation and launch prerequisites. Deployed V1 source hashes preserved."
 }

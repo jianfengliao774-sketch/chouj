@@ -4,11 +4,11 @@
 
 ## 包含
 
-- 新增 `contracts/production-v2/` 与 `outputs/bem-raffle-2075/production-v2/`：四档候选合约、明确白名单的公开编译文件、新容器只读核查及本地测试报告。没有新部署地址的档位仍保持待开放。
-- 新增玩家场次选择、奖金行情卡、中奖播报、销毁记录页和独立的钱包部署核对页。V2 Keeper 当前仅为不发送交易的计划生成器，部署后接入要求见新合约交付说明。
+- `contracts/production-v2/` 与 `outputs/bem-raffle-2075/production-v2/`：四档已部署合约、明确白名单的公开编译文件、新容器只读核查、部署恢复证据及本地测试报告。部署与启动状态分别展示。
+- 玩家场次选择、奖金行情卡、悬浮中奖播报、销毁记录页、钱包部署核对页，以及独立的 1 BEM 启动和测试交易入口。10/50/100 BEM 场次保持关闭。V2 Keeper 当前仅为不发送交易的计划生成器，接入要求见新合约交付说明。
 
 - `bem-production-site/`：生产站点源码、双语玩家页面、中文后台、只读 RPC、登录鉴权和持久化历史组件。
-- `contracts/production/`：4 份生产合约；`Bem2075RaffleBSC` 是已部署的最终目标。
+- `contracts/production/`：原 4 份生产合约；`Bem2075RaffleBSC` 是旧站保留的已部署目标。
 - `scripts/`：固定源码编译、主网依赖只读核查、生产 keeper、部署准备和回执登记源码。
 - `outputs/bem-raffle-2075/production/`：最终合约 ABI 与编译证据、公开部署/订阅报告、发布配置与相关文档。
 - `test/`：正式站点、生产合约及 keeper 的本地测试，包含钱包混合发现、交易替换、退款和实际页面事件回归。

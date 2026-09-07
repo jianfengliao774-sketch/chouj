@@ -4,9 +4,10 @@ import {poolRegistry} from '../bem-production-site/pools.mjs';
 import {quoteView,MARKET_BEM} from '../bem-production-site/web/market-guards.js';
 import {validateRecords,transactionUrl} from '../bem-production-site/web/public-record-guards.js';
 
-test('V2 registry does not reuse the deployed V1 contract or imply any pool is live',()=>{
+test('V2 registry registers four independently verified deployments without opening sales',()=>{
   const registry=poolRegistry();assert.equal(registry.chainId,56);
-  for(const p of registry.pools){assert.equal(p.deployment,null);assert.equal(p.salesEnabled,false);assert.equal(p.ticketsPerRound,10000);assert.equal(BigInt(p.ticketPriceBaseUnits)*10000n,BigInt(p.poolBaseUnits));assert.equal(BigInt(p.winnerBaseUnits)+BigInt(p.organizerBaseUnits)+BigInt(p.blackholeBaseUnits),BigInt(p.poolBaseUnits));assert.equal(p.maxTicketsPerPurchase,1000);assert.equal(p.maxTicketsPerAddress,5000);assert.equal(p.fundingWindowSeconds,86400);assert.equal(p.refundClaimWindowSeconds,86400);}
+  assert.equal(new Set(registry.pools.map(p=>p.deployment.address)).size,4);
+  for(const p of registry.pools){assert.equal(p.deployment.verified,true);assert.match(p.deployment.transactionHash,/^0x[0-9a-f]{64}$/);assert.notEqual(p.deployment.address,'0xBee0848D0c77d434A52d1D0236FcBFdCA0834343');assert.equal(p.salesEnabled,false);assert.equal(p.ticketsPerRound,10000);assert.equal(BigInt(p.ticketPriceBaseUnits)*10000n,BigInt(p.poolBaseUnits));assert.equal(BigInt(p.winnerBaseUnits)+BigInt(p.organizerBaseUnits)+BigInt(p.blackholeBaseUnits),BigInt(p.poolBaseUnits));assert.equal(p.maxTicketsPerPurchase,1000);assert.equal(p.maxTicketsPerAddress,5000);assert.equal(p.fundingWindowSeconds,86400);assert.equal(p.refundClaimWindowSeconds,86400);}
   registry.pools[0].salesEnabled=true;assert.equal(poolRegistry().pools[0].salesEnabled,false);
 });
 const now=1800000000000,price={chainId:56,token:MARKET_BEM,source:'DEX Screener',updatedAt:new Date(now).toISOString(),stale:false,usdt:{price:'10',pairAddress:'0x'+'1'.repeat(40),url:'https://evil.invalid'},bnb:{price:'0.013',pairAddress:'0x'+'2'.repeat(40)}};

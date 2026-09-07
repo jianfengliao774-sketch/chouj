@@ -6,6 +6,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { Interface, getAddress, keccak256, toUtf8Bytes } from 'ethers';
+import { POOL_DEPLOYMENTS } from './web/pool-deployments.js';
 
 export const HISTORY_GAME = '0xBee0848D0c77d434A52d1D0236FcBFdCA0834343';
 export const HISTORY_DEPLOYMENT_BLOCK = 120311123;
@@ -55,9 +56,12 @@ const paginate = (rows, { page = 1, pageSize = 20 } = {}) => {
  */
 export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
   deploymentBlock = HISTORY_DEPLOYMENT_BLOCK, storagePath, confirmations = 12,
-  chunkSize = 100, maxBlocksPerSync = 400, maxLogsPerChunk = 5000, maxTransactionsPerChunk = 100 } = {}) {
-  assert.equal(typeof rpc, 'function'); assert.equal(getAddress(gameAddress), HISTORY_GAME);
-  assert.equal(deploymentBlock, HISTORY_DEPLOYMENT_BLOCK);
+  chunkSize = 100, maxBlocksPerSync = 400, maxLogsPerChunk = 5000, maxTransactionsPerChunk = 100, poolId = 'legacy100' } = {}) {
+  const profile = poolId === 'legacy100' ? { address: HISTORY_GAME, deploymentBlock: HISTORY_DEPLOYMENT_BLOCK } : POOL_DEPLOYMENTS[poolId];
+  assert.ok(profile, 'Unknown history profile');
+  const historyGame = profile.address;
+  assert.equal(typeof rpc, 'function'); assert.equal(getAddress(gameAddress), historyGame);
+  assert.equal(deploymentBlock, profile.deploymentBlock);
   assert.equal(typeof storagePath, 'string'); assert.ok(storagePath.length > 0);
   for (const [key, value] of Object.entries({ confirmations, chunkSize, maxBlocksPerSync, maxLogsPerChunk, maxTransactionsPerChunk })) {
     assert.ok(Number.isInteger(value) && value > 0, `Invalid ${key}`);
@@ -66,10 +70,13 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
   assert.ok(chunkSize <= 1000 && maxBlocksPerSync <= 5000, 'Unbounded history scan prohibited');
   const iface = new Interface(abi);
   const eventFragments = iface.fragments.filter(f => f.type === 'event');
-  assert.deepEqual(eventFragments.map(f => f.format('full')).sort(), EXPECTED_EVENT_LAYOUT, 'Unexpected production event ABI');
+  const expectedLayout = poolId === 'legacy100' ? EXPECTED_EVENT_LAYOUT : new Interface([...EVENT_ABI,
+    'event RevenueBindingFixed(address indexed container,address indexed nft,uint256 tokenId)',
+    'event UnclaimedPrincipalBurned(uint256 indexed roundId,uint256 amount)']).fragments.map(f => f.format('full')).sort();
+  assert.deepEqual(eventFragments.map(f => f.format('full')).sort(), expectedLayout, 'Unexpected production event ABI');
   const abiHash = keccak256(toUtf8Bytes(eventFragments.map(f => f.format('full')).sort().join('\n')));
   const topicSet = new Set(eventFragments.map(f => iface.getEvent(f.name).topicHash));
-  const identity = { schemaVersion: 1, chainId: 56, gameAddress: HISTORY_GAME, deploymentBlock, abiHash };
+  const identity = { schemaVersion: 1, chainId: 56, gameAddress: historyGame, deploymentBlock, abiHash };
   let db = { ...identity, cursor: deploymentBlock - 1, checkpoints: [], events: [], receipts: {}, updatedAt: null };
   try {
     const stored = JSON.parse(readFileSync(storagePath, 'utf8'));
@@ -80,7 +87,7 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
     for (const event of stored.events) {
       assert.ok(event.blockNumber >= deploymentBlock && event.blockNumber <= stored.cursor);
       assert.ok(validHash(event.blockHash) && validHash(event.transactionHash) && topicSet.has(event.topics?.[0]));
-      assert.ok(same(event.address, HISTORY_GAME));
+      assert.ok(same(event.address, historyGame));
       const parsed = iface.parseLog({ topics: event.topics, data: event.data });
       assert.equal(parsed.name, event.name);
       const args = Object.fromEntries(parsed.fragment.inputs.map((input, i) => [input.name,
@@ -145,7 +152,7 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
     let end = desiredEnd;
     for (;;) {
       try {
-        const logs = await read('eth_getLogs', [{ address: HISTORY_GAME, fromBlock: hex(start), toBlock: hex(end), topics: [[...topicSet]] }]);
+        const logs = await read('eth_getLogs', [{ address: historyGame, fromBlock: hex(start), toBlock: hex(end), topics: [[...topicSet]] }]);
         assert.ok(Array.isArray(logs), 'RPC logs response is not an array');
         if (logs.length > maxLogsPerChunk || new Set(logs.map(l => l.transactionHash)).size > maxTransactionsPerChunk) {
           throw new Error('Chunk data limit exceeded');
@@ -181,7 +188,7 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
         const blocks = new Map([[end, endHeader]]), newReceipts = {};
         const eventIds = new Set(), decoded = [];
         for (const log of logs) {
-          assert.ok(same(log.address, HISTORY_GAME) && !log.removed, 'Noncanonical or foreign game log');
+          assert.ok(same(log.address, historyGame) && !log.removed, 'Noncanonical or foreign game log');
           assert.ok(validHash(log.blockHash) && validHash(log.transactionHash) && topicSet.has(log.topics?.[0]), 'Invalid game log');
           const blockNumber = number(log.blockNumber), transactionIndex = number(log.transactionIndex), logIndex = number(log.logIndex);
           assert.ok(blockNumber >= start && blockNumber <= end, 'Out-of-range log');
@@ -197,12 +204,12 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
             newReceipts[log.transactionHash] = receipt;
           }
           const receipt = newReceipts[log.transactionHash];
-          const receiptLog = receipt.logs.find(l => number(l.logIndex) === logIndex && same(l.address, HISTORY_GAME));
+          const receiptLog = receipt.logs.find(l => number(l.logIndex) === logIndex && same(l.address, historyGame));
           assert.ok(receiptLog && same(receiptLog.data, log.data) && stringify(receiptLog.topics) === stringify(log.topics), 'RPC log missing from its receipt');
           const parsed = iface.parseLog(log);
           const args = Object.fromEntries(parsed.fragment.inputs.map((input, i) => [input.name,
             typeof parsed.args[i] === 'bigint' ? parsed.args[i].toString() : parsed.args[i]]));
-          decoded.push({ id: eventId, address: HISTORY_GAME, name: parsed.name, args,
+          decoded.push({ id: eventId, address: historyGame, name: parsed.name, args,
             blockNumber, blockHash: log.blockHash, transactionHash: log.transactionHash, transactionIndex, logIndex,
             timeUtc: new Date(block.timestamp * 1000).toISOString(), topics: log.topics, data: log.data,
             explorerUrl: `https://bscscan.com/tx/${log.transactionHash}` });
@@ -302,19 +309,19 @@ export function createChainHistory({ rpc, gameAddress = HISTORY_GAME, abi,
   }
   function listAnnouncements(options = {}) {
     const rows = rounds().filter(row => row.status === 5 && row.settlementTxHash && row.winner)
-      .map(row => ({ poolId: 'legacy100', poolBaseUnits: '10000000000', roundId: row.roundId,
-        winner: row.winner, amountBaseUnits: '9500000000', timeUtc: row.settledAt,
-        transactionHash: row.settlementTxHash, gameAddress: HISTORY_GAME }));
-    return paginate(rows, options);
+      .map(row => ({ poolId, poolBaseUnits: (BigInt(poolId === 'legacy100' ? '100' : poolId) * 100000000n).toString(), roundId: row.roundId,
+        winner: row.winner, amountBaseUnits: (BigInt(poolId === 'legacy100' ? '100' : poolId) * 95000000n).toString(), timeUtc: row.settledAt,
+        transactionHash: row.settlementTxHash, gameAddress: historyGame }));
+    return options.all === true ? { rows, total: rows.length } : paginate(rows, options);
   }
   function listBurns(options = {}) {
-    const rows = db.events.filter(event => event.name === 'BlackholeTransfer')
-      .sort((a, b) => -eventOrder(a, b)).map(event => ({ poolId: 'legacy100',
-        poolBaseUnits: '10000000000', roundId: event.args.roundId, amountBaseUnits: event.args.amount,
-        kind: 'settlement', timeUtc: event.timeUtc, transactionHash: event.transactionHash,
-        logIndex: event.logIndex, blockNumber: event.blockNumber, gameAddress: HISTORY_GAME,
+    const rows = db.events.filter(event => event.name === 'BlackholeTransfer' || event.name === 'UnclaimedPrincipalBurned')
+      .sort((a, b) => -eventOrder(a, b)).map(event => ({ poolId,
+        poolBaseUnits: (BigInt(poolId === 'legacy100' ? '100' : poolId) * 100000000n).toString(), roundId: event.args.roundId, amountBaseUnits: event.args.amount,
+        kind: event.name === 'UnclaimedPrincipalBurned' ? 'unclaimed' : 'settlement', timeUtc: event.timeUtc, transactionHash: event.transactionHash,
+        logIndex: event.logIndex, blockNumber: event.blockNumber, gameAddress: historyGame,
         destination: '0x000000000000000000000000000000000000dEaD' }));
-    return paginate(rows, options);
+    return options.all === true ? { rows, total: rows.length } : paginate(rows, options);
   }
   return { sync, getStatus, listRounds, getRound, listTransactions, listAnnouncements, listBurns };
 }

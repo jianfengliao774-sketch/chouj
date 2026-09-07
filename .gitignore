@@ -73,3 +73,5 @@ outputs/**
 !outputs/bem-raffle-2075/production-v2/Bem2075Raffle13061Test1BSC.compile-input.json
 !outputs/bem-raffle-2075/production-v2/container-13061-readonly.json
 !outputs/bem-raffle-2075/production-v2/verification-container13061.json
+!outputs/bem-raffle-2075/production-v2/deployment-discovery-readonly.json
+!outputs/bem-raffle-2075/production-v2/recovered-deployments-verified.json

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { POOL_IDS, POOL_RULES, getPoolRules, validatePoolManifest, createPoolController, poolMetadata } from '../bem-production-site/web/pool-selection.js';
 import { poolRegistry } from '../bem-production-site/pools.mjs';
 
-const manifest = () => structuredClone(poolRegistry());
+const manifest = () => { const fixture=structuredClone(poolRegistry()); for(const row of fixture.pools)row.deployment=null; return fixture; };
 test('actual server registry schema validates with the frontend and pins network/token/containers', () => {
   const result = validatePoolManifest(poolRegistry()); assert.equal(result.size, 4);
   for (const mutate of [m => m.chainId = 1, m => m.bemAddress = '0x1111111111111111111111111111111111111111',

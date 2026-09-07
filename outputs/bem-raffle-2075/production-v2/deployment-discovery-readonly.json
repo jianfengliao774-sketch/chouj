@@ -1,0 +1,72 @@
+{
+  "checkedAt": "2026-09-07T02:47:15.049Z",
+  "readOnly": true,
+  "snapshot": {
+    "blockNumber": 120416956,
+    "blockHash": "0x29933b78878ef9712ad39be7b1a2e0c8ab6a58f545314d5ea43c83c78b4594a9",
+    "timeUtc": "2026-09-07T02:47:13.000Z"
+  },
+  "wallets": [
+    {
+      "address": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+      "firstNonce": 422,
+      "nextNonce": 507
+    },
+    {
+      "address": "0x7674fa446D42b1f7f150DC5e678cc525d275Ea53",
+      "firstNonce": 0,
+      "nextNonce": 10
+    }
+  ],
+  "scanned": 95,
+  "contracts": [
+    {
+      "owner": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+      "nonce": 506,
+      "address": "0x498ef8D499ca9940D3b3B1BBd31b2684AB35962B",
+      "bytes": 18638,
+      "runtimeCodeHash": "0xfba76c308b208ad9f01088633cf39e6c014bbe14064ff82900c9abf0c68dccd0",
+      "matches": [
+        "pool50"
+      ]
+    },
+    {
+      "owner": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+      "nonce": 505,
+      "address": "0x3335ec04A7509aDE8E6C4Bc851fE409EE063a2bc",
+      "bytes": 18638,
+      "runtimeCodeHash": "0x57bcf0f5d353139f0a2740bce7eca56b07295376708e5b802f646f8842600a48",
+      "matches": [
+        "pool10"
+      ]
+    },
+    {
+      "owner": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+      "nonce": 504,
+      "address": "0xE7D8dF903050d875f09cE1BBcE20E837fB55bC0c",
+      "bytes": 18638,
+      "runtimeCodeHash": "0xef681f526023ed624835dd100d6178dfa4876c34763d7ed566727e791390f7bc",
+      "matches": [
+        "test"
+      ]
+    },
+    {
+      "owner": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+      "nonce": 503,
+      "address": "0x2009FDe00618C06Fa2e88bE6a2FA590941437f9D",
+      "bytes": 18638,
+      "runtimeCodeHash": "0x35c99e0e5d8f3906e8a8e264fb017b8cfd4338e9a839f48ef7c0054f115121df",
+      "matches": [
+        "production"
+      ]
+    },
+    {
+      "owner": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+      "nonce": 422,
+      "address": "0xBee0848D0c77d434A52d1D0236FcBFdCA0834343",
+      "bytes": 15424,
+      "runtimeCodeHash": "0x924ffeae37682ce516aa4cb8eae09a4cea9acd2148c12634efe60704ddab94b8",
+      "matches": []
+    }
+  ]
+}

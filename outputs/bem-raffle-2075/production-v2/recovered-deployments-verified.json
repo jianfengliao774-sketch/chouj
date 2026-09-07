@@ -1,0 +1,655 @@
+{
+  "schemaVersion": 3,
+  "checkedAt": "2026-09-07T03:11:08.991Z",
+  "readOnly": true,
+  "rpcUrl": "https://bsc-dataseed.bnbchain.org",
+  "snapshot": {
+    "blockNumber": 120420153,
+    "blockHash": "0xdc746d5e97dab8caab10ac40ee750039ea7dae220309c53d8448b770d4cc4c81",
+    "timeUtc": "2026-09-07T03:11:12.000Z"
+  },
+  "deployments": [
+    {
+      "mode": "pool50",
+      "contractName": "Bem2075Raffle13061Pool50BSC",
+      "address": "0x498ef8D499ca9940D3b3B1BBd31b2684AB35962B",
+      "deployer": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+      "nonce": 506,
+      "chainId": 56,
+      "transactionHash": "0xbc69c6d437a2531df8c078c8ffcc0369f42ef2c7f512b43a83f1380df0dbd311",
+      "deploymentBlock": 120416356,
+      "blockHash": "0x6c10a81fed638d81e9dfa8a710359c430831601d49c79bd4f9d4a342dffbd85c",
+      "confirmations": 3798,
+      "runtimeCodeHash": "0xfba76c308b208ad9f01088633cf39e6c014bbe14064ff82900c9abf0c68dccd0",
+      "creationInputHash": "0x225ec66e4539df676591f0ed525603dea7f233d78d04fca95b7cf4fca856205f",
+      "creationTransactionVerified": true,
+      "exactLatestArtifactRuntimeVerified": true,
+      "sourceSha256s": {
+        "contracts/production-v2/BemSelectableRaffleV2.sol": "cf8d5c5ffe12749f1cc8877ee3db4ed7ca0e09b3b4909ef44f5aaad324db5fb7",
+        "contracts/production-v2/BemSelectableRaffle13061BSC.sol": "cb17dd67a7c08db826d44044f2f80a4a470d9368ad2a998a3a4a7f7549642743",
+        "contracts/production-v2/BemContainer13061SeriesBSC.sol": "2e5cb90f6ca49f758e059fb096b4600331dbca10beb7e73bb8802f25a83d2015",
+        "contracts/production-v2/pool50/Bem2075Raffle13061Pool50BSC.sol": "8ece9ba3f7ce8ab64b9a147fb056ce95a878e8ed1c9fc7ecc2908f771831c376"
+      },
+      "fixedRules": {
+        "poolBaseUnits": "5000000000",
+        "ticketPriceBaseUnits": "500000",
+        "ticketsPerRound": 10000,
+        "maxTicketsPerPurchase": 1000,
+        "maxTicketsPerAddress": 5000,
+        "blackholeBaseUnits": "200000000",
+        "organizerBaseUnits": "50000000",
+        "winnerBaseUnits": "4750000000",
+        "fundingWindowSeconds": 86400,
+        "refundClaimWindowSeconds": 86400
+      },
+      "fixedBindings": {
+        "processor": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "processorId": 2075,
+        "authorizationContainer": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646",
+        "revenueContainer": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+        "revenueNft": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+        "revenueTokenId": 13061
+      },
+      "constructorArgs": [
+        "77582411398321098948652233841078712279496169525251928512909841261362926957679",
+        3,
+        250000
+      ],
+      "deploymentVerified": true,
+      "staticGettersBlock": 120420153,
+      "staticGettersVerified": true,
+      "staticGetters": {
+        "bem": "0x5ce033B2bFCa3Af30b3e8C8457DeaF776A8b695a",
+        "organizer": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+        "CONTAINER": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646",
+        "AUTHORIZATION_NFT": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "CIRCUITS": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "REVENUE_CONTAINER": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+        "REVENUE_NFT": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+        "coordinator": "0xd691f04bc0C9a24Edb78af9E005Cf85768F694C9",
+        "OPENER": "0x021745DE2f42A7839d96f2d3634d0294487D81F1",
+        "BLACKHOLE": "0x000000000000000000000000000000000000dEaD",
+        "AUTHORIZATION_TOKEN_ID": "2075",
+        "CIRCUIT_ID": "2075",
+        "REVENUE_TOKEN_ID": "13061",
+        "TICKET_PRICE": "500000",
+        "TICKETS_PER_ROUND": "10000",
+        "MAX_TICKETS_PER_PURCHASE": "1000",
+        "ROUND_POOL": "5000000000",
+        "ORGANIZER_AMOUNT": "50000000",
+        "WINNER_AMOUNT": "4750000000",
+        "BLACKHOLE_AMOUNT": "200000000",
+        "subscriptionId": "77582411398321098948652233841078712279496169525251928512909841261362926957679",
+        "requestConfirmations": "3",
+        "callbackGasLimit": "250000",
+        "fundingWindow": "86400",
+        "REFUND_CLAIM_WINDOW": "86400",
+        "MAX_TICKETS_PER_ADDRESS": "5000",
+        "drawWindow": "3600",
+        "NEXT_ROUND_DELAY": "60",
+        "keyHash": "0x130dba50ad435d4ecc214aad0d5820474137bd68e7e77724144f27c3c377d3d4",
+        "CIRCUIT_HASH": "0xa375924f2a31f5169606ea20e357efa2aeeb2355aff859f28f40a15519714eef",
+        "sourceVerifiedAtBlock": "120416356",
+        "TEST_ONLY": false
+      },
+      "deploymentBlockGetters": {
+        "blockNumber": 120416356,
+        "verified": false,
+        "values": null,
+        "reason": "RPC failed for eth_call [{\"to\":\"0x498ef8D499ca9940D3b3B1BBd31b2684AB35962B\",\"data\":\"0x8765cf7b\"},\"0x72d6864\"]: {\"code\":-32000,\"message\":\"missing trie node\"}"
+      },
+      "current": {
+        "seriesAuthorized": false,
+        "currentRoundId": "1",
+        "nextRoundOpensAt": "0",
+        "totalLiability": "0",
+        "rounds": [
+          {
+            "roundId": "1",
+            "status": "0",
+            "sold": "0",
+            "fundingDeadline": "0",
+            "drawDeadline": "0",
+            "requestId": "0",
+            "ticketWord": "0",
+            "circuitWord": "0",
+            "drawCursor": "0",
+            "winningTicket": "0",
+            "winner": "0x0000000000000000000000000000000000000000",
+            "statusName": "Unstarted",
+            "timing": {
+              "lockedAt": "0",
+              "targetDrawBy": "0",
+              "scheduledDrawAt": "0",
+              "settledAt": "0"
+            },
+            "refundClaimDeadline": "0",
+            "refundedPrincipal": "0",
+            "unclaimedPrincipalBurned": false
+          }
+        ],
+        "vrfConsumer": false,
+        "bemBalanceBaseUnits": "0",
+        "nativeBalanceWei": "0",
+        "escrowSolvent": true
+      },
+      "readiness": {
+        "readyForPurchaseAtSnapshot": false,
+        "blockers": [
+          {
+            "code": "SERIES_NOT_AUTHORIZED",
+            "detail": "Fixed 2075 authorization container must call authorizeSeries(); deployer and revenue container cannot call it directly."
+          },
+          {
+            "code": "VRF_CONSUMER_MISSING",
+            "detail": "Add this exact new contract to the fixed subscription. Authorization of the old game does not cover this deployment."
+          },
+          {
+            "code": "ROUND_NOT_OPEN",
+            "detail": "Authorization opens the first funding round."
+          }
+        ],
+        "unverifiedPrerequisites": [
+          "At least two funded participants are required to fill 10000 tickets because each address is capped at 5000.",
+          "Participant BEM approvals and transaction gas, and availability of a settlement caller, are not verified.",
+          "Positive subscription balance does not prove current VRF fee sufficiency or successful fulfillment."
+        ]
+      }
+    },
+    {
+      "mode": "pool10",
+      "contractName": "Bem2075Raffle13061Pool10BSC",
+      "address": "0x3335ec04A7509aDE8E6C4Bc851fE409EE063a2bc",
+      "deployer": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+      "nonce": 505,
+      "chainId": 56,
+      "transactionHash": "0xa97bdb4425aaf234252191bdc53024476415e4e89835601261e8333d0687af8d",
+      "deploymentBlock": 120416332,
+      "blockHash": "0x971dc0798a3eb561b03f5fd30bce46913191cc3c642b8d2e5ab18248ac9542c5",
+      "confirmations": 3822,
+      "runtimeCodeHash": "0x57bcf0f5d353139f0a2740bce7eca56b07295376708e5b802f646f8842600a48",
+      "creationInputHash": "0x9466371f1abcc1c385f4686fcf0ec6b46e5dd0df7f110d49281b0678ebcd6d42",
+      "creationTransactionVerified": true,
+      "exactLatestArtifactRuntimeVerified": true,
+      "sourceSha256s": {
+        "contracts/production-v2/BemSelectableRaffleV2.sol": "cf8d5c5ffe12749f1cc8877ee3db4ed7ca0e09b3b4909ef44f5aaad324db5fb7",
+        "contracts/production-v2/BemSelectableRaffle13061BSC.sol": "cb17dd67a7c08db826d44044f2f80a4a470d9368ad2a998a3a4a7f7549642743",
+        "contracts/production-v2/BemContainer13061SeriesBSC.sol": "2e5cb90f6ca49f758e059fb096b4600331dbca10beb7e73bb8802f25a83d2015",
+        "contracts/production-v2/pool10/Bem2075Raffle13061Pool10BSC.sol": "a0236c56100891d39e9e466a55631f53ca52da21924185317aa8551d884178c9"
+      },
+      "fixedRules": {
+        "poolBaseUnits": "1000000000",
+        "ticketPriceBaseUnits": "100000",
+        "ticketsPerRound": 10000,
+        "maxTicketsPerPurchase": 1000,
+        "maxTicketsPerAddress": 5000,
+        "blackholeBaseUnits": "40000000",
+        "organizerBaseUnits": "10000000",
+        "winnerBaseUnits": "950000000",
+        "fundingWindowSeconds": 86400,
+        "refundClaimWindowSeconds": 86400
+      },
+      "fixedBindings": {
+        "processor": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "processorId": 2075,
+        "authorizationContainer": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646",
+        "revenueContainer": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+        "revenueNft": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+        "revenueTokenId": 13061
+      },
+      "constructorArgs": [
+        "77582411398321098948652233841078712279496169525251928512909841261362926957679",
+        3,
+        250000
+      ],
+      "deploymentVerified": true,
+      "staticGettersBlock": 120420153,
+      "staticGettersVerified": true,
+      "staticGetters": {
+        "bem": "0x5ce033B2bFCa3Af30b3e8C8457DeaF776A8b695a",
+        "organizer": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+        "CONTAINER": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646",
+        "AUTHORIZATION_NFT": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "CIRCUITS": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "REVENUE_CONTAINER": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+        "REVENUE_NFT": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+        "coordinator": "0xd691f04bc0C9a24Edb78af9E005Cf85768F694C9",
+        "OPENER": "0x021745DE2f42A7839d96f2d3634d0294487D81F1",
+        "BLACKHOLE": "0x000000000000000000000000000000000000dEaD",
+        "AUTHORIZATION_TOKEN_ID": "2075",
+        "CIRCUIT_ID": "2075",
+        "REVENUE_TOKEN_ID": "13061",
+        "TICKET_PRICE": "100000",
+        "TICKETS_PER_ROUND": "10000",
+        "MAX_TICKETS_PER_PURCHASE": "1000",
+        "ROUND_POOL": "1000000000",
+        "ORGANIZER_AMOUNT": "10000000",
+        "WINNER_AMOUNT": "950000000",
+        "BLACKHOLE_AMOUNT": "40000000",
+        "subscriptionId": "77582411398321098948652233841078712279496169525251928512909841261362926957679",
+        "requestConfirmations": "3",
+        "callbackGasLimit": "250000",
+        "fundingWindow": "86400",
+        "REFUND_CLAIM_WINDOW": "86400",
+        "MAX_TICKETS_PER_ADDRESS": "5000",
+        "drawWindow": "3600",
+        "NEXT_ROUND_DELAY": "60",
+        "keyHash": "0x130dba50ad435d4ecc214aad0d5820474137bd68e7e77724144f27c3c377d3d4",
+        "CIRCUIT_HASH": "0xa375924f2a31f5169606ea20e357efa2aeeb2355aff859f28f40a15519714eef",
+        "sourceVerifiedAtBlock": "120416332",
+        "TEST_ONLY": false
+      },
+      "deploymentBlockGetters": {
+        "blockNumber": 120416332,
+        "verified": false,
+        "values": null,
+        "reason": "RPC failed for eth_call [{\"to\":\"0x3335ec04A7509aDE8E6C4Bc851fE409EE063a2bc\",\"data\":\"0x8765cf7b\"},\"0x72d684c\"]: {\"code\":-32000,\"message\":\"missing trie node\"}"
+      },
+      "current": {
+        "seriesAuthorized": false,
+        "currentRoundId": "1",
+        "nextRoundOpensAt": "0",
+        "totalLiability": "0",
+        "rounds": [
+          {
+            "roundId": "1",
+            "status": "0",
+            "sold": "0",
+            "fundingDeadline": "0",
+            "drawDeadline": "0",
+            "requestId": "0",
+            "ticketWord": "0",
+            "circuitWord": "0",
+            "drawCursor": "0",
+            "winningTicket": "0",
+            "winner": "0x0000000000000000000000000000000000000000",
+            "statusName": "Unstarted",
+            "timing": {
+              "lockedAt": "0",
+              "targetDrawBy": "0",
+              "scheduledDrawAt": "0",
+              "settledAt": "0"
+            },
+            "refundClaimDeadline": "0",
+            "refundedPrincipal": "0",
+            "unclaimedPrincipalBurned": false
+          }
+        ],
+        "vrfConsumer": false,
+        "bemBalanceBaseUnits": "0",
+        "nativeBalanceWei": "0",
+        "escrowSolvent": true
+      },
+      "readiness": {
+        "readyForPurchaseAtSnapshot": false,
+        "blockers": [
+          {
+            "code": "SERIES_NOT_AUTHORIZED",
+            "detail": "Fixed 2075 authorization container must call authorizeSeries(); deployer and revenue container cannot call it directly."
+          },
+          {
+            "code": "VRF_CONSUMER_MISSING",
+            "detail": "Add this exact new contract to the fixed subscription. Authorization of the old game does not cover this deployment."
+          },
+          {
+            "code": "ROUND_NOT_OPEN",
+            "detail": "Authorization opens the first funding round."
+          }
+        ],
+        "unverifiedPrerequisites": [
+          "At least two funded participants are required to fill 10000 tickets because each address is capped at 5000.",
+          "Participant BEM approvals and transaction gas, and availability of a settlement caller, are not verified.",
+          "Positive subscription balance does not prove current VRF fee sufficiency or successful fulfillment."
+        ]
+      }
+    },
+    {
+      "mode": "test",
+      "contractName": "Bem2075Raffle13061Test1BSC",
+      "address": "0xE7D8dF903050d875f09cE1BBcE20E837fB55bC0c",
+      "deployer": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+      "nonce": 504,
+      "chainId": 56,
+      "transactionHash": "0x95f633f0d786425c59715a998df1cf28de04daea2fff5677420fcceb69e1f5da",
+      "deploymentBlock": 120416308,
+      "blockHash": "0xe8b76cfd07cd574239bdb6feeacba79be9831d33585344db753ca9b0302bb384",
+      "confirmations": 3846,
+      "runtimeCodeHash": "0xef681f526023ed624835dd100d6178dfa4876c34763d7ed566727e791390f7bc",
+      "creationInputHash": "0x0c7cf8b332434009fb90e6a881f7987b41b14267497e7bdcbf417ff58d41dbd2",
+      "creationTransactionVerified": true,
+      "exactLatestArtifactRuntimeVerified": true,
+      "sourceSha256s": {
+        "contracts/production-v2/BemSelectableRaffleV2.sol": "cf8d5c5ffe12749f1cc8877ee3db4ed7ca0e09b3b4909ef44f5aaad324db5fb7",
+        "contracts/production-v2/BemSelectableRaffle13061BSC.sol": "cb17dd67a7c08db826d44044f2f80a4a470d9368ad2a998a3a4a7f7549642743",
+        "contracts/production-v2/BemContainer13061SeriesBSC.sol": "2e5cb90f6ca49f758e059fb096b4600331dbca10beb7e73bb8802f25a83d2015",
+        "contracts/production-v2/test1/Bem2075Raffle13061Test1BSC.sol": "b9791706dcf87f0aafb6a3c733faf8af548fd8b84617871abd6c5af24a88b210"
+      },
+      "fixedRules": {
+        "poolBaseUnits": "100000000",
+        "ticketPriceBaseUnits": "10000",
+        "ticketsPerRound": 10000,
+        "maxTicketsPerPurchase": 1000,
+        "maxTicketsPerAddress": 5000,
+        "blackholeBaseUnits": "4000000",
+        "organizerBaseUnits": "1000000",
+        "winnerBaseUnits": "95000000",
+        "fundingWindowSeconds": 86400,
+        "refundClaimWindowSeconds": 86400
+      },
+      "fixedBindings": {
+        "processor": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "processorId": 2075,
+        "authorizationContainer": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646",
+        "revenueContainer": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+        "revenueNft": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+        "revenueTokenId": 13061
+      },
+      "constructorArgs": [
+        "77582411398321098948652233841078712279496169525251928512909841261362926957679",
+        3,
+        250000
+      ],
+      "deploymentVerified": true,
+      "staticGettersBlock": 120420153,
+      "staticGettersVerified": true,
+      "staticGetters": {
+        "bem": "0x5ce033B2bFCa3Af30b3e8C8457DeaF776A8b695a",
+        "organizer": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+        "CONTAINER": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646",
+        "AUTHORIZATION_NFT": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "CIRCUITS": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "REVENUE_CONTAINER": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+        "REVENUE_NFT": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+        "coordinator": "0xd691f04bc0C9a24Edb78af9E005Cf85768F694C9",
+        "OPENER": "0x021745DE2f42A7839d96f2d3634d0294487D81F1",
+        "BLACKHOLE": "0x000000000000000000000000000000000000dEaD",
+        "AUTHORIZATION_TOKEN_ID": "2075",
+        "CIRCUIT_ID": "2075",
+        "REVENUE_TOKEN_ID": "13061",
+        "TICKET_PRICE": "10000",
+        "TICKETS_PER_ROUND": "10000",
+        "MAX_TICKETS_PER_PURCHASE": "1000",
+        "ROUND_POOL": "100000000",
+        "ORGANIZER_AMOUNT": "1000000",
+        "WINNER_AMOUNT": "95000000",
+        "BLACKHOLE_AMOUNT": "4000000",
+        "subscriptionId": "77582411398321098948652233841078712279496169525251928512909841261362926957679",
+        "requestConfirmations": "3",
+        "callbackGasLimit": "250000",
+        "fundingWindow": "86400",
+        "REFUND_CLAIM_WINDOW": "86400",
+        "MAX_TICKETS_PER_ADDRESS": "5000",
+        "drawWindow": "3600",
+        "NEXT_ROUND_DELAY": "60",
+        "keyHash": "0x130dba50ad435d4ecc214aad0d5820474137bd68e7e77724144f27c3c377d3d4",
+        "CIRCUIT_HASH": "0xa375924f2a31f5169606ea20e357efa2aeeb2355aff859f28f40a15519714eef",
+        "sourceVerifiedAtBlock": "120416308",
+        "TEST_ONLY": true
+      },
+      "deploymentBlockGetters": {
+        "blockNumber": 120416308,
+        "verified": false,
+        "values": null,
+        "reason": "RPC failed for eth_call [{\"to\":\"0xE7D8dF903050d875f09cE1BBcE20E837fB55bC0c\",\"data\":\"0x8765cf7b\"},\"0x72d6834\"]: {\"code\":-32000,\"message\":\"missing trie node\"}"
+      },
+      "current": {
+        "seriesAuthorized": false,
+        "currentRoundId": "1",
+        "nextRoundOpensAt": "0",
+        "totalLiability": "0",
+        "rounds": [
+          {
+            "roundId": "1",
+            "status": "0",
+            "sold": "0",
+            "fundingDeadline": "0",
+            "drawDeadline": "0",
+            "requestId": "0",
+            "ticketWord": "0",
+            "circuitWord": "0",
+            "drawCursor": "0",
+            "winningTicket": "0",
+            "winner": "0x0000000000000000000000000000000000000000",
+            "statusName": "Unstarted",
+            "timing": {
+              "lockedAt": "0",
+              "targetDrawBy": "0",
+              "scheduledDrawAt": "0",
+              "settledAt": "0"
+            },
+            "refundClaimDeadline": "0",
+            "refundedPrincipal": "0",
+            "unclaimedPrincipalBurned": false
+          }
+        ],
+        "vrfConsumer": false,
+        "bemBalanceBaseUnits": "0",
+        "nativeBalanceWei": "0",
+        "escrowSolvent": true
+      },
+      "readiness": {
+        "readyForPurchaseAtSnapshot": false,
+        "blockers": [
+          {
+            "code": "SERIES_NOT_AUTHORIZED",
+            "detail": "Fixed 2075 authorization container must call authorizeSeries(); deployer and revenue container cannot call it directly."
+          },
+          {
+            "code": "VRF_CONSUMER_MISSING",
+            "detail": "Add this exact new contract to the fixed subscription. Authorization of the old game does not cover this deployment."
+          },
+          {
+            "code": "ROUND_NOT_OPEN",
+            "detail": "Authorization opens the first funding round."
+          }
+        ],
+        "unverifiedPrerequisites": [
+          "At least two funded participants are required to fill 10000 tickets because each address is capped at 5000.",
+          "Participant BEM approvals and transaction gas, and availability of a settlement caller, are not verified.",
+          "Positive subscription balance does not prove current VRF fee sufficiency or successful fulfillment."
+        ]
+      }
+    },
+    {
+      "mode": "production",
+      "contractName": "Bem2075Raffle13061BSC",
+      "address": "0x2009FDe00618C06Fa2e88bE6a2FA590941437f9D",
+      "deployer": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+      "nonce": 503,
+      "chainId": 56,
+      "transactionHash": "0x5667233b2e615395e1840c7e92b6c43742cc5ad240400709fc9c6c6f03ec403f",
+      "deploymentBlock": 120416272,
+      "blockHash": "0x10dda25551ea5c35951139bd7870055dca465ee36e4b02c111be35a22c9591d3",
+      "confirmations": 3882,
+      "runtimeCodeHash": "0x35c99e0e5d8f3906e8a8e264fb017b8cfd4338e9a839f48ef7c0054f115121df",
+      "creationInputHash": "0x999ac73348b32fc0a52d2811eefa9dc9248eafaa0d27b24f4da1440d4f5e7716",
+      "creationTransactionVerified": true,
+      "exactLatestArtifactRuntimeVerified": true,
+      "sourceSha256s": {
+        "contracts/production-v2/BemSelectableRaffleV2.sol": "cf8d5c5ffe12749f1cc8877ee3db4ed7ca0e09b3b4909ef44f5aaad324db5fb7",
+        "contracts/production-v2/BemSelectableRaffle13061BSC.sol": "cb17dd67a7c08db826d44044f2f80a4a470d9368ad2a998a3a4a7f7549642743",
+        "contracts/production-v2/BemContainer13061SeriesBSC.sol": "2e5cb90f6ca49f758e059fb096b4600331dbca10beb7e73bb8802f25a83d2015",
+        "contracts/production-v2/Bem2075Raffle13061BSC.sol": "c9e0866c6921bd4f996418da443f781c0a9b0142dadb8c26408cfff643866815"
+      },
+      "fixedRules": {
+        "poolBaseUnits": "10000000000",
+        "ticketPriceBaseUnits": "1000000",
+        "ticketsPerRound": 10000,
+        "maxTicketsPerPurchase": 1000,
+        "maxTicketsPerAddress": 5000,
+        "blackholeBaseUnits": "400000000",
+        "organizerBaseUnits": "100000000",
+        "winnerBaseUnits": "9500000000",
+        "fundingWindowSeconds": 86400,
+        "refundClaimWindowSeconds": 86400
+      },
+      "fixedBindings": {
+        "processor": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "processorId": 2075,
+        "authorizationContainer": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646",
+        "revenueContainer": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+        "revenueNft": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+        "revenueTokenId": 13061
+      },
+      "constructorArgs": [
+        "77582411398321098948652233841078712279496169525251928512909841261362926957679",
+        3,
+        250000
+      ],
+      "deploymentVerified": true,
+      "staticGettersBlock": 120420153,
+      "staticGettersVerified": true,
+      "staticGetters": {
+        "bem": "0x5ce033B2bFCa3Af30b3e8C8457DeaF776A8b695a",
+        "organizer": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+        "CONTAINER": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646",
+        "AUTHORIZATION_NFT": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "CIRCUITS": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "REVENUE_CONTAINER": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+        "REVENUE_NFT": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+        "coordinator": "0xd691f04bc0C9a24Edb78af9E005Cf85768F694C9",
+        "OPENER": "0x021745DE2f42A7839d96f2d3634d0294487D81F1",
+        "BLACKHOLE": "0x000000000000000000000000000000000000dEaD",
+        "AUTHORIZATION_TOKEN_ID": "2075",
+        "CIRCUIT_ID": "2075",
+        "REVENUE_TOKEN_ID": "13061",
+        "TICKET_PRICE": "1000000",
+        "TICKETS_PER_ROUND": "10000",
+        "MAX_TICKETS_PER_PURCHASE": "1000",
+        "ROUND_POOL": "10000000000",
+        "ORGANIZER_AMOUNT": "100000000",
+        "WINNER_AMOUNT": "9500000000",
+        "BLACKHOLE_AMOUNT": "400000000",
+        "subscriptionId": "77582411398321098948652233841078712279496169525251928512909841261362926957679",
+        "requestConfirmations": "3",
+        "callbackGasLimit": "250000",
+        "fundingWindow": "86400",
+        "REFUND_CLAIM_WINDOW": "86400",
+        "MAX_TICKETS_PER_ADDRESS": "5000",
+        "drawWindow": "3600",
+        "NEXT_ROUND_DELAY": "60",
+        "keyHash": "0x130dba50ad435d4ecc214aad0d5820474137bd68e7e77724144f27c3c377d3d4",
+        "CIRCUIT_HASH": "0xa375924f2a31f5169606ea20e357efa2aeeb2355aff859f28f40a15519714eef",
+        "sourceVerifiedAtBlock": "120416272",
+        "TEST_ONLY": false
+      },
+      "deploymentBlockGetters": {
+        "blockNumber": 120416272,
+        "verified": false,
+        "values": null,
+        "reason": "RPC failed for eth_call [{\"to\":\"0x2009FDe00618C06Fa2e88bE6a2FA590941437f9D\",\"data\":\"0x8765cf7b\"},\"0x72d6810\"]: {\"code\":-32000,\"message\":\"missing trie node\"}"
+      },
+      "current": {
+        "seriesAuthorized": false,
+        "currentRoundId": "1",
+        "nextRoundOpensAt": "0",
+        "totalLiability": "0",
+        "rounds": [
+          {
+            "roundId": "1",
+            "status": "0",
+            "sold": "0",
+            "fundingDeadline": "0",
+            "drawDeadline": "0",
+            "requestId": "0",
+            "ticketWord": "0",
+            "circuitWord": "0",
+            "drawCursor": "0",
+            "winningTicket": "0",
+            "winner": "0x0000000000000000000000000000000000000000",
+            "statusName": "Unstarted",
+            "timing": {
+              "lockedAt": "0",
+              "targetDrawBy": "0",
+              "scheduledDrawAt": "0",
+              "settledAt": "0"
+            },
+            "refundClaimDeadline": "0",
+            "refundedPrincipal": "0",
+            "unclaimedPrincipalBurned": false
+          }
+        ],
+        "vrfConsumer": false,
+        "bemBalanceBaseUnits": "0",
+        "nativeBalanceWei": "0",
+        "escrowSolvent": true
+      },
+      "readiness": {
+        "readyForPurchaseAtSnapshot": false,
+        "blockers": [
+          {
+            "code": "SERIES_NOT_AUTHORIZED",
+            "detail": "Fixed 2075 authorization container must call authorizeSeries(); deployer and revenue container cannot call it directly."
+          },
+          {
+            "code": "VRF_CONSUMER_MISSING",
+            "detail": "Add this exact new contract to the fixed subscription. Authorization of the old game does not cover this deployment."
+          },
+          {
+            "code": "ROUND_NOT_OPEN",
+            "detail": "Authorization opens the first funding round."
+          }
+        ],
+        "unverifiedPrerequisites": [
+          "At least two funded participants are required to fill 10000 tickets because each address is capped at 5000.",
+          "Participant BEM approvals and transaction gas, and availability of a settlement caller, are not verified.",
+          "Positive subscription balance does not prove current VRF fee sufficiency or successful fulfillment."
+        ]
+      }
+    }
+  ],
+  "vrf": {
+    "subscriptionId": "77582411398321098948652233841078712279496169525251928512909841261362926957679",
+    "owner": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+    "linkBalanceBaseUnits": "0",
+    "nativeBalanceWei": "10000000000000000",
+    "nativeBalanceBnb": "0.01",
+    "requestCount": "0",
+    "consumers": [
+      "0xBee0848D0c77d434A52d1D0236FcBFdCA0834343"
+    ],
+    "paymentMode": "native BNB",
+    "feeSufficiencyVerified": false
+  },
+  "dependencies": {
+    "authorizationContainer": {
+      "address": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646",
+      "bindingVerified": true,
+      "token": {
+        "chainId": "56",
+        "tokenContract": "0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C",
+        "tokenId": "2075"
+      },
+      "owner": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+      "nftOwner": "0x304F06903324B8056cB1ED627144EfB2C34df3a8",
+      "registryAccount": "0x358BE84b95224d228f3A61964Fa3c9fB61D7B646",
+      "registryOpened": true,
+      "runtimeCodeHash": "0xc507f9a9b306c83d9f7bf5550e620a8423eabe069f5032e2062638463fc1305e",
+      "nativeBalanceWei": "0",
+      "execFeeWei": "200000000000000",
+      "execFeeBnb": "0.0002"
+    },
+    "revenueContainer": {
+      "address": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+      "bindingVerified": true,
+      "token": {
+        "chainId": "56",
+        "tokenContract": "0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C",
+        "tokenId": "13061"
+      },
+      "owner": "0x7674fa446D42b1f7f150DC5e678cc525d275Ea53",
+      "nftOwner": "0x7674fa446D42b1f7f150DC5e678cc525d275Ea53",
+      "registryAccount": "0x001f110422F04a90bF7D6eC96714f75046BD7126",
+      "registryOpened": true,
+      "runtimeCodeHash": "0xc6bd82ae4e27c01d0a769d216526f84e5fc2e16765ac30b4da84d56944f5c470",
+      "nativeBalanceWei": "10000000000000000",
+      "execFeeWei": "200000000000000",
+      "execFeeBnb": "0.0002"
+    },
+    "bemDecimals": 8
+  },
+  "limitations": [
+    "Public read-only verification only: no token approval, purchase, VRF callback, settlement, refund or wallet control was tested.",
+    "The RPC prunes historical state (missing trie node). Deployment-block getters are explicitly unverified; exact successful creation input, current runtime and immutable getters are independently verified."
+  ]
+}

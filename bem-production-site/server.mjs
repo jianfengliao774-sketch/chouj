@@ -11,13 +11,15 @@ import { createReadRpc, validateReadRequest } from './rpc.mjs';
 import { createAdminAuth } from './auth.mjs';
 import { createChainHistory } from './chain-history.mjs';
 import { poolRegistry } from './pools.mjs';
+import { createPoolStatusReader } from './pool-status.mjs';
+import { POOL_DEPLOYMENTS } from './web/pool-deployments.js';
 import { createMarketPriceService } from './market-price.mjs';
 
 const format = value => JSON.stringify(value, (_, x) => typeof x === 'bigint' ? x.toString() : x);
 const ABI = new Interface(['function getSubscription(uint256) view returns(uint96 balance,uint96 nativeBalance,uint64 reqCount,address owner,address[] consumers)']);
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.webp': 'image/webp', '.ico': 'image/x-icon', '.woff2': 'font/woff2' };
 
-export async function createProductionServer({ port = 8788, rpc = createReadRpc(), manifest, history, staticRoot = path.join(SITE, 'dist'), publicOrigin, adminCredential, market = createMarketPriceService() } = {}) {
+export async function createProductionServer({ port = 8788, rpc = createReadRpc(), manifest, history, poolHistories = {}, staticRoot = path.join(SITE, 'dist'), publicOrigin, adminCredential, market = createMarketPriceService() } = {}) {
   let publicUrl = null;
   if (publicOrigin !== undefined) {
     publicUrl = new URL(publicOrigin);
@@ -28,6 +30,7 @@ export async function createProductionServer({ port = 8788, rpc = createReadRpc(
   manifest ??= await loadManifest();
   if (manifest.mode !== 'production' || manifest.chainId !== 56 || manifest.gameAddress !== GAME || manifest.salesEnabled !== false) throw new Error('Unapproved production configuration');
   const iface = new Interface(manifest.gameAbi);
+  const readPoolStatus = createPoolStatusReader({ rpc });
   const auth = createAdminAuth({ credential: adminCredential });
   let cached = null, reading = null;
   async function readStatus() {
@@ -87,17 +90,30 @@ export async function createProductionServer({ port = 8788, rpc = createReadRpc(
       if (++count.requests > 600) return json(res, 429, { error: '访问较频繁，请稍后重试。' }, { 'retry-after': '10' });
       if (req.method === 'GET' && url.pathname === '/api/health') return json(res, 200, { mode: 'production', chainId: 56, gameAddress: GAME, salesEnabled: false });
       if (req.method === 'GET' && url.pathname === '/api/config') return json(res, 200, manifest);
-      if (req.method === 'GET' && url.pathname === '/api/pools') return json(res, 200, poolRegistry());
+      if (req.method === 'GET' && url.pathname === '/api/pools') {
+        const registry = poolRegistry();
+        try {
+          const status = await readPoolStatus('1');
+          registry.pools.find(row => row.id === '1').salesEnabled = status.salesEnabled;
+        } catch { /* A failed chain read keeps the test pool unavailable. */ }
+        return json(res, 200, registry);
+      }
+      const poolStatus = /^\/api\/pools\/(1|10|50|100)\/status$/.exec(url.pathname);
+      if (req.method === 'GET' && poolStatus) return json(res, 200, await readPoolStatus(poolStatus[1]));
       if (req.method === 'GET' && url.pathname === '/api/market') return json(res, 200, await market.getQuote());
       if (req.method === 'GET' && ['/api/announcements', '/api/burns'].includes(url.pathname)) {
         const pool = url.searchParams.get('pool') || 'all';
         const page = Number(url.searchParams.get('page') || 1), pageSize = Number(url.searchParams.get('pageSize') || 20);
         if (!['all', 'legacy100', '1', '10', '50', '100'].includes(pool) || !Number.isSafeInteger(page) || page < 1 || !Number.isSafeInteger(pageSize) || pageSize < 1 || pageSize > 50) return json(res, 400, { error: '无效场次或分页' });
-        const isNew = !['all', 'legacy100'].includes(pool);
-        const records = isNew ? { rows: [], page, pageSize, total: 0, totalPages: 0 }
-          : url.pathname === '/api/burns' ? history.listBurns({ page, pageSize }) : history.listAnnouncements({ page, pageSize });
-        return json(res, 200, { schemaVersion: 2, chainId: 56, pool, deploymentPending: isNew,
-          index: isNew ? { state: 'awaiting_deployment' } : history.getStatus(), ...records });
+        const indexes = pool === 'all' ? [history, ...Object.keys(POOL_DEPLOYMENTS).map(id => poolHistories[id])]
+          : [pool === 'legacy100' ? history : poolHistories[pool]];
+        const method = url.pathname === '/api/burns' ? 'listBurns' : 'listAnnouncements';
+        const rows = indexes.flatMap(index => index ? index[method]({ all: true }).rows : [])
+          .sort((a,b) => Date.parse(b.timeUtc) - Date.parse(a.timeUtc) || b.transactionHash.localeCompare(a.transactionHash));
+        const states = indexes.map(index => index?.getStatus() ?? { state: 'awaiting_index' });
+        const index = states.every(s => s.state === 'ready') ? { state: 'ready' } : { state: 'syncing', sources: states };
+        return json(res, 200, { schemaVersion: 2, chainId: 56, pool, deploymentPending: false,
+          index, rows: rows.slice((page-1)*pageSize, page*pageSize), page, pageSize, total: rows.length, totalPages: Math.ceil(rows.length/pageSize) });
       }
       if (req.method === 'GET' && url.pathname === '/api/status') return json(res, 200, await readStatus());
       if (req.method === 'POST' && url.pathname === '/rpc') {
@@ -172,13 +188,21 @@ async function main() {
     storagePath: path.join(dataDir, 'chain-history.json'), confirmations: 12,
     chunkSize: Number(process.env.BEM_HISTORY_CHUNK_SIZE ?? 100),
     maxBlocksPerSync: Number(process.env.BEM_HISTORY_MAX_BLOCKS_PER_SYNC ?? 400) });
+  const poolHistories = {};
+  const names = { '1': 'Bem2075Raffle13061Test1BSC', '10': 'Bem2075Raffle13061Pool10BSC', '50': 'Bem2075Raffle13061Pool50BSC', '100': 'Bem2075Raffle13061BSC' };
+  for (const [poolId, deployment] of Object.entries(POOL_DEPLOYMENTS)) {
+    if (keccak256(await rpc('eth_getCode', [deployment.address, 'latest'])) !== deployment.runtimeCodeHash) throw new Error('Registered pool runtime mismatch');
+    const abi = JSON.parse(await fs.readFile(path.join(ROOT, 'outputs/bem-raffle-2075/production-v2', names[poolId]+'.abi.json'), 'utf8'));
+    poolHistories[poolId] = createChainHistory({ rpc, poolId, gameAddress: deployment.address, abi, deploymentBlock: deployment.deploymentBlock,
+      storagePath: path.join(dataDir, 'chain-history-pool-'+poolId+'.json'), confirmations: 12, chunkSize: 100, maxBlocksPerSync: 1000 });
+  }
   const credentialPath = process.env.BEM_ADMIN_CREDENTIALS_FILE;
   if (!credentialPath || !path.isAbsolute(credentialPath)) throw new Error('Set BEM_ADMIN_CREDENTIALS_FILE to an absolute protected path');
   const adminCredential = JSON.parse(await fs.readFile(credentialPath, 'utf8'));
-  const { server } = await createProductionServer({ port, rpc, manifest, history, publicOrigin: process.env.BEM_PUBLIC_ORIGIN, adminCredential });
+  const { server } = await createProductionServer({ port, rpc, manifest, history, poolHistories, publicOrigin: process.env.BEM_PUBLIC_ORIGIN, adminCredential });
   await new Promise((resolve, reject) => { server.once('error', reject); server.listen(port, '127.0.0.1', resolve); });
   let syncing = false;
-  async function sync() { if (syncing) return; syncing = true; try { await history.sync(); } catch { /* Index retains stale/error state; never substitute invented history. */ } finally { syncing = false; } }
+  async function sync() { if (syncing) return; syncing = true; try { await Promise.allSettled([history, ...Object.values(poolHistories)].map(index => index.sync())); } finally { syncing = false; } }
   const timer = setInterval(sync, 15000); sync();
   const stop = () => { clearInterval(timer); server.close(() => process.exit(0)); };
   process.once('SIGINT', stop); process.once('SIGTERM', stop);

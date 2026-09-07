@@ -1,0 +1,126 @@
+/* Shared player-page spacing and readable copy; loaded after each page's existing theme. */
+.player-page{font-size:14px}
+.player-page .shell{min-width:0}
+.player-page .shell>.wallet-bar{margin-top:22px}
+.player-page a,.player-page a:visited{color:#a52b32;text-underline-offset:3px}
+.player-page a:hover{color:#82222a}
+.player-page button,.player-page select{min-height:44px;font-size:14px}
+.player-page .wallet-actions{display:flex;align-items:center;gap:8px;min-width:0;max-width:100%;flex-wrap:wrap}
+.player-page .wallet-actions>button{min-height:50px;font-size:14px;white-space:normal;overflow-wrap:anywhere}
+.player-page .language-switch{display:inline-flex;align-items:center;flex:none;margin-left:0;gap:2px;padding:2px}
+.player-page .language-switch button{min-width:44px;min-height:44px;padding:8px;flex:none;flex-basis:auto;font-size:14px;white-space:nowrap}
+.player-page .wallet-actions .language-switch button{flex:none;flex-basis:auto}
+.player-page .wallet-bar>div:first-child{min-width:0;max-width:100%}
+.player-page .wallet-address,.player-page .wallet-browser-help input{font-size:14px;line-height:1.8}
+.player-page .wallet-foot,.player-page .wallet-bar .wallet-foot,.player-page .wallet-browser-help,
+.player-page .notice,.player-page .muted,.player-page .fine-print,.player-page .record-note,
+.player-page .purchase-card .muted,.player-page .purchase-card .fine-print,.player-page .refund-card .fine-print,
+.player-page .history-card .section-heading .muted,.player-page .empty-state{font-size:14px;line-height:1.8}
+.player-page .timing-card p,.player-page .pool-selection-detail,.player-page .pool-selection-status,
+.player-page .hero .hero-message .community-copy,.player-page .verification-card p,.player-page #selected-help{font-size:15px;line-height:1.8}
+.player-page .hero p,.player-page .hero .hero-message .local-mode-note{font-size:14px;line-height:1.8}
+.player-page .eyebrow,.player-page .wallet-bar .eyebrow,.player-page .hero .eyebrow,
+.player-page .payout span,.player-page .payout small,.player-page .processor-stats span,.player-page .processor-stats small,
+.player-page .prize-card-label,.player-page .prize-equivalents small,.player-page .market-footer,
+.player-page .machine-heading,.player-page .animation-note,.player-page .steps,.player-page .phase,
+.player-page .proof-fields dt,.player-page .history-entry small,.player-page .public-history-row small,
+.player-page .public-history-row time,.player-page .hero .rank-feature small{font-size:13px;line-height:1.8}
+.player-page .purchase-summary small,.player-page .draw-countdown-panel small,.player-page .prize>span small{font-size:13px;line-height:1.8}
+.player-page #my-numbers{font-size:14px;line-height:1.8}
+.player-page .market-unit,.player-page .progress-label,.player-page .round-heading,.player-page .reel-message,
+.player-page .contract-links,.player-page .history-entry .mono,.player-page .proof-fields .mono,
+.player-page .tx-entry,.player-page .tx-entry small,.player-page .proof-event pre,.player-page label,
+.player-page .public-history-row a,.player-page .tabs a,.player-page .tabs button{font-size:14px;line-height:1.8}
+.player-page .pool-selection-heading{font-size:16px}
+.player-page .pool-choice span{font-size:14px;line-height:1.8}
+.player-page .pool-choice small{font-size:13px;line-height:1.8}
+.player-page .pool-choice{min-width:0;white-space:normal;overflow-wrap:anywhere}
+.player-page .winner-broadcast,.player-page .winner-broadcast>b{font-size:14px;line-height:1.8}
+.player-page .winner-broadcast button{min-height:44px;font-size:13px}
+.player-page>.winner-broadcast-dock{position:sticky;top:0;z-index:20;background:#fff6e7;border-bottom:1px solid #e5cfaa;box-shadow:0 3px 10px #7554310a}
+.player-page .winner-broadcast-dock .winner-broadcast{display:flex;align-items:center;gap:13px;min-height:60px;margin:0;padding:8px 0;border:0;border-radius:0;background:transparent}
+.player-page .winner-broadcast-dock .winner-broadcast>b{color:#b2232e;flex:none;letter-spacing:.04em}
+.player-page .winner-broadcast-dock .ticker-window{overflow:hidden;flex:1;min-width:0;white-space:nowrap;text-overflow:ellipsis;color:#806347}
+.player-page .winner-broadcast-dock .ticker-track{display:flex;width:max-content;align-items:center;gap:30px}
+.player-page .winner-broadcast-dock .ticker-track.is-moving{animation:winner-scroll 35s linear infinite}
+.player-page .winner-broadcast-dock .ticker-group{display:flex;align-items:center;gap:30px;white-space:nowrap}
+.player-page .winner-broadcast-dock .ticker-group a{text-decoration:none}
+.player-page .winner-broadcast-dock .ticker-group strong{color:#b4222d;margin:0 4px}
+.player-page .winner-broadcast-dock .winner-broadcast:hover .ticker-track,.player-page .winner-broadcast-dock .winner-broadcast:focus-within .ticker-track,.player-page .winner-broadcast-dock .ticker-window.paused .ticker-track{animation-play-state:paused}
+.player-page .winner-broadcast-dock button{flex:none;padding:7px 10px;min-width:44px}
+.player-page :is(button,input,textarea,select,summary,[tabindex],section[id]){scroll-margin-top:84px}
+@keyframes winner-scroll{to{transform:translateX(calc(-50% - 15px))}}
+@media(prefers-reduced-motion:reduce){
+  .player-page .winner-broadcast-dock .ticker-track.is-moving{animation:none}
+  .player-page .winner-broadcast-dock .ticker-window{overflow-x:auto}
+  .player-page .winner-broadcast-dock .ticker-track>[aria-hidden]{display:none}
+}
+.player-page .quick-picks button,.player-page .quiet{min-height:44px;font-size:14px}
+.player-page .machine-heading,.player-page .progress-label{flex-wrap:wrap;gap:8px}
+.player-page footer{font-size:13px;line-height:1.8;margin-top:24px;padding:20px 0 26px;overflow-wrap:anywhere}
+
+/* The records page uses the same content width, card rhythm and warm-red links. */
+.player-page .page-navigation{display:flex;align-items:center;justify-content:space-between;gap:14px;margin:22px 0 18px}
+.player-page .page-return{display:inline-flex;align-items:center;gap:8px;min-height:44px;padding:10px 14px;border:1px solid #dfc8a8;border-radius:7px;background:#fffaf0;color:#a52b32;font-size:14px;line-height:1.6;text-decoration:none}
+.player-page .burn-intro{padding:26px}
+.player-page .burn-intro h1{font-size:28px;line-height:1.4;margin:10px 0 18px}
+.player-page .burn-intro p{font-size:15px;line-height:1.8;max-width:none}
+.player-page .burn-intro .record-note{font-size:14px}
+.player-page .burn-intro .burn-address{font-size:14px;line-height:1.8;margin-bottom:0}
+.player-page .burn-list{margin-top:20px}
+.player-page .burn-toolbar{margin:0 0 20px;gap:12px}
+.player-page .burn-toolbar label{margin:0;flex:none}
+.player-page .burn-toolbar select{min-width:0;max-width:100%;font-size:14px}
+.player-page .burn-toolbar .record-note{flex:1 1 220px;font-size:14px;line-height:1.8}
+.player-page .burn-table{font-size:14px;line-height:1.8}
+.player-page .burn-table th,.player-page .burn-table td small,.player-page .burn-table td::before{font-size:13px;line-height:1.8}
+.player-page .burn-table .hash{font-size:14px;line-height:1.8}
+.player-page .burn-list .empty-state{font-size:15px;line-height:1.8}
+.player-page .burn-pager{flex-wrap:wrap;font-size:14px}
+
+@media(max-width:760px){
+  .player-page .wallet-actions{display:grid;grid-template-columns:auto minmax(0,1fr);width:100%;gap:8px}
+  .player-page .wallet-actions .language-switch{grid-column:1;grid-row:1;justify-self:start}
+  .player-page #connect-wallet{grid-column:2;grid-row:1;min-width:0}
+  .player-page #copy-browser-url,.player-page #switch-network{grid-column:1/-1;min-width:0}
+  .player-page .wallet-actions button:last-child{flex-basis:auto}
+  .player-page .wallet-browser-help{min-width:0}
+  .player-page .hero .hero-message .community-copy{font-size:15px}
+}
+@media(max-width:560px){
+  .player-page .shell>.wallet-bar{margin-top:16px}
+  .player-page .pool-choice strong{font-size:17px;line-height:1.5}
+  .player-page .pool-selection-status,.player-page .pool-selection-detail{font-size:15px;line-height:1.8}
+  .player-page .page-navigation{margin:16px 0;gap:10px}
+  .player-page .page-return{padding:10px 12px;min-width:0}
+  .player-page .burn-intro{padding:20px}
+  .player-page .burn-intro h1{font-size:24px}
+  .player-page .burn-toolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px}
+  .player-page .burn-toolbar label,.player-page .burn-toolbar .record-note{grid-column:1/-1}
+  .player-page .burn-toolbar select{width:100%}
+  .player-page .burn-toolbar button{max-width:150px;white-space:normal}
+  .player-page footer{gap:12px;font-size:13px}
+}
+
+/* The chip, ranking and prize share one row; no empty grid cell above the prize. */
+.player-page .reactor>.hero:has(.prize-card){grid-template-columns:minmax(140px,1fr) minmax(125px,.85fr) minmax(240px,1.4fr);align-items:stretch;gap:16px}
+.player-page .hero:has(.prize-card) .hero-awards{display:contents}
+.player-page .hero:has(.prize-card) .processor-chip{grid-column:1;grid-row:1;align-self:stretch;display:flex;flex-direction:column;justify-content:center;width:100%;height:auto;min-height:250px;margin:0}
+.player-page .hero:has(.prize-card) .processor-chip-art{position:relative;inset:auto;flex:none;width:100%;height:auto;max-height:260px;object-fit:contain}
+.player-page .hero:has(.prize-card) .processor-chip-caption{position:static;margin:10px auto 0}
+.player-page .hero:has(.prize-card) .rank-feature{grid-column:2;grid-row:1;align-self:stretch;box-sizing:border-box;padding:18px 12px}
+.player-page .hero:has(.prize-card) .prize-card{grid-column:3;grid-row:1;align-self:stretch;width:100%;margin:0;padding:18px;gap:6px}
+.player-page .hero:has(.prize-card) .hero-content{grid-column:1/-1;grid-row:2;margin-top:8px}
+.player-page .hero:has(.prize-card) .hero-message{grid-column:1/-1;grid-row:3}
+.player-page .hero .prize-main strong{font-weight:750}
+.player-page .prize-card-label,.player-page .prize-main>span,.player-page .prize-equivalents small,.player-page .prize-equivalents b,.player-page .market-unit,.player-page .market-footer{font-weight:700}
+.player-page .prize-equivalents{gap:8px}
+.player-page .prize-equivalents b{font-size:17px}
+@media(max-width:760px){
+  .player-page .reactor>.hero:has(.prize-card){grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
+  .player-page .hero:has(.prize-card) .processor-chip{min-height:180px;max-width:230px;justify-self:center}
+  .player-page .hero:has(.prize-card) .rank-feature{flex-direction:column;text-align:center;justify-content:center}
+  .player-page .hero:has(.prize-card) .prize-card{grid-column:1/-1;grid-row:2}
+  .player-page .hero:has(.prize-card) .hero-content{grid-row:3}
+  .player-page .hero:has(.prize-card) .hero-message{grid-row:4}
+}
