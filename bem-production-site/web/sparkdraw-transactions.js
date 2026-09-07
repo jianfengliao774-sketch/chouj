@@ -1,6 +1,7 @@
 import {Interface,keccak256,getAddress,toQuantity} from 'ethers';
 import abi from './sparkdraw-abi.json' with {type:'json'};
 import {profile} from './sparkdraw-profiles.js';
+import {requirePoolSales} from './sparkdraw-sales-policy.js';
 import {SPARKDRAW as F} from './sparkdraw-config.js';
 import {enforcePurchaseGasBudget} from './purchase-gas-policy.js';
 import {matchesIntent,validReplacement,recoverTransaction,replacementStatus} from './transaction-recovery.js';
@@ -18,7 +19,7 @@ export function parseTickets(mode,count,text){
   }
   if(!set.size)fail('TICKET_RANGE');return{count:set.size,tickets:[...set].sort((a,b)=>a-b)};
 }
-export function createSparkDrawTransactions({rpc,wallet,context,storage=localStorage,onChange=()=>{},locks=globalThis.navigator?.locks,now=Date.now}){
+export function createSparkDrawTransactions({rpc,wallet,context,storage=localStorage,onChange=()=>{},locks=globalThis.navigator?.locks,now=Date.now,checkSales=requirePoolSales}){
   let busy=false,polling=false,cursor=0;const discovery=new Map();
   const load=()=>{
     const raw=storage.getItem(KEY),value=raw?JSON.parse(raw):null;
@@ -73,6 +74,7 @@ export function createSparkDrawTransactions({rpc,wallet,context,storage=localSto
     finally{cursor++;polling=false;}
   }
   async function execute({poolId,method,args,kind,count,roundId}){
+    checkSales(poolId,method);
     const input={poolId,method,args,kind};
     const work=async()=>{
       if(busy)fail('TRANSACTION_IN_FLIGHT');busy=true;

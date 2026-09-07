@@ -7,7 +7,7 @@ const link=hash=>{const a=node('a',hash);a.href='https://bscscan.com/tx/'+hash;a
 async function refresh(){try{
   const d=await api('/api/admin/overview');$('login-panel').hidden=true;$('admin-content').hidden=false;$('admin-account').textContent=d.session.username;
   $('today-completed').textContent=d.pools.reduce((n,p)=>n+p.todayCompleted,0);$('activity-day').textContent=d.day+' · UTC+0 统计日';$('activity-generated').textContent='已确认链上记录';
-  $('activity-pools').replaceChildren(...d.pools.map(p=>{const box=node('section','');box.className='panel';box.append(node('h2',`${p.poolId} BEM · 今日完成 ${p.todayCompleted} 期`),node('p',p.address),node('p',`索引 ${p.index.state} · ${p.index.indexedThrough} / ${p.index.targetBlock}`));
+  $('activity-pools').replaceChildren(...d.pools.map(p=>{const box=node('section','');box.className='panel';box.append(node('h2',`${p.poolId==='0.1'?'历史场次':p.poolId+' BEM'} · 今日完成 ${p.todayCompleted} 期`),node('p',p.address),node('p',`索引 ${p.index.state} · ${p.index.indexedThrough} / ${p.index.targetBlock}`));
     for(const r of p.rounds){const detail=node('details',''),summary=node('summary',`${r.displayRoundId||r.roundId} · ${r.sold} 份 · 状态 ${r.status}`);detail.append(summary);
       if(r.startedAt&&r.lockedAt)detail.append(node('p',`${r.sold===10000?'售满':'封盘'}用时：${Math.round((Date.parse(r.lockedAt)-Date.parse(r.startedAt))/1000)} 秒`));
       let loaded=false;detail.ontoggle=async()=>{if(!detail.open||loaded)return;try{const data=await api(`/api/admin/round?pool=${p.poolId}&round=${r.roundId}`),wallets=new Map();
