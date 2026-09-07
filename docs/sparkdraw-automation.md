@@ -2,25 +2,23 @@
 
 生产后台 `/admin.html` 的「自动开奖保险箱」用于绑定 Google Authenticator、启停服务和补充 Gas。初次绑定需要管理员在自己的手机输入设置密钥，并提交当前 6 位验证码。未绑定或暂停时，后台不签发新的交易。
 
-初始独立执行钱包：`0xb4856db6cd174D5E09b9B844a107cCB6Fdd3CCD8`。五档合约共用当前执行钱包；后台显示实际启用的地址。它不持有 13061 NFT，也不拥有用户奖金或退款的领取权限。后台支持导入指定私钥并替换执行钱包，不提供已保存私钥的显示或下载。
+初始独立执行钱包：`0xb4856db6cd174D5E09b9B844a107cCB6Fdd3CCD8`。五档合约共用当前执行钱包；后台显示实际启用的地址。初始钱包不持有 13061 NFT；导入的钱包可以是容器持有人，但自动开奖服务不代领用户奖金或退款。后台支持导入指定私钥并替换执行钱包，不提供已保存私钥的显示或下载。
 
-后台只签发五个固定合约的 closeRound、fulfillRandomness、settle、openRefunds、burnUnclaimed 和 burnUnclaimedPrize，交易 value 必须为零。目标未来 drand 轮次由合约确定，证明仍由链上验证；后台负责送达，不能选择中奖号码。奖金与退款仍归原收款钱包领取。
+后台开奖只签发五个固定合约的 closeRound、fulfillRandomness、settle、openRefunds、burnUnclaimed 和 burnUnclaimedPrize，这些维护交易 value 必须为零。另允许下文规定的固定容器补充 Gas 交易。目标未来 drand 轮次由合约确定，证明仍由链上验证；后台负责送达，不能选择中奖号码。奖金与退款仍归原收款钱包领取。
 
 费用默认限制：单笔最高 0.001 BNB、Gas price 最高 0.1 Gwei、每日最多预留 0.003 BNB。超出限制会停止该笔发送并显示状态。预算按 UTC 签发日核算，包括回退交易的实际 Gas。节点、链或随机数服务不可用时重试，不能保证链本身永不延迟。
 
 ## 初次启用
 
 1. 登录后台，点击「绑定谷歌验证器」。在 Google Authenticator 选择输入设置密钥、基于时间。
-2. 输入验证码，点击「验证并开启自动开奖」。没有 BNB 时会显示等待 Gas。
-3. 连接当前持有 13061 容器的钱包，选择拨款金额并在钱包确认。容器执行需额外协议调用费，当前链上 EXEC_FEE 为 0.0002 BNB，由持有人钱包支付；此外还有网络 Gas。执行钱包收到容器拨出的 BNB 后自动运行。
-
-默认显示 0.003 BNB 拨款，但不自动转账。2026-09-07 已进行 0.003 BNB 的 eth_estimateGas 模拟，估算 136,927 Gas；模拟未签名、未发送资金。
+2. 输入验证码，点击「验证并授权 3 天」。授权期间后台自动执行，关闭时需在独立弹窗输入验证码。
+3. 可导入容器当前持有人钱包作为执行钱包。满足下文余额和费用条件时，后台自动从容器补充 Gas；执行钱包需先有支付调用费和网络费的 BNB。
 
 ## 服务器部署
 
 `ops/sparkdraw-keeper.service` 用独立 sparkdraw-keeper 系统用户执行，flock 防止重复进程。服务器生成的执行私钥和 TOTP 密钥分别通过 systemd-creds 的主机密钥加密，保存在 `/etc/credstore.encrypted`；服务启动时由 systemd 提供只读凭据。主机加密不等于外部 HSM，服务器 root 仍是信任边界。不要将凭据、主机加密密钥、验证码设置密钥或签名交易原文放入仓库和日志。
 
-网站加载 `ops/sparkdraw-vault.conf`，读取独立 TOTP 凭据。验证码用于绑定和启停操作，不用于每次开奖。既有管理员密码、同源检查仍适用。验证码单次使用、允许一个时间步偏差，连续五次错误需等待五分钟。
+网站加载 `ops/sparkdraw-vault.conf`，读取独立 TOTP 凭据。验证码用于登录、绑定、导入和启停操作，不用于每次开奖。既有管理员密码、同源检查仍适用。验证码单次使用、允许一个时间步偏差，连续五次错误需等待五分钟。
 
 `/var/lib/sparkdraw-control/control.json` 由 app 用户写入，执行用户通过 app 组只读访问。初始 enabled=false。网站只读取 `/run/sparkdraw-keeper/status.json` 的公开运行状态。
 
@@ -32,7 +30,7 @@
 
 ## 前端协作
 
-后台 UI 位于 `web/sparkdraw-vault-ui.js` 和 `web/admin.html`。`automation-wallet.js` 仅含公开地址。业务签名约束位于 `sparkdraw-automation-core.mjs`，执行循环位于 `sparkdraw-automation.mjs`。页面修改不得添加任意目标、任意 calldata 或自动拨款接口。私钥导入必须保留管理员登录、同源检查、TOTP 和暂停后切换要求。
+后台 UI 位于 `web/sparkdraw-vault-ui.js` 和 `web/admin.html`。`automation-wallet.js` 仅含公开地址。业务签名约束位于 `sparkdraw-automation-core.mjs`，执行循环位于 `sparkdraw-automation.mjs`。页面修改不得添加任意目标、任意 calldata 或绕过固定补充规则的拨款接口。私钥导入必须保留管理员登录、同源检查、TOTP 和暂停后切换要求。
 
 运行 `node --test test/bem-sparkdraw-automation.test.mjs test/bem-sparkdraw-service.test.mjs test/bem-sparkdraw-replay.test.mjs` 验证维护白名单、TOTP、后台鉴权和卷轴回放。`node scripts/check_automation_funding.mjs` 只读核对容器费用及模拟拨款，不广播交易。
 
@@ -43,3 +41,11 @@
 导入通过 HTTPS 同源管理员接口 `/api/admin/vault/key`，不会写入浏览器存储或日志。服务器以 AES-256-GCM 加密私钥，绑定记录编号、地址和时间，密文保存在 `/var/lib/sparkdraw-key-vault`（目录 app:sparkdraw-keeper 2750，文件 0640）。独立的 32 字节主密钥由 systemd-creds 主机密钥加密，网站与执行服务分别加载只读凭据。验证码用于授权保存操作，不是加密密钥。
 
 每份导入密文均保留，初始钱包凭据也保留。执行服务保存切换前的私有交易日志，继承全局 Gas 预算、历史和轮次进度。切换不会转移旧钱包余额；补充 Gas 的目标随当前执行钱包变化。此目录和凭据不得放入网站静态目录、Git 或对话。重启仍读取已保存的密文；缺少日志不会自动重建并继续花费。
+
+## 2026-09-07：权限修复、三日授权和容器自动补充
+
+网站的 UMask=0077 会覆盖文件创建参数。密文和控制文件在原子替换前明确 chmod 0640，私有验证码状态保留 0600；网站 systemd ReadWritePaths 显式包含密文目录和控制目录。已有密文只修正权限，不要求重新上传。已验证但控制写入失败的导入，经核对原记录与无待确认交易后恢复授权，保留原始授权时间。
+
+启用或导入成功后授权 72 小时，过期不再签发、广播新的开奖或补充 Gas 交易，已有交易仍核对结果。前端授权期间隐藏验证码输入框；关闭服务通过独立验证码弹窗，关闭立即撤销授权。后台登录在验证器绑定后要求账号、密码和 TOTP，登录与执行授权分开，登录不会延长三日授权。首次尚未绑定时仅允许通过账号密码进入绑定流程。
+
+当保险箱钱包是 13061 容器当前持有人时，执行钱包余额低于 0.001 BNB 可自动补充固定 0.003 BNB，每 UTC 日最多一笔尝试（失败也计次）。签名只允许固定容器 execute 将 BNB 转给签名钱包，data 为空、operation=0、容器费用不高于 0.0002 BNB。实际调用费和网络费都计入每日 0.003 BNB 费用上限。执行钱包必须先有足够 BNB 支付调用费和网络费。补充过程与开奖共用持久化交易日志和 nonce，不存在任意收款人或调用接口。

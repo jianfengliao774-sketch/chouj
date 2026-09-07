@@ -1,6 +1,8 @@
 import test from 'node:test';import assert from 'node:assert/strict';import fs from 'node:fs/promises';import os from 'node:os';import path from 'node:path';
 import {Wallet} from 'ethers';
-import {ACTIONS,chooseAutomationAction,validateAutomationTransaction} from '../bem-production-site/sparkdraw-automation-core.mjs';
+import {ACTIONS,FUNDING,FUNDING_LIMITS,chooseAutomationAction,validateAutomationTransaction} from '../bem-production-site/sparkdraw-automation-core.mjs';
+import {SPARKDRAW} from '../bem-production-site/web/sparkdraw-config.js';
+import {AUTHORIZATION_MS,authorizedControl,executionEnabled} from '../bem-production-site/sparkdraw-authorization.mjs';
 import {profile} from '../bem-production-site/web/sparkdraw-profiles.js';
 import {createSparkDrawVault,totpCode,matchTotp} from '../bem-production-site/sparkdraw-vault.mjs';
 test('automation respects sealed beacon time, timeout precedence and claim deadlines',()=>{
@@ -31,4 +33,18 @@ test('Google TOTP vectors, enrollment, replay protection and rate limiting',asyn
   assert.ok(!JSON.stringify(await vault.status()).includes(secret));
   for(let n=0;n<5;n++)await assert.rejects(()=>vault.update({code:'xxxxxx',enabled:true,username:'admin'}));
   await assert.rejects(()=>vault.update({code:totpCode(secret,4),enabled:true,username:'admin'}),e=>e.authStatus===429);
+});
+
+test('authorization lasts 72 hours, expires at the exact boundary, and binds imported key activation',()=>{
+  assert.equal(AUTHORIZATION_MS,259200000);const control={enabled:false,resumeAfterKeyId:'saved-key',authorizationExpiresAt:1000+AUTHORIZATION_MS};
+  assert.equal(authorizedControl(control,1000),true);assert.equal(executionEnabled(control,'old-key',1000),false);assert.equal(executionEnabled(control,'saved-key',1000),true);
+  assert.equal(executionEnabled(control,'saved-key',control.authorizationExpiresAt-1),true);assert.equal(executionEnabled(control,'saved-key',control.authorizationExpiresAt),false);
+  assert.equal(executionEnabled({enabled:true},'saved-key',1000),false);assert.equal(executionEnabled({enabled:false,authorizationExpiresAt:control.authorizationExpiresAt},'saved-key',1000),false);
+});
+
+test('container refill is fixed to 13061, fixed amount, signer recipient and empty call data',async()=>{
+  const wallet=Wallet.createRandom();const tx={chainId:56n,type:0,to:SPARKDRAW.revenue,value:FUNDING_LIMITS.executionFee,nonce:1,gasLimit:200000n,gasPrice:50000000n,data:FUNDING.encodeFunctionData('execute',[wallet.address,FUNDING_LIMITS.amount,'0x',0])};
+  assert.equal(validateAutomationTransaction(await wallet.signTransaction(tx),wallet.address).method,'fundGas');
+  for(const args of [[Wallet.createRandom().address,FUNDING_LIMITS.amount,'0x',0],[wallet.address,1n,'0x',0],[wallet.address,FUNDING_LIMITS.amount,'0x1234',0],[wallet.address,FUNDING_LIMITS.amount,'0x',1]])await assert.rejects(async()=>validateAutomationTransaction(await wallet.signTransaction({...tx,data:FUNDING.encodeFunctionData('execute',args)}),wallet.address));
+  await assert.rejects(async()=>validateAutomationTransaction(await wallet.signTransaction({...tx,value:FUNDING_LIMITS.executionFee+1n}),wallet.address));
 });

@@ -32,9 +32,10 @@ export function createKeyStore({directory,master}){
       const record=sealKey(privateKey,master);if(record.address.toLowerCase()!==String(expectedAddress).toLowerCase())throw Object.assign(Error('钱包地址与私钥不一致。'),{authStatus:400});
       const encoded=JSON.stringify(record);
       // Keep every encrypted import, including the previous executor key. No plaintext files.
-      await fs.writeFile(path.join(directory,record.id+'.json'),encoded,{mode:0o640,flag:'wx'});
+      const archive=path.join(directory,record.id+'.json');
+      await fs.writeFile(archive,encoded,{mode:0o640,flag:'wx'});await fs.chmod(archive,0o640);
       const temp=path.join(directory,'active-'+record.id+'.tmp');
-      await fs.writeFile(temp,encoded,{mode:0o640,flag:'wx'});await fs.rename(temp,path.join(directory,'active.json'));
+      await fs.writeFile(temp,encoded,{mode:0o640,flag:'wx'});await fs.chmod(temp,0o640);await fs.rename(temp,path.join(directory,'active.json'));
       return{id:record.id,address:record.address,savedAt:record.createdAt};
     }
   };

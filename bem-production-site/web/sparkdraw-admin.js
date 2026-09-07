@@ -17,5 +17,5 @@ async function refresh(){try{
       }catch(e){$('admin-notice').textContent=e.message;}};box.append(detail);
     }return box;}));$('admin-notice').textContent='仅显示新部署的五档合约。';
   }catch(e){if(e.status===401){$('login-panel').hidden=false;$('admin-content').hidden=true;}else $('admin-notice').textContent=e.message;}}
-$('login-form').onsubmit=async e=>{e.preventDefault();if(busy)return;busy=true;try{await api('/api/admin/login',{username:$('admin-username').value.trim(),password:$('admin-password').value});$('admin-password').value='';await refresh();}catch(e){$('admin-notice').textContent=e.message;}finally{busy=false;}};
+$('login-form').onsubmit=async e=>{e.preventDefault();if(busy)return;busy=true;try{await api('/api/admin/login',{username:$('admin-username').value.trim(),password:$('admin-password').value,code:$('admin-totp').value.trim()});$('admin-password').value='';$('admin-totp').value='';await refresh();}catch(e){$('admin-notice').textContent=e.message;}finally{busy=false;}};
 $('logout').onclick=async()=>{await api('/api/admin/logout',{});$('login-panel').hidden=false;$('admin-content').hidden=true;};$('refresh').onclick=refresh;refresh();

@@ -14,7 +14,7 @@ const url=new URL(location.href);let pool=POOL_IDS.includes(url.searchParams.get
 let wallet=null,account=null,chain=null,revision=0,mode='auto',snapshot=null,balance=null,allowance=0n,held=0n,loading=false,flow=false,serial=0,tab=document.body.dataset.initialTab||location.hash.slice(1)||'draw';
 let personalPage=1,burnPage=1,burnWalletPage=1,historyPage=1,recordsVersion=0,activeResult=null;
 let refundData=null,refundError=false,refundFlow=false;
-const roundName=r=>roundDisplay(r,{language:getLanguage(),now:chainNow()});
+const roundName=r=>r?.displayRoundId?roundDisplay(r):r?.status===0?t('待开盘','Not opened'):t('期号同步中','Number syncing');
 const context=()=>({account,key:JSON.stringify([revision,account,pool,chain,mode,$('ticket-count').value,$('selected-tickets').value])});
 const note=x=>{$('notice').textContent=x;};
 async function api(path,body){const r=await fetch(path,{cache:'no-store',signal:AbortSignal.timeout(15000),...(body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw Error(t('服务暂时无法响应，正在自动重试。','Service temporarily unavailable; retrying.'));}if(!r.ok)throw Error(d.error||'Network unavailable');return d;}
@@ -87,12 +87,14 @@ function render(){
 }
 const statusText=n=>[t('首次购买即开盘','Starts with first purchase'),t('购买中','Open'),t('已封盘','Closed'),t('等待随机数','Awaiting randomness'),t('等待计算结算','Awaiting settlement'),t('已开奖','Settled'),t('退款中','Refunding')][n];
 const chainNow=()=>snapshot?snapshot.time+Math.floor((Date.now()-snapshot.receivedAt)/1000):Math.floor(Date.now()/1000);
-function countdown(node,deadline){node.dataset.deadline=String(deadline);const left=Math.max(0,deadline-chainNow());node.textContent=left?[Math.floor(left/3600),Math.floor(left%3600/60),left%60].map(n=>String(n).padStart(2,'0')).join(':'):t('已到期','Expired');}
+function countdown(node,deadline){node.dataset.deadline=String(deadline);const left=Math.max(0,deadline-chainNow());node.textContent=left?[Math.floor(left/3600),Math.floor(left%3600/60),left%60].map(n=>String(n).padStart(2,'0')).join(':'):(node.dataset.expiredText||t('已到期','Expired'));}
+function reelPrizeVisible(r,account,now){return !!account&&r.status===5&&r.winner?.toLowerCase()===account.toLowerCase()&&BigInt(r.prize?.amount||0)>0n&&!r.prize.claimed&&!r.prize.burned&&now<Number(r.prize.claimDeadline);}
 function renderDraw(){
   const current=snapshot?.rounds[0],prior=snapshot?.rounds[1],draw=prior&&[3,4,5].includes(prior.status)?prior:current;$('countdown-panel').hidden=false;
   const deadline=draw&&[3,4].includes(draw.status)?draw.beaconAvailableAt:current?.earlyDrawDeadline||current?.fundingDeadline;
+  $('countdown-value').dataset.expiredText=draw&&[3,4].includes(draw.status)||current?.sold>=9500?t('正在开奖','Drawing…'):t('募集已结束','Funding ended');
   $('countdown-label').textContent=draw&&[3,4].includes(draw.status)?t('随机数可提交倒计时','Randomness available in'):t('本期募集倒计时','Funding countdown');
-  if(deadline)countdown($('countdown-value'),deadline);else{$('countdown-value').textContent='—';delete $('countdown-value').dataset.deadline;}
+  if(deadline)countdown($('countdown-value'),deadline);else{$('countdown-value').textContent=draw?.status===5?t('已开奖','Draw completed'):'—';delete $('countdown-value').dataset.deadline;}
   const worker=snapshot?.keeper?.worker,automatic=worker?.online&&worker.enabled&&BigInt(worker.balanceWei||0)>0n;
   $('countdown-note').textContent=draw&&[3,4].includes(draw.status)?automatic?t('后台自动处理随机数证明与开奖结算，完成后公布中奖号码。','The backend handles the randomness proof and settlement, then publishes the winning number.'):t('等待开奖服务就绪，结果确认后公布。','Waiting for the draw service; the confirmed result will be published.'):t('首次购买开始计时，开奖操作由后台处理。','Timing starts with the first purchase; the backend handles the draw.');
   const win=draw?.status===5?draw:null;activeResult=win;
@@ -101,7 +103,7 @@ function renderDraw(){
   $('reel-message').replaceChildren(win?links('address',win.winner,t('中奖钱包：','Winner: ')+win.winner):el('span',t('尚未产生中奖号码。','No winning number yet.')));$('replay').disabled=!win;
   const actions=$('draw-actions');actions.replaceChildren();
   for(const r of snapshot?.rounds||[]){
-    if(r.status===5&&r.prize.amount!=='0'&&!r.prize.claimed&&!r.prize.burned)actions.append(claimButton({...r,prize:{...r.prize,winner:r.winner}},pool));
+    if(reelPrizeVisible(r,account,chainNow()))actions.append(claimButton({...r,prize:{...r.prize,winner:r.winner}},pool));
   }
 
 }

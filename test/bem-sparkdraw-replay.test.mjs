@@ -3,6 +3,17 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 const source=fs.readFileSync(new URL('../bem-production-site/web/sparkdraw-player.js',import.meta.url),'utf8');
+test('reel claim button is visible only to the winner with an unclaimed unexpired prize',()=>{
+  const c=vm.createContext({});vm.runInContext(source.slice(source.indexOf('function reelPrizeVisible('),source.indexOf('function renderDraw()')),c);
+  const winner='0x'+'a'.repeat(40),r={status:5,winner,prize:{amount:'9500000',claimed:false,burned:false,claimDeadline:200}};
+  assert.equal(c.reelPrizeVisible(r,null,100),false);assert.equal(c.reelPrizeVisible(r,'0x'+'b'.repeat(40),100),false);assert.equal(c.reelPrizeVisible(r,winner,100),true);
+  for(const patch of [{claimed:true},{burned:true},{amount:'0'},{claimDeadline:100}])assert.equal(c.reelPrizeVisible({...r,prize:{...r.prize,...patch}},winner,100),false);
+});
+test('draw countdown says drawing at zero while claim deadlines still say expired',()=>{
+  const c=vm.createContext({chainNow:()=>100,t:zh=>zh});vm.runInContext(source.slice(source.indexOf('function countdown('),source.indexOf('function renderDraw()')),c);
+  const draw={dataset:{expiredText:'正在开奖'}};c.countdown(draw,101);assert.equal(draw.textContent,'00:00:01');c.countdown(draw,100);assert.equal(draw.textContent,'正在开奖');
+  const claim={dataset:{}};c.countdown(claim,100);assert.equal(claim.textContent,'已到期');
+});
 test('public player cannot open a wallet to trigger a draw, while claims still connect',async()=>{
   let connections=0;const context=vm.createContext({account:null,picker:{open(){connections++;}},manager:{execute(){throw Error('unexpected send');}},render(){}});
   vm.runInContext(source.match(/async function action\(id,method,args\)\{[^\n]+/)[0],context);
