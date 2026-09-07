@@ -192,13 +192,39 @@ function transactionStatus(status){return({confirmed:t('已确认','Confirmed'),
 function showTransactionResult(r){note(r.kind==='buy'&&r.status==='confirmed'&&r.result?t('购买已确认：{n} 份，实付 {amount} BEM。','Purchase confirmed: {n} tickets, paid {amount} BEM.',{n:r.result.filled,amount:money(r.result.paid)}):r.kind==='approve'&&r.status==='confirmed'?t('授权已确认，可以继续购买。','Approval confirmed. You can continue purchasing.'):transactionStatus(r.status));partial(r);}
 function partial(result){if(!result?.result||result.result.filled>=result.result.requested)return;const r=result.result,dialog=el('dialog','');dialog.className='partial-fill-result';dialog.append(el('h2',t('部分购买成功','Partial purchase completed')),el('p',t('申请 {a} 份，成交 {b} 份；实际扣款 {c} BEM，其余 {d} BEM 未扣除。','Requested {a}, filled {b}; paid {c} BEM. The remaining {d} BEM was not charged.',{a:r.requested,b:r.filled,c:money(r.paid),d:money(r.unspent)})),button(t('知道了','OK'),()=>dialog.close()));document.body.append(dialog);dialog.onclose=()=>dialog.remove();dialog.showModal();}
 async function poll(force=false){try{const r=await manager.check({force});if(r){showTransactionResult(r);refresh();refreshRecords();return r;}}catch(e){failure(e);}return null;}
-async function waitReceipt(hash,key){for(let i=0;i<30;i++){if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});await poll();const r=manager.result(hash);if(r){if(r.status!=='confirmed')throw Error(transactionStatus(r.status));return;}await new Promise(resolve=>setTimeout(resolve,2000));}throw Object.assign(Error('TRANSACTION_PENDING'),{code:'TRANSACTION_PENDING'});}
+async function waitReceipt(hash,key){
+  const started=Date.now();
+  while(Date.now()-started<60000){
+    if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});
+    // An unrelated old transaction must not delay this approval. Check the
+    // returned hash first; replacement discovery remains available after 10 s.
+    let r=manager.result(hash);
+    if(!r){
+      try{await manager.checkHash(hash,{discover:Date.now()-started>=10000});}
+      catch(e){if(e.code!=='RPC_UNAVAILABLE')throw e;}
+      r=manager.result(hash);
+    }
+    if(r){if(r.status!=='confirmed')throw Error(transactionStatus(r.status));showTransactionResult(r);return;}
+    await new Promise(resolve=>setTimeout(resolve,Date.now()-started<10000?500:1000));
+  }
+  throw Object.assign(Error('TRANSACTION_PENDING'),{code:'TRANSACTION_PENDING'});
+}
+// Stock and account state do not depend on the typed quantity. Reuse one
+// short-lived, same-block snapshot while the user edits 1 / 1,000 / 5,000.
+const purchaseState=createPurchasePreparation({
+  context:()=>({key:JSON.stringify([account,pool,chain,snapshot?.currentRoundId])}),
+  load:async()=>{
+    const startedAt=Date.now(),id=pool,a=account,p=profile(id);
+    if(!snapshot?.currentRoundId)throw Object.assign(Error('ROUND_CHANGED'),{code:'ROUND_CHANGED'});
+    const current=BigInt(snapshot.currentRoundId),block=await rpc('eth_blockNumber',[]);
+    const values=await Promise.all([call(GAME,p.address,'currentRoundId',[],block),call(GAME,p.address,'rounds',[current],block),call(GAME,p.address,'ticketsOf',[current,a],block),call(TOKEN,F.bem,'balanceOf',[a],block),call(TOKEN,F.bem,'allowance',[a,p.address],block),call(GAME,p.address,'ticketWords',[current,0,556],block)]);
+    if(values[0][0]!==current)throw Object.assign(Error('ROUND_CHANGED'),{code:'ROUND_CHANGED'});
+    return{current,values,expiresAt:startedAt+5000};
+  }
+});
 async function preparePurchase(){
-  const key=context().key,id=pool,a=account,s=selection(),p=profile(id);
-  if(!snapshot?.currentRoundId)throw Object.assign(Error('ROUND_CHANGED'),{code:'ROUND_CHANGED'});
-  const current=BigInt(snapshot.currentRoundId),block=await rpc('eth_blockNumber',[]);
-  const [round,r,owned,b,al,stock]=await Promise.all([call(GAME,p.address,'currentRoundId',[],block),call(GAME,p.address,'rounds',[current],block),call(GAME,p.address,'ticketsOf',[current,a],block),call(TOKEN,F.bem,'balanceOf',[a],block),call(TOKEN,F.bem,'allowance',[a,p.address],block),s.tickets?null:call(GAME,p.address,'ticketWords',[current,0,556],block)]);
-  if(round[0]!==current)throw Object.assign(Error('ROUND_CHANGED'),{code:'ROUND_CHANGED'});
+  const key=context().key,id=pool,s=selection(),p=profile(id);
+  const {current,values:[,r,owned,b,al,stock],expiresAt}=await purchaseState.get();
   const filled=Math.min(s.count,10000-Number(r[1]),5000-Number(owned[0]));
   if(filled<=0)throw Object.assign(Error('ADDRESS_LIMIT'),{code:'ADDRESS_LIMIT'});
   if(b[0]<BigInt(filled)*p.ticketPrice)throw Object.assign(Error('INSUFFICIENT_BEM'),{code:'INSUFFICIENT_BEM'});
@@ -208,12 +234,13 @@ async function preparePurchase(){
   if(!needsApproval&&!chosen.length)throw Error(t('本期已售完，请等待下一期。','This round has sold out. Wait for the next round.'));
   const input=needsApproval?{poolId:id,method:'approve',args:[p.address,BigInt(s.count)*p.ticketPrice],kind:'approve'}:{poolId:id,method:'buySelected',args:[current,chosen],kind:'buy',roundId:current,count:chosen.length};
   await manager.prepare(input);
-  return {needsApproval,input};
+  return {needsApproval,input,expiresAt};
 }
-const purchasePreparation=createPurchasePreparation({context,load:preparePurchase});
+const purchasePreparation=createPurchasePreparation({context,load:preparePurchase,expiresAt:plan=>plan.expiresAt});
 function schedulePurchasePreparation(){
   clearTimeout(preparationTimer);
   if(!account||chain!==56||!snapshot||flow||manager.busy||!poolSalesEnabled(pool))return;
+  purchaseState.warm();
   preparationTimer=setTimeout(()=>purchasePreparation.warm(),180);
 }
 function purchaseProgress(zh,en){walletProgress=t(zh,en);note(walletProgress);render();}
@@ -223,25 +250,31 @@ async function buy(){
   flow=true;const key=context().key;
   try{
     purchaseProgress('正在打开钱包…','Opening your wallet…');
-    let plan=await purchasePreparation.get();
-    if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});
+    let plan;
+    const hash=await manager.execute(async()=>{
+      plan=await purchasePreparation.get();
+      if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});
+      if(plan.needsApproval)purchaseProgress('请在钱包中确认授权…','Confirm approval in your wallet…');
+      else purchaseProgress('请在钱包中确认购买…','Confirm purchase in your wallet…');
+      return plan.input;
+    });
     if(plan.needsApproval){
-      purchaseProgress('请在钱包中确认授权…','Confirm approval in your wallet…');
-      const hash=await manager.execute(plan.input);
       purchaseProgress('授权已提交，等待确认…','Approval sent; awaiting confirmation…');
       await waitReceipt(hash,key);
-      // Re-read after approval. Background preparation never carries stock,
-      // balances, allowance or gas across an arbitrarily long wallet wait.
-      purchasePreparation.clear();
+      // Re-read after approval; no stale stock, allowance or estimate survives
+      // an arbitrarily long wallet prompt or mining wait.
+      purchaseState.clear();purchasePreparation.clear();
       purchaseProgress('正在打开购买确认…','Opening purchase confirmation…');
-      plan=await purchasePreparation.get();
-      if(plan.needsApproval)throw Object.assign(Error('授权额度尚未同步，请稍后点击购买。'),{code:'APPROVAL_NOT_READY'});
+      await manager.execute(async()=>{
+        plan=await purchasePreparation.get();
+        if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});
+        if(plan.needsApproval)throw Object.assign(Error('授权额度尚未同步，请稍后点击购买。'),{code:'APPROVAL_NOT_READY'});
+        purchaseProgress('请在钱包中确认购买…','Confirm purchase in your wallet…');
+        return plan.input;
+      });
     }
-    if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});
-    purchaseProgress('请在钱包中确认购买…','Confirm purchase in your wallet…');
-    await manager.execute(plan.input);
     note(t('购买已提交，正在核对结果。','Purchase sent; checking the result.'));
-  }catch(e){failure(e);}finally{flow=false;walletProgress='';purchasePreparation.clear();render();}
+  }catch(e){failure(e);}finally{flow=false;walletProgress='';purchaseState.clear();purchasePreparation.clear();render();}
 }
 async function action(id,method,args){if(!['claimPrizes','refundMany','burnUnclaimedPrize','burnUnclaimed'].includes(method))throw Error('BACKEND_DRAW_ONLY');if(!account)return picker.open();await manager.execute({poolId:id,method,args,kind:method,roundId:Array.isArray(args[0])?0:args[0]});render();}
 function claimButton(r,id){const prize=r.prize,winner=prize?.winner||r.winner;let label=t('领取奖金','Claim prize');if(prize?.claimed)label=t('已领取','Claimed');else if(prize?.burned)label=t('已销毁','Burned');else if(chainNow()>=prize?.claimDeadline)label=t('领取期已结束','Claim window expired');

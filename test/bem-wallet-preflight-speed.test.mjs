@@ -8,13 +8,14 @@ const account='0x1111111111111111111111111111111111111111',other='0x222222222222
 const code=JSON.parse(fs.readFileSync(new URL('./fixtures/drand/deployed-five-runtime.json',import.meta.url))).code;
 const purchase={poolId:'5',method:'buySelected',args:[1,[0,17,9999]],kind:'buy',roundId:1,count:3};
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return{promise,resolve};};
-function fixture({initialAccounts,estimate,changeAtNonce,wrongCode=false,expensive=false,walletError=null}={}){
+function fixture({initialAccounts,estimate,changeAtNonce,wrongCode=false,expensive=false,walletError=null,nonceError=null,now=Date.now}={}){
   const requests=[],sent=[],values=new Map();let accountsReads=0,key='same',currentAccount=account;
   const wallet={async request(q){
     requests.push(q.method);
     if(q.method==='eth_accounts'){accountsReads++;return accountsReads===1&&initialAccounts?initialAccounts.promise:[currentAccount];}
     if(q.method==='eth_chainId')return'0x38';
     if(q.method==='eth_getTransactionCount'){
+      if(nonceError)throw nonceError;
       if(changeAtNonce==='account')currentAccount=other;
       if(changeAtNonce==='context')key='changed';
       return'0x3';
@@ -31,19 +32,20 @@ function fixture({initialAccounts,estimate,changeAtNonce,wrongCode=false,expensi
     throw Error(method);
   };
   const manager=createSparkDrawTransactions({rpc,wallet:()=>wallet,context:()=>({account,key}),
-    storage:{getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)},locks:{request:async(k,o,fn)=>fn({})}});
+    now,storage:{getItem:k=>values.get(k)||null,setItem:(k,v)=>values.set(k,v)},locks:{request:async(k,o,fn)=>fn({})}});
   return{manager,requests,sent};
 }
 
 test('fee reads run together; fresh nonce and final identity still precede send',async()=>{
   const initialAccounts=deferred(),estimate=deferred(),f=fixture({initialAccounts,estimate});
   const run=assert.rejects(f.manager.execute(purchase),{code:4001});
+  await new Promise(r=>setImmediate(r));
   for(const method of ['eth_getCode','eth_estimateGas','eth_gasPrice','eth_blockNumber'])assert.ok(f.requests.includes(method),method);
-  assert.equal(f.requests.includes('eth_getTransactionCount'),false);assert.equal(f.manager.pending,null);
+  assert.equal(f.requests.includes('eth_getTransactionCount'),true);assert.equal(f.manager.pending,null);
   initialAccounts.resolve([account]);estimate.resolve('0xf4240');await run;
   assert.equal(f.sent.length,1);assert.equal(f.requests.filter(m=>m==='eth_accounts').length,1);
   assert.equal(f.requests.filter(m=>m==='eth_chainId').length,1);
-  assert.deepEqual(f.requests.slice(-4),['eth_getTransactionCount','eth_accounts','eth_chainId','eth_sendTransaction']);
+  assert.deepEqual(f.requests.slice(-3),['eth_accounts','eth_chainId','eth_sendTransaction']);
   const tx=f.sent[0];assert.equal(tx.to,profile('5').address);assert.equal(tx.nonce,'0x3');assert.equal(tx.chainId,'0x38');
   assert.equal(tx.data,GAME.encodeFunctionData('buySelected',purchase.args));assert.equal(BigInt(tx.gas),1200000n);
   assert.equal(f.manager.pending,null);
@@ -83,4 +85,28 @@ test('wrapped rejection clears the record, but an ambiguous send error stays tra
     const f=fixture({walletError});await assert.rejects(f.manager.execute(purchase));
     assert.equal(f.manager.pending===null,rejected);
   }
+});
+
+
+test('input loading overlaps the wallet nonce; send waits for preparation and final identity',async()=>{
+  const input=deferred(),f=fixture();const run=assert.rejects(f.manager.execute(()=>input.promise),{code:4001});
+  await new Promise(r=>setImmediate(r));assert.deepEqual(f.requests,['eth_getTransactionCount']);
+  assert.equal(f.manager.pending,null);input.resolve(purchase);await run;
+  assert.equal(f.sent.length,1);assert.deepEqual(f.requests.slice(-3),['eth_accounts','eth_chainId','eth_sendTransaction']);
+});
+test('a slow preparation refreshes the early nonce, and a failed branch never sends',async()=>{
+  let time=0;const input=deferred(),f=fixture({now:()=>time});
+  const run=assert.rejects(f.manager.execute(()=>input.promise),{code:4001});await new Promise(r=>setImmediate(r));
+  time=5000;input.resolve(purchase);await run;assert.equal(f.requests.filter(m=>m==='eth_getTransactionCount').length,2);
+  const bad=fixture({nonceError:Error('nonce offline')});await assert.rejects(bad.manager.execute(purchase),/nonce offline/);
+  assert.equal(bad.sent.length,0);assert.equal(bad.manager.pending,null);
+  const rejected=fixture();await assert.rejects(rejected.manager.execute(()=>{throw Error('load failed');}),/load failed/);
+  assert.equal(rejected.sent.length,0);assert.equal(rejected.manager.pending,null);
+});
+test('editing a warmed ticket array invalidates calldata; identical values reuse preparation',async()=>{
+  const f=fixture(),input={...purchase,args:[1,Array.from({length:5000},(_,i)=>i)]};
+  const prepared=await f.manager.prepare(input);assert.strictEqual(await f.manager.prepare(input),prepared);
+  input.args[1][4999]=9999;await assert.rejects(f.manager.execute(input),{code:4001});
+  assert.equal(f.requests.filter(m=>m==='eth_estimateGas').length,2);
+  assert.equal(Number(GAME.decodeFunctionData('buySelected',f.sent[0].data)[1][4999]),9999);
 });
