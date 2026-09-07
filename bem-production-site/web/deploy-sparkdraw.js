@@ -16,8 +16,15 @@ function render(){
   $('wallet-address').textContent=account??F.deployer;
   $('deploy-list').replaceChildren(...order.map(kind=>{
     const row=document.createElement('div');row.className='scope-note';
-    const button=document.createElement('button');button.className='secondary';button.textContent=names[kind];
-    button.disabled=busy||(kind!=='verifier'&&!registry.verifier);button.onclick=()=>{selected=kind;estimate=null;render();};
+    const button=document.createElement('button');button.className=kind===selected?'':'secondary';button.textContent=(kind===selected?'已选择 · ':'')+names[kind];
+    button.setAttribute('aria-pressed',String(kind===selected));
+    button.disabled=busy||(kind!=='verifier'&&!registry.verifier);button.onclick=()=>{
+      if(selected!==kind)estimate=null;
+      selected=kind;render();
+      note('已选择'+names[kind]+'。请在这里核对费用，再确认本笔部署。');
+      $('deployment-actions').scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+      $('deployment-actions').focus({preventScroll:true});
+    };
     const text=document.createElement('p');const entry=completed(kind);
     if(entry){const a=document.createElement('a');a.href='https://bscscan.com/address/'+entry.address;a.textContent=entry.address;a.className='mono';a.target='_blank';a.rel='noopener noreferrer';text.append('已部署 · ',a);}
     else text.textContent=records[kind]?.hash?'已提交，等待核对':kind==='verifier'?'部署一次，五个场次共用':`容器 1% + 销毁 ${F.pools[kind].burnPercent}%`;
