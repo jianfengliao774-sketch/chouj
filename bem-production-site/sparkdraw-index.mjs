@@ -3,9 +3,10 @@ import path from 'node:path';
 import {Interface} from 'ethers';
 import {POOL_IDS,profile} from './web/sparkdraw-profiles.js';
 import {sparkDrawRecords} from './sparkdraw-records.mjs';
+import {globalRoundLabels} from './sparkdraw-round-numbering.mjs';
 const plain=x=>JSON.parse(JSON.stringify(x,(_,v)=>typeof v==='bigint'?v.toString():v));
 export async function createSparkDrawIndex({rpc,abi,directory,confirmations=12}){
-  const iface=new Interface(abi),states=new Map();let running=false;
+  const iface=new Interface(abi),states=new Map();let running=false,roundLabels=new Map();
   await fs.mkdir(directory,{recursive:true});
   for(const id of POOL_IDS){
     const p=profile(id),file=path.join(directory,'sparkdraw-v5-'+id+'.json');
@@ -13,6 +14,13 @@ export async function createSparkDrawIndex({rpc,abi,directory,confirmations=12})
     try{const saved=JSON.parse(await fs.readFile(file,'utf8'));if(saved.version!==5||saved.address!==p.address||!Array.isArray(saved.events))throw Error('Index identity mismatch');s=saved;}catch(e){if(e.code!=='ENOENT')throw e;}
     states.set(id,{s,file,status:'syncing',target:s.through,view:sparkDrawRecords(s.events,{pool:id,address:p.address})});
   }
+  function refreshLabels(){
+    const through=Math.min(...[...states.values()].map(x=>x.s.through));
+    const next=globalRoundLabels([...states.entries()].map(([poolId,x])=>({poolId,events:x.s.events})),through);
+    if(JSON.stringify([...next])===JSON.stringify([...roundLabels]))return;
+    roundLabels=next;for(const[id,x]of states)x.view=sparkDrawRecords(x.s.events,{pool:id,address:profile(id).address,roundLabels});
+  }
+  refreshLabels();
   const metadata=id=>{const x=states.get(id);return{state:x.status,indexedThrough:x.s.through,targetBlock:x.target,confirmations};};
   async function sync(){
     if(running)return;running=true;
@@ -35,10 +43,11 @@ export async function createSparkDrawIndex({rpc,abi,directory,confirmations=12})
           const endBlock=await rpc('eth_getBlockByNumber',['0x'+end.toString(16),false]);
           const next={...x.s,through:end,hash:endBlock.hash,events:[...x.s.events,...events]};
           await fs.writeFile(x.file+'.tmp',JSON.stringify(next));await fs.rename(x.file+'.tmp',x.file);x.s=next;
-          x.view=sparkDrawRecords(next.events,{pool:id,address:p.address});x.status=end>=target?'ready':'syncing';
+          x.view=sparkDrawRecords(next.events,{pool:id,address:p.address,roundLabels});x.status=end>=target?'ready':'syncing';
         }catch{x.status='stale';}
       }
+      refreshLabels();
     }finally{running=false;}
   }
-  return{sync,metadata,view:id=>states.get(id).view,events:id=>states.get(id).s.events};
+  return{sync,metadata,roundLabel:(id,roundId)=>roundLabels.get(id+':'+roundId),view:id=>states.get(id).view,events:id=>states.get(id).s.events};
 }

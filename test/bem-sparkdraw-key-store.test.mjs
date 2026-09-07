@@ -8,6 +8,19 @@ import {Wallet} from 'ethers';
 import {sealKey,openKey,createKeyStore,rotateJournal,privateWallet} from '../bem-production-site/sparkdraw-key-store.mjs';
 import {createSparkDrawVault,totpCode} from '../bem-production-site/sparkdraw-vault.mjs';
 
+test('strict server umask still permits the worker to read ciphertext and control but not TOTP state',{skip:process.platform==='win32'},async t=>{
+  const directory=await fs.mkdtemp(path.join(os.tmpdir(),'sparkdraw-umask-'));t.after(()=>fs.rm(directory,{recursive:true,force:true}));
+  const old=process.umask(0o077);
+  try{
+    const store=createKeyStore({directory,master:randomBytes(32)}),wallet=Wallet.createRandom();await store.save(wallet.privateKey,wallet.address);
+    for(const name of await fs.readdir(directory))assert.equal((await fs.stat(path.join(directory,name))).mode&0o777,0o640);
+    const secret='GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ';const vault=await createSparkDrawVault({directory,secret,statusFile:path.join(directory,'missing'),now:()=>60000});
+    await vault.update({code:totpCode(secret,2),enabled:false,enroll:true,username:'fixture'});
+    assert.equal((await fs.stat(path.join(directory,'automation-control.json'))).mode&0o777,0o640);
+    assert.equal((await fs.stat(path.join(directory,'sparkdraw-vault-state.json'))).mode&0o777,0o600);
+  }finally{process.umask(old);}
+});
+
 test('key encryption authenticates ciphertext and address and never persists plaintext',async t=>{
   const directory=await fs.mkdtemp(path.join(os.tmpdir(),'sparkdraw-key-'));t.after(()=>fs.rm(directory,{recursive:true,force:true}));
   const master=randomBytes(32),wallet=Wallet.createRandom(),r=sealKey(wallet.privateKey,master);

@@ -1,10 +1,9 @@
 import { getAddress } from 'ethers';
 import { SPARKDRAW } from './web/sparkdraw-config.js';
-import {utcDay,numberedRound} from './web/round-display.js';
 const add = (a, b) => (BigInt(a ?? '0') + BigInt(b ?? '0')).toString();
 
 // Derive public and personal records only from receipt-confirmed, persisted logs.
-export function sparkDrawRecords(events, { pool, address }) {
+export function sparkDrawRecords(events, { pool, address, roundLabels=new Map() }) {
   const rounds = new Map(), burns = [];
   const row = id => {
     if (!rounds.has(id)) rounds.set(id, { roundId:id,poolId:pool,gameAddress:address,status:0,sold:0,
@@ -44,11 +43,7 @@ export function sparkDrawRecords(events, { pool, address }) {
         destination:'0x000000000000000000000000000000000000dEaD',transactionHash:event.transactionHash,logIndex:event.logIndex,timeUtc});
     }
   }
-  const counters=new Map();
-  for(const r of [...rounds.values()].sort((a,b)=>Number(a.roundId)-Number(b.roundId))){
-    if(!r.fundingDeadline)continue;const started=r.fundingDeadline-SPARKDRAW.fundingSeconds,day=utcDay(started),sequence=(counters.get(day)||0)+1;
-    counters.set(day,sequence);r.dailySequence=sequence;r.displayRoundId=numberedRound(started,sequence);
-  }
+  for(const r of rounds.values())Object.assign(r,roundLabels.get(pool+':'+r.roundId)||{});
   for(const burn of burns)burn.displayRoundId=rounds.get(burn.roundId)?.displayRoundId;
   const all=[...rounds.values()].reverse();
   return {

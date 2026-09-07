@@ -5,5 +5,5 @@ export function roundDisplay(round,{now=Math.floor(Date.now()/1000)}={}){
   if(!round)return '—';
   if(round.displayRoundId)return round.displayRoundId;
   const opened=Number(round.fundingDeadline)>0?Number(round.fundingDeadline)-SPARKDRAW.fundingSeconds:now;
-  return round.dailySequence?numberedRound(opened,round.dailySequence):'—';
+  return round.globalSequence?numberedRound(opened,round.globalSequence):'—';
 }

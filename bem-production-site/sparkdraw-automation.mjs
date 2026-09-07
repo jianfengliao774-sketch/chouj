@@ -4,8 +4,9 @@ import {Wallet,Interface,keccak256} from 'ethers';
 import {POOL_IDS,profile,VERIFIER,VERIFIER_HASH} from './web/sparkdraw-profiles.js';
 import {AUTOMATION_WALLET} from './web/automation-wallet.js';
 import {SPARKDRAW as F} from './web/sparkdraw-config.js';
-import {ACTIONS,AUTOMATION_LIMITS as L,chooseAutomationAction,validateAutomationTransaction} from './sparkdraw-automation-core.mjs';
+import {ACTIONS,FUNDING,FUNDING_LIMITS as FL,AUTOMATION_LIMITS as L,chooseAutomationAction,validateAutomationTransaction} from './sparkdraw-automation-core.mjs';
 import {readActiveKey,openKey,rotateJournal} from './sparkdraw-key-store.mjs';
+import {executionEnabled} from './sparkdraw-authorization.mjs';
 const root=process.env.STATE_DIRECTORY,publicRoot=process.env.RUNTIME_DIRECTORY,credentials=process.env.CREDENTIALS_DIRECTORY;
 if(!root||!publicRoot||!credentials||!process.env.SPARKDRAW_CONTROL)throw Error('AUTOMATION_CONFIGURATION_REQUIRED');
 const keyDirectory=process.env.SPARKDRAW_VAULT_DIRECTORY;
@@ -17,7 +18,7 @@ let address=signer.address;
 const game=new Interface(JSON.parse(await fs.readFile(new URL('./web/sparkdraw-abi.json',import.meta.url),'utf8')));
 const endpoint=process.env.BEM_RPC_URL||'https://bsc-dataseed.bnbchain.org';
 if(new URL(endpoint).protocol!=='https:')throw Error('HTTPS_RPC_REQUIRED');
-let serial=0,stopped=false,enabled=false,balance='0',lastError=null,lastCheck=0,poolCursor=0;
+let serial=0,stopped=false,enabled=false,balance='0',lastError=null,lastCheck=0,poolCursor=0,authorizationExpired=false;
 const journalFile=path.join(root,'journal.json');
 let journal,freshJournal=false;try{journal=JSON.parse(await fs.readFile(journalFile,'utf8'));}catch(e){if(e.code!=='ENOENT')throw Error('INVALID_JOURNAL');freshJournal=true;journal={version:1,address,pending:null,spending:{},pools:{},history:[]};}
 if((journal.address!==address&&!initialKey)||journal.version!==1||!journal.pools||!journal.spending)throw Error('JOURNAL_BINDING_MISMATCH');
@@ -26,7 +27,7 @@ const save=()=>atomic(journalFile,journal,0o600);
 const rpc=async(method,params)=>{const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:++serial,method,params}),signal:AbortSignal.timeout(15000)});let d;try{d=await r.json();}catch{throw Error('RPC_UNAVAILABLE');}if(!r.ok||d.error)throw Error('RPC_UNAVAILABLE');return d.result;};
 const read=async(id,name,args=[],tag='latest')=>game.decodeFunctionResult(name,await rpc('eth_call',[{to:profile(id).address,data:game.encodeFunctionData(name,args)},tag]));
 const day=()=>new Date().toISOString().slice(0,10);
-const controlEnabled=control=>control.enabled===true||!!(control.resumeAfterKeyId&&control.resumeAfterKeyId===journal.keyId);
+const controlEnabled=control=>executionEnabled(control,journal.keyId);
 async function adoptKey(){
   const record=keyDirectory?await readActiveKey(keyDirectory):null;
   if(!record){if(journal.keyId)throw Error('VAULT_KEY_UNAVAILABLE');return;}
@@ -55,15 +56,16 @@ async function pending(){
     const [header,latest]=await Promise.all([rpc('eth_getBlockByNumber',[receipt.blockNumber,false]),rpc('eth_blockNumber',[])]);
     if(!header||header.hash!==receipt.blockHash||BigInt(latest)-BigInt(receipt.blockNumber)<2n){await publish('confirming');return true;}
     if(receipt.from?.toLowerCase()!==address.toLowerCase()||receipt.to?.toLowerCase()!==tx.to.toLowerCase())throw Error('RECEIPT_MISMATCH');
-    const spent=BigInt(receipt.gasUsed)*BigInt(receipt.effectiveGasPrice||tx.gasPrice),chargedDay=p.day;
-    journal.spending[chargedDay]=String(BigInt(journal.spending[chargedDay]||0)+spent);
     const ok=BigInt(receipt.status)===1n;
+    const spent=BigInt(receipt.gasUsed)*BigInt(receipt.effectiveGasPrice||tx.gasPrice)+(ok?tx.value:0n),chargedDay=p.day;
+    journal.spending[chargedDay]=String(BigInt(journal.spending[chargedDay]||0)+spent);
     journal.history.push({hash:p.hash,pool:poolId,round:roundId,method,success:ok,gasWei:String(spent),at:new Date().toISOString()});journal.history=journal.history.slice(-200);
-    journal.pools[poolId].rounds[roundId]={next:ok?0:Math.floor(Date.now()/1000)+60};journal.pending=null;await save();await publish(ok?'running':'transaction_reverted');return true;
+    if(method==='fundGas'){journal.fundingDays??={};journal.fundingDays[chargedDay]=true;}else journal.pools[poolId].rounds[roundId]={next:ok?0:Math.floor(Date.now()/1000)+60};journal.pending=null;await save();await publish(ok?'running':'transaction_reverted');return true;
   }
   const latestNonce=BigInt(await rpc('eth_getTransactionCount',[address,'latest']));
   if(latestNonce>BigInt(tx.nonce))throw Error('NONCE_REQUIRES_REVIEW');
-  if(enabled&&Date.now()-(p.sentAt||0)>15000){p.sentAt=Date.now();await save();const hash=await rpc('eth_sendRawTransaction',[p.raw]);if(hash!==p.hash)throw Error('BROADCAST_HASH_MISMATCH');}
+  let broadcastEnabled=false;try{broadcastEnabled=controlEnabled(JSON.parse(await fs.readFile(process.env.SPARKDRAW_CONTROL,'utf8')));}catch{}
+  if(broadcastEnabled&&Date.now()-(p.sentAt||0)>15000){p.sentAt=Date.now();await save();const hash=await rpc('eth_sendRawTransaction',[p.raw]);if(hash!==p.hash)throw Error('BROADCAST_HASH_MISMATCH');}
   await publish(enabled?'transaction_pending':'paused');return true;
 }
 async function inspect(id,rid,now,tag){
@@ -94,13 +96,33 @@ async function prepare(id,rid,job,now){
   validateAutomationTransaction(raw,address);
   journal.pending={raw,hash:keccak256(raw),poolId:id,roundId:String(rid),method:job.method,day:day(),sentAt:0};await save();
 }
+async function prepareFunding(){
+  if(BigInt(balance)>=FL.threshold||journal.fundingDays?.[day()])return false;
+  const readContainer=async name=>FUNDING.decodeFunctionResult(name,await rpc('eth_call',[{to:F.revenue,data:FUNDING.encodeFunctionData(name)},'latest']))[0];
+  const [owner,executionFee,containerBalance]=await Promise.all([readContainer('owner'),readContainer('EXEC_FEE'),rpc('eth_getBalance',[F.revenue,'latest'])]);
+  if(owner.toLowerCase()!==address.toLowerCase())throw Error('CONTAINER_OWNER_MISMATCH');
+  if(executionFee>FL.executionFee)throw Error('CONTAINER_FEE_CHANGED');
+  if(BigInt(balance)<=executionFee)throw Error('FUNDING_BOOTSTRAP_GAS_REQUIRED');
+  if(BigInt(containerBalance)<FL.amount)throw Error('CONTAINER_GAS_BALANCE_LOW');
+  const data=FUNDING.encodeFunctionData('execute',[address,FL.amount,'0x',0]),value='0x'+executionFee.toString(16);
+  const [estimate,price,latestNonce,pendingNonce]=await Promise.all([rpc('eth_estimateGas',[{from:address,to:F.revenue,data,value}]),rpc('eth_gasPrice',[]),rpc('eth_getTransactionCount',[address,'latest']),rpc('eth_getTransactionCount',[address,'pending'])]);
+  if(latestNonce!==pendingNonce)throw Error('NONCE_REQUIRES_REVIEW');
+  const gas=(BigInt(estimate)*120n+99n)/100n,gasPrice=BigInt(price),fee=gas*gasPrice+executionFee;
+  if(gas>FL.gas||gasPrice>L.gasPrice||gasPrice<=0n||fee>L.fee)throw Error('GAS_BUDGET_EXCEEDED');
+  if(BigInt(journal.spending[day()]||0)+fee>L.daily)throw Error('DAILY_BUDGET_REACHED');
+  if(BigInt(balance)<fee)throw Error('FUNDING_BOOTSTRAP_GAS_REQUIRED');
+  const control=JSON.parse(await fs.readFile(process.env.SPARKDRAW_CONTROL,'utf8'));if(!controlEnabled(control))return false;
+  const raw=await signer.signTransaction({chainId:56n,type:0,to:F.revenue,data,value:executionFee,nonce:Number(BigInt(latestNonce)),gasLimit:gas,gasPrice});validateAutomationTransaction(raw,address);
+  journal.pending={raw,hash:keccak256(raw),poolId:'13061',roundId:'0',method:'fundGas',day:day(),sentAt:0};await save();return true;
+}
 async function tick(){
-  try{const control=JSON.parse(await fs.readFile(process.env.SPARKDRAW_CONTROL,'utf8'));enabled=controlEnabled(control);}catch{enabled=false;}
+  try{const control=JSON.parse(await fs.readFile(process.env.SPARKDRAW_CONTROL,'utf8'));enabled=controlEnabled(control);authorizationExpired=!!control.authorizationExpiresAt&&control.authorizationExpiresAt<=Date.now();}catch{enabled=false;authorizationExpired=false;}
   await adoptKey();
   balance=String(BigInt(await rpc('eth_getBalance',[address,'latest'])));
   if(Date.now()-lastCheck>60000)await identity();
   if(await pending())return;
-  if(!enabled){await publish('paused');return;}
+  if(!enabled){await publish(authorizationExpired?'authorization_expired':'paused');return;}
+  if(await prepareFunding()){await publish('preparing');return;}
   if(BigInt(balance)<10000000000000n){await publish('awaiting_gas');return;}
   const block=await rpc('eth_getBlockByNumber',['latest',false]),now=Number(BigInt(block.timestamp)),id=POOL_IDS[poolCursor++%POOL_IDS.length];
   const current=Number((await read(id,'currentRoundId',[],block.number))[0]);if(!Number.isSafeInteger(current)||current>10000000)throw Error('ROUND_RANGE');

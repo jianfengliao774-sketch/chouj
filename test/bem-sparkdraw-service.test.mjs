@@ -40,5 +40,10 @@ test('V5 service exposes only the five new pools, routes old pages away and reje
   assert.equal((await request('/api/admin/vault/control',{method:'POST',headers,body:JSON.stringify({enabled:true,enroll:true,code:totpCode(secret,Math.floor(Date.now()/30000))})})).status,200);
   assert.equal((await request('/api/admin/vault/setup',{method:'POST',headers})).status,409);
   assert.ok(!JSON.stringify(await(await request('/api/admin/vault',{headers})).json()).includes(secret));
+  const loginBody={username:'fixture-admin',password:'test-only-password'};
+  const noOtp=await request('/api/admin/login',{method:'POST',headers,body:JSON.stringify(loginBody)});assert.equal(noOtp.status,403);assert.equal(noOtp.headers.get('set-cookie'),null);
+  const withOtp={...loginBody,code:totpCode(secret,Math.floor(Date.now()/30000))};
+  const verified=await request('/api/admin/login',{method:'POST',headers,body:JSON.stringify(withOtp)});assert.equal(verified.status,200);
+  const replay=await request('/api/admin/login',{method:'POST',headers,body:JSON.stringify(withOtp)});assert.equal(replay.status,403);assert.equal(replay.headers.get('set-cookie'),null);
   const records=await(await request('/api/sparkdraw/records?kind=wallet&address=0x1111111111111111111111111111111111111111')).json();assert.equal(records.rows.length,0);assert.equal(records.claims.length,5);
 });

@@ -10,7 +10,6 @@ import {createSparkDrawIndex} from './sparkdraw-index.mjs';
 import {createSparkDrawVault} from './sparkdraw-vault.mjs';
 import {createKeyStore} from './sparkdraw-key-store.mjs';
 import {walletClaimGroups} from './sparkdraw-claims.mjs';
-import {numberedRound,utcDay} from './web/round-display.js';
 import {createAdminAuth} from './auth.mjs';
 import {createMarketPriceService} from './market-price.mjs';
 const SITE=path.dirname(fileURLToPath(import.meta.url));
@@ -39,15 +38,7 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
       earlyDrawDeadline:int(early[0]),sealedAt:int(sealed[0]),beaconRound:String(beacon[0]),beaconAvailableAt:beacon[0]?F.genesis+(int(beacon[0])-1)*F.beaconPeriod:0,
       prize:{amount:String(prize[0]),settledAt:int(prize[1]),claimDeadline:int(prize[2]),claimed:prize[3],burned:prize[4]},principalBurned:burned[0]};
   }
-  async function labelRound(id,round,block){
-    const started=round.fundingDeadline?round.fundingDeadline-F.fundingSeconds:int(block.timestamp),startOfDay=Math.floor(started/86400)*86400;
-    const first=await cached('first-daily-round:'+id+':'+utcDay(started),86400000,async()=>{
-      let lo=1n,hi=BigInt(round.roundId);
-      while(lo<hi){const mid=(lo+hi)/2n,r=await call(id,'rounds',[mid],block.number);if(Number(r[2])-F.fundingSeconds<startOfDay)lo=mid+1n;else hi=mid;}
-      return lo;
-    });
-    const sequence=BigInt(round.roundId)-first+1n;return{...round,dailySequence:String(sequence),displayRoundId:numberedRound(started,sequence)};
-  }
+  function labelRound(id,round){return{...round,...(index.roundLabel(id,round.roundId)||{displayRoundId:null,globalSequence:null})};}
   const state=id=>cached('state:'+id,3000,async()=>{
     const b=await rpc('eth_getBlockByNumber',['latest',false]),current=(await call(id,'currentRoundId',[],b.number))[0];
     const ids=[current];if(current>1n)ids.push(current-1n);
@@ -103,7 +94,7 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
       if(req.method==='GET'&&url.pathname==='/api/burns/summary')return respond(res,200,await cached('burn-summary',300000,()=>({totalBaseUnits:POOL_IDS.flatMap(id=>index.view(id).burns).reduce((a,b)=>a+BigInt(b.amountBaseUnits),0n).toString(),updatedAt:new Date().toISOString(),indexes:Object.fromEntries(POOL_IDS.map(id=>[id,index.metadata(id)]))})));
       if(url.pathname.startsWith('/api/admin/')){
         if(req.method==='POST'&&req.headers.origin!==origin)return respond(res,403,{error:'Same-origin request required'});
-        if(url.pathname==='/api/admin/login'&&req.method==='POST'){const d=await body(req),login=await auth.login({...d,ip});auth.logout(req.headers.cookie);return respond(res,200,{username:login.username},{'set-cookie':`bem2075_admin=${login.token}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=900${origin.startsWith('https:')?'; Secure':''}`});}
+        if(url.pathname==='/api/admin/login'&&req.method==='POST'){const d=await body(req),login=await auth.login({...d,ip});try{await vault.verifyLogin({code:d.code,username:login.username});}catch(e){auth.logout('bem2075_admin='+login.token);throw e;}auth.logout(req.headers.cookie);return respond(res,200,{username:login.username},{'set-cookie':`bem2075_admin=${login.token}; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=900${origin.startsWith('https:')?'; Secure':''}`});}
         if(url.pathname==='/api/admin/logout'&&req.method==='POST'){auth.logout(req.headers.cookie);return respond(res,200,{signedOut:true},{'set-cookie':'bem2075_admin=; HttpOnly; SameSite=Strict; Path=/api/admin; Max-Age=0'});}
         const session=await auth.session(req.headers.cookie);if(!session)return respond(res,401,{error:'请先登录'});
         if(url.pathname==='/api/admin/vault'&&req.method==='GET')return respond(res,200,await vault.status());
