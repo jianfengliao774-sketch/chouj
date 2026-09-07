@@ -80,16 +80,18 @@ export function createSparkDrawTransactions({rpc,wallet,context,storage=localSto
       if(busy)fail('TRANSACTION_IN_FLIGHT');busy=true;
       try{
         const c=context(),p=wallet();if(!c.account||!p)fail('CONNECT_WALLET');if(blocked(input))fail('TRANSACTION_PENDING');
-        const dest=profile(poolId);await identity(p,c);
-        if(keccak256(await rpc('eth_getCode',[dest.address,'latest']))!==dest.runtimeHash)fail('CONTRACT_MISMATCH');
+        const dest=profile(poolId);
         if(!['buy','buySelected','approve','refundMany','claimPrizes','closeRound','fulfillRandomness','settle','openRefunds','burnUnclaimed','burnUnclaimedPrize'].includes(method))fail('ACTION_NOT_SUPPORTED');
         if(method==='approve'&&(!same(args[0],dest.address)||BigInt(args[1])<=0n||BigInt(args[1])>5000n*dest.ticketPrice))fail('APPROVAL_AMOUNT');
         if(claims.has(method)&&!same(args[1],c.account))fail('CONTEXT_CHANGED');
         const to=method==='approve'?F.bem:dest.address,data=(method==='approve'?TOKEN:GAME).encodeFunctionData(method,args),tx={from:c.account,to,data,value:'0x0'};
-        const [rawGas,rawPrice,startBlock]=await Promise.all([rpc('eth_estimateGas',[tx,'latest']),rpc('eth_gasPrice',[]),rpc('eth_blockNumber',[])]);
+        // These are independent reads. Keep the initial identity check, then
+        // recheck after the fresh nonce read immediately before sending.
+        const [,code,rawGas,rawPrice,startBlock]=await Promise.all([identity(p,c),rpc('eth_getCode',[dest.address,'latest']),rpc('eth_estimateGas',[tx,'latest']),rpc('eth_gasPrice',[]),rpc('eth_blockNumber',[])]);
+        if(keccak256(code)!==dest.runtimeHash)fail('CONTRACT_MISMATCH');
         const estimate=BigInt(rawGas),price=BigInt(rawPrice);if(estimate<=0n||estimate>16777216n)fail('GAS_LIMIT_EXCEEDED');if(price<=0n)fail('GAS_PRICE_UNAVAILABLE');
         const buffered=(estimate*120n+99n)/100n,gas=buffered>16777216n?16777216n:buffered;
-        enforcePurchaseGasBudget(kind,gas,price);await identity(p,c);
+        enforcePurchaseGasBudget(kind,gas,price);
         let nonce=BigInt(await p.request({method:'eth_getTransactionCount',params:[c.account,'pending']}));
         for(const r of own(load().pending))nonce=nonce>BigInt(r.boundNonce??r.nonce)?nonce:BigInt(r.boundNonce??r.nonce)+1n;
         await identity(p,c);if(blocked(input))fail('TRANSACTION_PENDING');
