@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="280" height="280" viewBox="0 0 280 280" fill="none">
+  <defs>
+    <linearGradient id="chip" x1="64" y1="49" x2="211" y2="225" gradientUnits="userSpaceOnUse"><stop stop-color="#D74C3A"/><stop offset="1" stop-color="#A62332"/></linearGradient>
+    <linearGradient id="ticket" x1="40" y1="187" x2="158" y2="260" gradientUnits="userSpaceOnUse"><stop stop-color="#FFF9E9"/><stop offset="1" stop-color="#F3DDAF"/></linearGradient>
+  </defs>
+  <circle cx="140" cy="136" r="108" fill="#F6E8CF"/>
+  <circle cx="140" cy="136" r="122" stroke="#D9B478" stroke-dasharray="3 9"/>
+  <path d="M83 45v22m23-27v27m23-30v30m23-30v30m23-27v27m23-22v22M83 205v22m23-22v27m23-27v30m23-30v30m23-30v27m23-27v22M40 82h23m-29 23h29m-31 23h31m-31 23h31m-27 23h27m-23 23h23m144-115h23m-23 23h29m-29 23h31m-31 23h31m-31 23h27m-27 23h23" stroke="#B98A4B" stroke-width="5" stroke-linecap="round"/>
+  <rect x="60" y="64" width="155" height="157" rx="27" fill="#DFC59C"/>
+  <rect x="60" y="56" width="155" height="157" rx="27" fill="url(#chip)" stroke="#9F2630" stroke-width="2"/>
+  <rect x="72" y="68" width="131" height="133" rx="18" stroke="#F0B781" stroke-opacity=".8"/>
+  <path d="M83 94h14v16m91-16h-14v16M83 177h14v-16m91 16h-14v-16" stroke="#EFAD75" stroke-width="2" stroke-linecap="round"/>
+  <path d="M143 89c7 22-13 30-8 46 9-5 15-15 14-24 23 19 31 38 19 55-12 20-46 23-60 3-15-22 0-40 12-54-1 18 4 24 8 25-7-20 16-31 15-51Z" fill="#FFF1CF"/>
+  <path d="M140 142c7 13-5 15-1 24 2-4 6-6 7-10 9 12 1 21-8 20-14-2-15-16 2-34Z" fill="#EDAA58"/>
+  <g transform="rotate(-14 95 220)">
+    <path d="M30 197h119v13a11 11 0 0 0 0 22v13H30v-13a11 11 0 0 0 0-22v-13Z" fill="url(#ticket)" stroke="#B7894D" stroke-width="2"/>
+    <path d="M116 201v40" stroke="#C39A61" stroke-dasharray="4 4"/>
+    <text x="51" y="228" fill="#AC2C32" font-family="Arial,sans-serif" font-size="23" font-weight="800" letter-spacing="2">BEM</text>
+    <path d="m131 212 2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5Z" fill="#B98945"/>
+  </g>
+  <path d="m229 33 4 12 12 4-12 4-4 12-4-12-12-4 12-4 4-12Z" fill="#C59347"/>
+  <path d="m43 57 2 7 7 2-7 2-2 7-2-7-7-2 7-2 2-7Z" fill="#BD3734"/>
+  <path d="m234 214 3 8 8 3-8 3-3 8-3-8-8-3 8-3 3-8Z" fill="#BD3734"/>
+  <circle cx="216" cy="251" r="3" fill="#C59347"/>
+  <circle cx="26" cy="150" r="3" fill="#BD3734"/>
+</svg>
