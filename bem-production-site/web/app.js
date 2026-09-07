@@ -1,6 +1,7 @@
 import { Contract, JsonRpcProvider, formatUnits, getAddress, keccak256, toQuantity } from 'ethers';
 import { t, getLocale, translateKnown, initLanguage } from './player-i18n.js';
 import { createWalletPicker } from './wallet-picker.js';
+import { enforcePurchaseGasBudget } from './purchase-gas-policy.js';
 import { parseRefundRound, refundEligibility, createRefundIntent, assertRefundSnapshot } from './refund-guards.js';
 import { createTransactionTracker, createTransactionRecord, restoreTransactionRecords, isTransactionBlocking } from './transaction-tracker.js';
 import { PINNED, GuardError, same, validateManifest, createIntent, parseSelection, assertFixedSnapshot, assertPurchaseSnapshot, explorerLink } from './guards.js';
@@ -19,6 +20,7 @@ const statuses = () => [t('待启动','Awaiting launch'),t('募集中','Open'),t
 function notice(message,error=false,passive=false) { if(passive&&state.noticePriority>=2)return;state.noticePriority=error?3:passive?1:2;$('notice').textContent=message; $('notice').classList.toggle('error-copy',error); }
 function explanation(error) {
   const copy = {
+    GAS_FEE_CAP_EXCEEDED:['本笔网络费用上限超过 0.001 BNB，未提交。请减少份数或等待网络费用下降。','The maximum network fee exceeds 0.001 BNB. Nothing was submitted. Reduce the quantity or wait for lower network fees.'],
     MANIFEST:['正式配置核验失败，交易已禁用。','Production configuration could not be verified. Transactions are disabled.'],
     IDENTITY:['链上合约或固定规则不匹配，交易已禁用。','The onchain contract or fixed rules do not match. Transactions are disabled.'],
     NOT_LAUNCHED:['正式合约已部署，待正式启动，暂不接受授权与购买。','The contract is deployed and awaiting launch. Approvals and purchases are currently unavailable.'],
@@ -304,6 +306,9 @@ async function submit(action) {
     const gas=BigInt(await state.rpc.send('eth_estimateGas',[tx]));
     const gasLimit=(gas*120n+99n)/100n;
     if(gasLimit>16777216n) throw new Error(t('预估网络执行量超出限制，未提交交易。','Estimated execution exceeds the limit. No transaction was submitted.'));
+    const gasPrice=BigInt(await state.rpc.send('eth_gasPrice',[]));
+    enforcePurchaseGasBudget(action,gasLimit,gasPrice);
+    tx.gasPrice=toQuantity(gasPrice);
     const finalConfig=validateManifest(await fetchJson('/api/config'));
     const finalSnapshot=await readSnapshot(intent.account,true);
     const finalIdentity=await walletIdentity(wallet);

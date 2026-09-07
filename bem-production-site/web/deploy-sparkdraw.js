@@ -94,4 +94,4 @@ $('reset-rejected').onclick=()=>run(async()=>{
 let polling=false;
 setInterval(async()=>{if(polling||busy)return;polling=true;try{for(const kind of order){const entry=records[kind];if(entry?.hash&&!completed(kind)){try{await register(kind,entry.hash);}catch(e){note(shortError(e));}break;}}}finally{polling=false;}},4000);
 $('compiler-version').textContent='编译器：'+artifacts.compiler;
-loadRegistry().then(()=>note('先部署共用验证合约，然后依次部署五个场次。')).catch(e=>note(shortError(e)));render();
+loadRegistry().then(()=>note(order.every(completed)?'6 个合约均已部署并登记，无需重复部署。首次购买开始对应场次的募集。':'先部署共用验证合约，然后依次部署五个场次。')).catch(e=>note(shortError(e)));render();

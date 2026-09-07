@@ -1,6 +1,7 @@
 import { Interface, getAddress, keccak256, toQuantity } from 'ethers';
 import { previewPoolSelection } from './player-v2-state.js';
 import { verifyWalletTransactionEnvelope } from './wallet-transaction-envelope.js';
+import { enforcePurchaseGasBudget } from './purchase-gas-policy.js';
 
 // This isolated entry never uses a registry-provided destination or a V1 profile.
 export const TEST_PLAYER = Object.freeze({
@@ -237,6 +238,7 @@ export function createTestPlayerTransactions({ wallet, getContext, readRpc, onUp
       const estimate = integer(estimateRaw), gasPrice = integer(priceRaw); need(estimate > 0n && estimate <= TEST_PLAYER.gasCap, 'GAS_LIMIT_EXCEEDED');
       const buffered = (estimate * 120n + 99n) / 100n, gas = buffered > TEST_PLAYER.gasCap ? TEST_PLAYER.gasCap : buffered;
       need(gasPrice > 0n, 'GAS_PRICE_UNAVAILABLE');
+      enforcePurchaseGasBudget(kind, gas, gasPrice);
       need(latest.bnbBalance >= gas * gasPrice, 'INSUFFICIENT_BNB');
       const nonce = integer(await rpc('eth_getTransactionCount', [account, 'pending']));
       need(nonce >= latest.nonceFloor, 'NONCE_MISMATCH');

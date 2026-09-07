@@ -6,6 +6,7 @@ import { Interface, formatUnits, getAddress, toQuantity } from 'ethers';
 import * as guards from '../bem-production-site/web/guards.js';
 import * as refundGuards from '../bem-production-site/web/refund-guards.js';
 import * as transactionRecords from '../bem-production-site/web/transaction-tracker.js';
+import { enforcePurchaseGasBudget } from '../bem-production-site/web/purchase-gas-policy.js';
 
 const APP = new URL('../bem-production-site/web/app.js', import.meta.url);
 const HTML = new URL('../bem-production-site/web/legacy.html', import.meta.url);
@@ -74,6 +75,7 @@ async function harness(){
   }
   const translate=(zh,en,params={})=>zh.replace(/\{(\w+)\}/g,(all,name)=>String(params[name]??all));
   const sandbox={...guards,...refundGuards,...transactionRecords,Contract:class{constructor(address){return guards.same(address,p.gameAddress)?game:token;}},JsonRpcProvider:ReadRpc,formatUnits,getAddress,toQuantity,
+    enforcePurchaseGasBudget,
     createTransactionRecord:args=>transactionRecords.createTransactionRecord({...args,submittedAt:args.submittedAt??new Date(clock).toISOString()}),
     isTransactionBlocking:(record,account)=>transactionRecords.isTransactionBlocking(record,account,clock),
     // Contract identity checks have independent tests. This fixture supplies a synthetic verified chain.

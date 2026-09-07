@@ -87,6 +87,8 @@ function errorCopy(error) {
     REFUND_UNAVAILABLE: ['该期目前不可领取本金，请核对期号和领取期限。', 'A refund is unavailable for this round. Check the round and claim deadline.'],
     SETTLEMENT_NOT_DUE: ['尚未到结算时间，或该期已结算。', 'Settlement is not due or the round is already settled.'],
     GAS_LIMIT_EXCEEDED: ['该组合所需 Gas 过高，请减少份数或选择更连续的号码。', 'This selection requires too much gas. Reduce the quantity or choose more consecutive numbers.'],
+    GAS_FEE_CAP_EXCEEDED: ['本笔网络费用上限超过 0.001 BNB，未提交。请减少份数或等待网络费用下降。', 'The maximum network fee exceeds 0.001 BNB. Nothing was submitted. Reduce the quantity or wait for lower network fees.'],
+    GAS_PRICE_UNAVAILABLE: ['暂时无法获取网络费用，请稍后重试。', 'Network fees are temporarily unavailable. Try again shortly.'],
     TRANSACTION_UNRESOLVED: ['上一笔交易结果尚未确认，请先核查交易记录。', 'The previous transaction is unresolved. Check its record first.'],
     RPC_UNAVAILABLE: ['链上状态读取暂时失败，请点击刷新余额与状态重试。', 'Chain state could not be read. Refresh balances and state to retry.'],
     TRANSACTION_IN_FLIGHT: ['正在处理交易，请先完成钱包中的请求。', 'A transaction is being processed. Resolve the wallet request first.'],

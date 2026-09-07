@@ -189,6 +189,19 @@ test('one fresh gas estimate is buffered, capped, and never split into extra sen
   const s = setup({ estimate: 16000000n }); await s.manager.execute('buy', { roundId: 1n, quantity: 2 }); assert.equal(BigInt(s.sent[0].gas), F.gasCap);
 });
 
+test('purchase fee ceiling blocks before wallet submission or pending storage, then allows a cheaper retry', async()=>{
+  for(const kind of ['buy','approve']){
+    const s=setup({estimate:1_000_000n,gasPrice:1_000_000_000n,allowance:kind==='approve'?0n:10000000n});
+    await rejects(()=>s.manager.execute(kind,{roundId:1n,quantity:2}),'GAS_FEE_CAP_EXCEEDED');
+    assert.equal(s.sent.length,0);
+    s.state.gasPrice=50_000_000n;
+    await s.manager.execute(kind,{roundId:1n,quantity:2});
+    assert.equal(s.sent.length,1);
+    assert.equal(BigInt(s.sent[0].gas),1_200_000n);
+    assert.ok(BigInt(s.sent[0].gas)*BigInt(s.sent[0].gasPrice)<=10n**15n);
+  }
+});
+
 test('refund is always to the connected user, supports older rounds and the exact 24h claim interval', async () => {
   const s = setup({ authorized: false, consumer: false, currentRound: 2n, timestamp: 2000n });
   const r = await s.manager.readState(ACCOUNT, { roundId: 1n }); assert.equal(r.canRefund, true); assert.equal(r.refundAmount, 20000n);

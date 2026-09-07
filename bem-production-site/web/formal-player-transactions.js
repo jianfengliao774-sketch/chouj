@@ -1,6 +1,7 @@
 import { Interface, getAddress, keccak256, toQuantity } from 'ethers';
 import { previewPoolSelection } from './player-v2-state.js';
 import { verifyWalletTransactionEnvelope } from './wallet-transaction-envelope.js';
+import { enforcePurchaseGasBudget } from './purchase-gas-policy.js';
 import { getFormalPlayerProfile } from './formal-player-profiles.js';
 
 // V3 only. The immutable 1 BEM transaction module stays separate.
@@ -259,6 +260,7 @@ function validRecord(value) {
       const estimate = integer(estimateRaw), gasPrice = integer(priceRaw); need(estimate > 0n && estimate <= F.gasCap, 'GAS_LIMIT_EXCEEDED');
       const buffered = (estimate * 120n + 99n) / 100n, gas = buffered > F.gasCap ? F.gasCap : buffered;
       need(gasPrice > 0n, 'GAS_PRICE_UNAVAILABLE');
+      enforcePurchaseGasBudget(kind, gas, gasPrice);
       need(latest.bnbBalance >= gas * gasPrice, 'INSUFFICIENT_BNB');
       const nonce = integer(await rpc('eth_getTransactionCount', [account, 'pending']));
       need(nonce >= latest.nonceFloor, 'NONCE_MISMATCH');
