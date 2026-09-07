@@ -5,6 +5,7 @@ import {requirePoolSales} from './sparkdraw-sales-policy.js';
 import {SPARKDRAW as F} from './sparkdraw-config.js';
 import {enforcePurchaseGasBudget} from './purchase-gas-policy.js';
 import {matchesIntent,validReplacement,recoverTransaction,replacementStatus} from './transaction-recovery.js';
+import {walletRequestRejected} from './wallet-request-errors.js';
 export const GAME=new Interface(abi);
 export const TOKEN=new Interface(['function balanceOf(address) view returns(uint256)','function allowance(address,address) view returns(uint256)','function approve(address,uint256) returns(bool)']);
 const KEY='sparkdraw:v5:pending';
@@ -20,7 +21,7 @@ export function parseTickets(mode,count,text){
   if(!set.size)fail('TICKET_RANGE');return{count:set.size,tickets:[...set].sort((a,b)=>a-b)};
 }
 export function createSparkDrawTransactions({rpc,wallet,context,storage=localStorage,onChange=()=>{},locks=globalThis.navigator?.locks,now=Date.now,checkSales=requirePoolSales}){
-  let busy=false,polling=false,cursor=0;const discovery=new Map();
+  let busy=false,polling=false,cursor=0,prepared=null;const discovery=new Map();
   const load=()=>{
     const raw=storage.getItem(KEY),value=raw?JSON.parse(raw):null;
     if(!value)return{version:6,pending:[],history:[]};
@@ -50,6 +51,26 @@ export function createSparkDrawTransactions({rpc,wallet,context,storage=localSto
     });
   }
   const identity=async(p,c)=>{const[a,chain]=await Promise.all([p.request({method:'eth_accounts'}),p.request({method:'eth_chainId'})]);if(BigInt(chain)!==56n||!a[0]||!same(a[0],c.account)||context().key!==c.key)fail('CONTEXT_CHANGED');};
+  function prepare({poolId,method,args,kind}){
+    checkSales(poolId,method);
+    const c=context(),provider=wallet(),dest=profile(poolId);if(!c.account||!provider)fail('CONNECT_WALLET');
+    if(!['buy','buySelected','approve','refundMany','claimPrizes','closeRound','fulfillRandomness','settle','openRefunds','burnUnclaimed','burnUnclaimedPrize'].includes(method))fail('ACTION_NOT_SUPPORTED');
+    if(method==='approve'&&(!same(args[0],dest.address)||BigInt(args[1])<=0n||BigInt(args[1])>5000n*dest.ticketPrice))fail('APPROVAL_AMOUNT');
+    if(claims.has(method)&&!same(args[1],c.account))fail('CONTEXT_CHANGED');
+    const to=method==='approve'?F.bem:dest.address,data=(method==='approve'?TOKEN:GAME).encodeFunctionData(method,args),tx={from:c.account,to,data,value:'0x0'};
+    const key=JSON.stringify([c.key,poolId,method,kind,to,data]);
+    if(prepared&&prepared.key===key&&prepared.provider===provider&&(!prepared.done||now()-prepared.at<5000))return prepared.promise;
+    const job={key,provider,at:now(),done:false,promise:null};prepared=job;
+    job.promise=Promise.all([rpc('eth_getCode',[dest.address,'latest']),rpc('eth_estimateGas',[tx,'latest']),rpc('eth_gasPrice',[]),rpc('eth_blockNumber',[])]).then(([code,rawGas,rawPrice,startBlock])=>{
+      if(keccak256(code)!==dest.runtimeHash)fail('CONTRACT_MISMATCH');
+      const estimate=BigInt(rawGas),price=BigInt(rawPrice);if(estimate<=0n||estimate>16777216n)fail('GAS_LIMIT_EXCEEDED');if(price<=0n)fail('GAS_PRICE_UNAVAILABLE');
+      const buffered=(estimate*120n+99n)/100n,gas=buffered>16777216n?16777216n:buffered;
+      enforcePurchaseGasBudget(kind,gas,price);
+      if(context().key!==c.key||wallet()!==provider)fail('CONTEXT_CHANGED');
+      return {to,data,tx,gas,price,startBlock};
+    }).catch(error=>{if(prepared===job)prepared=null;throw error;}).finally(()=>{job.done=true;});
+    return job.promise;
+  }
   function outcome(record,found){
     const {tx,receipt,matches}=found,p=profile(record.poolId);let result=null;
     if(matches&&BigInt(receipt.status)===1n&&record.kind==='buy'){
@@ -80,18 +101,7 @@ export function createSparkDrawTransactions({rpc,wallet,context,storage=localSto
       if(busy)fail('TRANSACTION_IN_FLIGHT');busy=true;
       try{
         const c=context(),p=wallet();if(!c.account||!p)fail('CONNECT_WALLET');if(blocked(input))fail('TRANSACTION_PENDING');
-        const dest=profile(poolId);
-        if(!['buy','buySelected','approve','refundMany','claimPrizes','closeRound','fulfillRandomness','settle','openRefunds','burnUnclaimed','burnUnclaimedPrize'].includes(method))fail('ACTION_NOT_SUPPORTED');
-        if(method==='approve'&&(!same(args[0],dest.address)||BigInt(args[1])<=0n||BigInt(args[1])>5000n*dest.ticketPrice))fail('APPROVAL_AMOUNT');
-        if(claims.has(method)&&!same(args[1],c.account))fail('CONTEXT_CHANGED');
-        const to=method==='approve'?F.bem:dest.address,data=(method==='approve'?TOKEN:GAME).encodeFunctionData(method,args),tx={from:c.account,to,data,value:'0x0'};
-        // These are independent reads. Keep the initial identity check, then
-        // recheck after the fresh nonce read immediately before sending.
-        const [,code,rawGas,rawPrice,startBlock]=await Promise.all([identity(p,c),rpc('eth_getCode',[dest.address,'latest']),rpc('eth_estimateGas',[tx,'latest']),rpc('eth_gasPrice',[]),rpc('eth_blockNumber',[])]);
-        if(keccak256(code)!==dest.runtimeHash)fail('CONTRACT_MISMATCH');
-        const estimate=BigInt(rawGas),price=BigInt(rawPrice);if(estimate<=0n||estimate>16777216n)fail('GAS_LIMIT_EXCEEDED');if(price<=0n)fail('GAS_PRICE_UNAVAILABLE');
-        const buffered=(estimate*120n+99n)/100n,gas=buffered>16777216n?16777216n:buffered;
-        enforcePurchaseGasBudget(kind,gas,price);
+        const {to,data,tx,gas,price,startBlock}=await prepare(input);
         let nonce=BigInt(await p.request({method:'eth_getTransactionCount',params:[c.account,'pending']}));
         for(const r of own(load().pending))nonce=nonce>BigInt(r.boundNonce??r.nonce)?nonce:BigInt(r.boundNonce??r.nonce)+1n;
         await identity(p,c);if(blocked(input))fail('TRANSACTION_PENDING');
@@ -104,12 +114,12 @@ export function createSparkDrawTransactions({rpc,wallet,context,storage=localSto
           // visible. A transient RPC miss must not turn a sent transaction into failure.
           let boundNonce;try{const sent=await rpc('eth_getTransactionByHash',[hash]);if(sent&&same(sent.hash,hash)&&matchesIntent(sent,{...record,hash}))boundNonce=String(BigInt(sent.nonce));}catch{}
           const latest=load(),i=latest.pending.findIndex(r=>r.id===record.id);if(i>=0){latest.pending[i]={...latest.pending[i],hash,...(boundNonce!=null?{boundNonce}:{})};save(latest);}return hash;
-        }catch(e){if(e.code===4001||e.code==='ACTION_REJECTED'){const latest=load();latest.pending=latest.pending.filter(r=>r.id!==record.id);save(latest);}throw e;}
-      }finally{busy=false;}
+        }catch(e){if(walletRequestRejected(e)){const latest=load();latest.pending=latest.pending.filter(r=>r.id!==record.id);save(latest);}throw e;}
+      }finally{busy=false;prepared=null;}
     };
     if(!locks)fail('LOCK_UNAVAILABLE');return locks.request(KEY,{ifAvailable:true},lock=>{if(!lock)fail('TRANSACTION_IN_FLIGHT');return work();});
   }
-  return{execute,check,blocked,get pending(){return own(load().pending)[0]||null;},get pendings(){return own(load().pending);},get history(){return own(load().history);},get busy(){return busy;},
+  return{execute,prepare,check,blocked,get pending(){return own(load().pending)[0]||null;},get pendings(){return own(load().pending);},get history(){return own(load().history);},get busy(){return busy;},
     result(hash){return own(load().history).findLast(r=>same(r.originalHash,hash)||same(r.hash,hash))||null;},
     async attach(hash,id){
       const record=own(load().pending).find(r=>id?r.id===id:true);if(!record||!/^0x[a-f0-9]{64}$/i.test(hash))fail('TRANSACTION_MISMATCH');

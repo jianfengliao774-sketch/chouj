@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { Interface } from 'ethers';
+import { Interface, solidityPacked } from 'ethers';
 import { verifyWalletTransactionEnvelope } from '../bem-production-site/web/wallet-transaction-envelope.js';
 const fixture = JSON.parse(fs.readFileSync(new URL('fixtures/bem-test-wallet-wrapped-buy.json', import.meta.url)));
 const tx = fixture.transaction;
@@ -42,4 +42,14 @@ test('unwrapped transactions keep the original exact nonce constraint', () => {
   const direct = { ...tx, to: intent.to, input: intent.data };
   assert.throws(() => verifyWalletTransactionEnvelope(direct, intent), /NONCE_MISMATCH/);
   assert.equal(verifyWalletTransactionEnvelope(direct, { ...intent, nonce: '543' }).wrapped, false);
+});
+
+test('a full 5000-ticket call fits the wallet wrapper without weakening exact inner-call checks',()=>{
+  const selected=new Interface(['function buySelected(uint256,uint16[])']);
+  const data=selected.encodeFunctionData('buySelected',[1,Array.from({length:5000},(_,i)=>i)]);
+  const expected={...intent,data};
+  const input=wallet.encodeFunctionData('redeemDelegations',[['0x'],['0x'+'0'.repeat(64)],[solidityPacked(['address','uint256','bytes'],[expected.to,0,data])]]);
+  assert.ok(input.length>262146);
+  assert.equal(verifyWalletTransactionEnvelope({...tx,input},expected).wrapped,true);
+  assert.throws(()=>verifyWalletTransactionEnvelope({...tx,input}, {...expected,data:selected.encodeFunctionData('buySelected',[1,[0]])}));
 });

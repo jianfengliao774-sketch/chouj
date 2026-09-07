@@ -8,7 +8,7 @@ const account='0x1111111111111111111111111111111111111111',other='0x222222222222
 const code=JSON.parse(fs.readFileSync(new URL('./fixtures/drand/deployed-five-runtime.json',import.meta.url))).code;
 const purchase={poolId:'5',method:'buySelected',args:[1,[0,17,9999]],kind:'buy',roundId:1,count:3};
 const deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return{promise,resolve};};
-function fixture({initialAccounts,estimate,changeAtNonce,wrongCode=false,expensive=false}={}){
+function fixture({initialAccounts,estimate,changeAtNonce,wrongCode=false,expensive=false,walletError=null}={}){
   const requests=[],sent=[],values=new Map();let accountsReads=0,key='same',currentAccount=account;
   const wallet={async request(q){
     requests.push(q.method);
@@ -19,7 +19,7 @@ function fixture({initialAccounts,estimate,changeAtNonce,wrongCode=false,expensi
       if(changeAtNonce==='context')key='changed';
       return'0x3';
     }
-    if(q.method==='eth_sendTransaction'){sent.push(q.params[0]);throw Object.assign(Error('Fixture cancellation'),{code:4001});}
+    if(q.method==='eth_sendTransaction'){sent.push(q.params[0]);throw walletError||Object.assign(Error('Fixture cancellation'),{code:4001});}
     throw Error(q.method);
   }};
   const rpc=async method=>{
@@ -35,14 +35,14 @@ function fixture({initialAccounts,estimate,changeAtNonce,wrongCode=false,expensi
   return{manager,requests,sent};
 }
 
-test('identity, code and fee reads start together; fresh nonce and final identity still precede send',async()=>{
+test('fee reads run together; fresh nonce and final identity still precede send',async()=>{
   const initialAccounts=deferred(),estimate=deferred(),f=fixture({initialAccounts,estimate});
   const run=assert.rejects(f.manager.execute(purchase),{code:4001});
-  for(const method of ['eth_accounts','eth_chainId','eth_getCode','eth_estimateGas','eth_gasPrice','eth_blockNumber'])assert.ok(f.requests.includes(method),method);
+  for(const method of ['eth_getCode','eth_estimateGas','eth_gasPrice','eth_blockNumber'])assert.ok(f.requests.includes(method),method);
   assert.equal(f.requests.includes('eth_getTransactionCount'),false);assert.equal(f.manager.pending,null);
   initialAccounts.resolve([account]);estimate.resolve('0xf4240');await run;
-  assert.equal(f.sent.length,1);assert.equal(f.requests.filter(m=>m==='eth_accounts').length,2);
-  assert.equal(f.requests.filter(m=>m==='eth_chainId').length,2);
+  assert.equal(f.sent.length,1);assert.equal(f.requests.filter(m=>m==='eth_accounts').length,1);
+  assert.equal(f.requests.filter(m=>m==='eth_chainId').length,1);
   assert.deepEqual(f.requests.slice(-4),['eth_getTransactionCount','eth_accounts','eth_chainId','eth_sendTransaction']);
   const tx=f.sent[0];assert.equal(tx.to,profile('5').address);assert.equal(tx.nonce,'0x3');assert.equal(tx.chainId,'0x38');
   assert.equal(tx.data,GAME.encodeFunctionData('buySelected',purchase.args));assert.equal(BigInt(tx.gas),1200000n);
@@ -67,4 +67,20 @@ test('each user retry obtains fresh contract and fee reads; no completed preflig
   const f=fixture();for(let i=0;i<2;i++)await assert.rejects(f.manager.execute(purchase),{code:4001});
   for(const method of ['eth_getCode','eth_estimateGas','eth_gasPrice','eth_getTransactionCount'])assert.equal(f.requests.filter(m=>m===method).length,2);
   assert.equal(f.sent.length,2);assert.equal(f.manager.pending,null);
+});
+
+test('background preparation never touches the wallet; clicking reuses its estimate with fresh wallet identity and nonce',async()=>{
+  const f=fixture();await f.manager.prepare(purchase);
+  assert.deepEqual(f.requests,['eth_getCode','eth_estimateGas','eth_gasPrice','eth_blockNumber']);
+  assert.equal(f.sent.length,0);assert.equal(f.manager.pending,null);
+  await assert.rejects(f.manager.execute(purchase),{code:4001});
+  assert.equal(f.requests.filter(m=>m==='eth_estimateGas').length,1);
+  assert.deepEqual(f.requests.slice(-4),['eth_getTransactionCount','eth_accounts','eth_chainId','eth_sendTransaction']);
+});
+
+test('wrapped rejection clears the record, but an ambiguous send error stays tracked',async()=>{
+  for(const [walletError,rejected] of [[{code:'4001'},true],[{code:-32603,data:{originalError:{code:4001}}},true],[{code:-32603,message:'transport failed'},false]]){
+    const f=fixture({walletError});await assert.rejects(f.manager.execute(purchase));
+    assert.equal(f.manager.pending===null,rejected);
+  }
 });

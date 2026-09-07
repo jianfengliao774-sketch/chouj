@@ -11,6 +11,8 @@ import {createWalletPicker} from './wallet-picker.js';
 import {createWalletSession} from './wallet-connection.js';
 import {createReadRpcBatcher} from './read-rpc-batcher.js';
 import {availablePurchaseLimit,clampPurchaseCount} from './purchase-limit.js';
+import {createPurchasePreparation} from './purchase-preparation.js';
+import {walletRequestRejected} from './wallet-request-errors.js';
 import {t,getLanguage,initLanguage,translateKnown} from './player-i18n.js';
 import {createSparkDrawTransactions,parseTickets,GAME,TOKEN} from './sparkdraw-transactions.js';
 const $=id=>document.getElementById(id),money=x=>formatUnits(BigInt(x||0),8).replace(/\.0$/,''),el=(tag,text)=>Object.assign(document.createElement(tag),{textContent:text});
@@ -18,11 +20,11 @@ const burnMoney=x=>{const milli=(BigInt(x||0)+50000n)/100000n;return `${milli/10
 const url=new URL(location.href);let pool=POOL_IDS.includes(url.searchParams.get('pool'))&&url.searchParams.get('pool')!=='0.1'?url.searchParams.get('pool'):DEFAULT_POOL_ID;
 let wallet=null,account=null,chain=null,revision=0,mode='auto',snapshot=null,balance=null,allowance=0n,held=0n,loading=false,flow=false,tab=document.body.dataset.initialTab||location.hash.slice(1)||'draw';
 let personalPage=1,burnPage=1,burnWalletPage=1,historyPage=1,recordsVersion=0,activeResult=null;
-let heldContext=null;
+let heldContext=null,preparationTimer,walletProgress='';
 let refundData=null,refundError=false,refundFlow=false;
 const poolLabel=id=>id==='0.1'?t('历史场次','Archived pool'):id+' BEM';
 const roundName=r=>r?.displayRoundId?roundDisplay(r):r?.status===0?t('待开盘','Not opened'):t('期号同步中','Number syncing');
-const context=()=>({account,key:JSON.stringify([revision,account,pool,chain,mode,$('ticket-count').value,$('selected-tickets').value])});
+const context=()=>({account,key:JSON.stringify([revision,account,pool,chain,snapshot?.currentRoundId,mode,$('ticket-count').value,$('selected-tickets').value])});
 const note=x=>{$('notice').textContent=x;};
 async function api(path,body){const r=await fetch(path,{cache:'no-store',signal:AbortSignal.timeout(15000),...(body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw Error(t('服务暂时无法响应，正在自动重试。','Service temporarily unavailable; retrying.'));}if(!r.ok)throw Error(d.error||'Network unavailable');return d;}
 const rpc=createReadRpcBatcher();
@@ -31,7 +33,7 @@ const manager=createSparkDrawTransactions({rpc,wallet:()=>wallet,context,onChang
 const links=(kind,value,label=value)=>{const a=el('a',label);a.href='https://bscscan.com/'+kind+'/'+value;a.target='_blank';a.rel='noopener noreferrer';a.className='mono';return a;};
 const errors={POOL_SALES_CLOSED:["本场已关闭新购买，请选择 5、10 或 50 BEM 正式场。","New purchases are closed. Choose the 5, 10 or 50 BEM pool."],GAS_FEE_CAP_EXCEEDED:['预计网络费超过 0.001 BNB，未发送。请减少份数或等待网络费用下降。','The maximum network fee exceeds 0.001 BNB. Nothing was sent. Reduce the quantity or wait.'],TICKET_LIMIT:['每笔请选择 1–5,000 份。','Choose 1–5,000 tickets per transaction.'],TICKET_RANGE:['请输入 00001–10000 内的号码或连续区间。','Enter numbers or ranges within 00001–10000.'],CONTEXT_CHANGED:['钱包或选择已变化，请重新操作。','Wallet or selection changed. Try again.'],TRANSACTION_PENDING:['上一笔交易仍在等待确认，请查看交易记录。','The previous transaction is pending. See its transaction record.'],GAS_LIMIT_EXCEEDED:['该组合的 Gas 超过单笔限制，请减少份数。','Gas exceeds the transaction limit. Reduce the ticket count.'],INSUFFICIENT_BEM:['BEM 余额不足。','Insufficient BEM balance.'],ADDRESS_LIMIT:['本钱包本期已达到 5,000 份。','This wallet has reached 5,000 tickets this round.']};
 Object.assign(errors, {ROUND_CHANGED:['期号已变化或正在读取，请稍后重新购买。','The round changed or is still loading. Please try again shortly.'],RPC_UNAVAILABLE:['链上查询暂时未完成，请稍后重试。','Chain reads are temporarily unavailable. Please try again.'],LOCK_UNAVAILABLE:['当前钱包浏览器不支持安全交易，请更新钱包 App 后重试。','Update your wallet app to use secure transactions.'],TRANSACTION_IN_FLIGHT:['已有操作等待钱包确认，请先完成该操作。','A wallet request is already in progress. Complete it first.']});
-function failure(e){note(e.code===4001||e.code==='ACTION_REJECTED'?t('已取消钱包确认。','Wallet request cancelled.'):errors[e.code]?t(...errors[e.code]):t('操作未完成：','Could not complete: ')+String(e.shortMessage||e.message||e).slice(0,150));}
+function failure(e){note(walletRequestRejected(e)?t('已取消钱包确认。','Wallet request cancelled.'):errors[e.code]?t(...errors[e.code]):t('操作未完成：','Could not complete: ')+String(e.shortMessage||e.message||e).slice(0,150));}
 function button(label,fn){const b=el('button',label);b.type='button';b.onclick=()=>Promise.resolve(fn()).catch(failure);return b;}
 const bound=new WeakSet();
 function bind(p){if(bound.has(p))return;bound.add(p);
@@ -45,8 +47,8 @@ const walletSession=createWalletSession({storage:sessionStorage,version:()=>revi
   $('personal-wallet').value=account;render();await refresh();await refreshRecords();
 }});
 function restoreConnection(){clearTimeout(restoreTimer);if(account||connectingWallet)return;restoreTimer=setTimeout(()=>{if(!account&&!connectingWallet&&!$('wallet-picker').open)walletSession.restore(discoveredWallets).catch(()=>{});},120);}
-window.addEventListener('focus',restoreConnection);
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)restoreConnection();});
+window.addEventListener('focus',()=>{restoreConnection();if(account)void poll(true);});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden){restoreConnection();if(account)void poll(true);}});
 const picker=createWalletPicker({dialog:$('wallet-picker'),onChange(entries){discoveredWallets=entries;restoreConnection();},onSelect:async(entry)=>{
   if(connectingWallet)return;
   const {provider}=entry;connectingWallet=true;walletSession.cancel();clearTimeout(restoreTimer);
@@ -95,17 +97,19 @@ function render(){
   // Never silently change a pending transaction's context. Outside that flow,
   // shortcuts, pasted values and live stock updates all use the same limit.
   if(mode==='auto'&&!flow&&!manager.busy&&!connectingWallet){const next=clampPurchaseCount(input.value,limit);if(next!==input.value){input.value=next;revision++;}}
-  let valid=true;try{const s=selection();$('purchase-total').textContent=money(BigInt(s.count)*p.ticketPrice)+' BEM';$('selection-note').textContent=t('申请 {count} 份，仅按实际分配份数扣款。','Requesting {count} tickets; only allocated tickets are charged.',{count:s.count});}catch{valid=false;$('purchase-total').textContent='— BEM';}
+  let valid=true,selectedCount=0;try{const s=selection();selectedCount=s.count;$('purchase-total').textContent=money(BigInt(s.count)*p.ticketPrice)+' BEM';$('selection-note').textContent=t('申请 {count} 份，仅按实际分配份数扣款。','Requesting {count} tickets; only allocated tickets are charged.',{count:s.count});}catch{valid=false;$('purchase-total').textContent='— BEM';}
   if(limit===0){$('purchase-total').textContent='0 BEM';$('selection-note').textContent=t('本场暂无可购份数。','No tickets available for this purchase.');}
   const now=chainNow(),open=r&&(r.status===0||r.status===1&&now<Math.min(r.fundingDeadline,r.earlyDrawDeadline||Infinity));
-  $('buy').disabled=!p.salesEnabled||connectingWallet||limit===0||!!account&&(!valid||!open||chain!==56||flow||manager.busy||manager.blocked({method:'buy'}));
-  $('buy').textContent=flow?t('等待钱包与链上确认…','Waiting for wallet / confirmation…'):!account?t('连接钱包并购买','Connect wallet to buy'):t('授权并购买','Approve & buy');
-  $('purchase-state').textContent=!account?t('点击购买会连接钱包。','Click buy to connect your wallet.'):manager.blocked({method:'buy'})?t('购买记录核对中，可继续领取奖金或退款。钱包加速或取消后将更新结果。','Checking your purchase. Prize and refund claims remain available; wallet replacements will be checked.'):!open?t('读取状态中，或本期购买时间已结束。','Loading state, or sales for this round have ended.'):t('本钱包本期还可购买 {count} 份。','This wallet may buy {count} more tickets this round.',{count:String(5000n-held)});
+  const pendingPurchase=manager.pendings.find(row=>['approve','buy','buySelected'].includes(row.method||row.kind));
+  const purchaseBlocked=manager.blocked({method:'buy'});
+  $('buy').disabled=!p.salesEnabled||connectingWallet||!account&&limit===0||!!account&&(chain!==56||flow||manager.busy||!purchaseBlocked&&(!valid||!open||limit===0));
+  $('buy').textContent=flow?walletProgress||t('正在打开钱包…','Opening your wallet…'):!account?t('连接钱包并购买','Connect wallet to buy'):purchaseBlocked?(pendingPurchase?.kind==='approve'?t('核对授权结果','Check approval result'):t('核对购买结果','Check purchase result')):allowance>=BigInt(selectedCount)*p.ticketPrice?t('购买','Buy'):t('授权并购买','Approve & buy');
+  $('purchase-state').textContent=!account?t('点击购买会连接钱包。','Click buy to connect your wallet.'):purchaseBlocked?(pendingPurchase?.kind==='approve'?t('授权结果核对中。可点击按钮重新核对，不会重复授权。','Checking approval. Click to recheck; no duplicate approval will be sent.'):t('购买已提交，正在核对结果。点击按钮可重新核对，不会重复扣款。','Purchase submitted. Click to recheck its result; no duplicate charge will be sent.')):!open?t('读取状态中，或本期购买时间已结束。','Loading state, or sales for this round have ended.'):t('本钱包本期还可购买 {count} 份。','This wallet may buy {count} more tickets this round.',{count:String(5000n-held)});
   $('my-count').textContent=account?String(held):'—';
   $('round-label').textContent=roundName(r);$('purchase-round-label').textContent=roundName(r);
   $('round-phase').textContent=r?statusText(r.status):t('读取中','Loading');$('funding-amount').textContent=`${money(BigInt(r?.sold||0)*p.ticketPrice)} / ${pool} BEM`;$('funding-tickets').textContent=`${r?.sold||0} / 10,000`;$('funding-progress').firstElementChild.style.width=((r?.sold||0)/100)+'%';
   window.dispatchEvent(new CustomEvent('bem:poolchange',{detail:{pool:{winnerBaseUnits:prize.toString()}}}));
-  renderDraw();renderPending();renderSelector();renderRefund();
+  renderDraw();renderPending();renderSelector();renderRefund();schedulePurchasePreparation();
 }
 const statusText=n=>[t('首次购买即开盘','Starts with first purchase'),t('购买中','Open'),t('已封盘','Closed'),t('等待随机数','Awaiting randomness'),t('等待计算结算','Awaiting settlement'),t('已开奖','Settled'),t('退款中','Refunding')][n];
 const chainNow=()=>snapshot?snapshot.time+Math.floor((Date.now()-snapshot.receivedAt)/1000):Math.floor(Date.now()/1000);
@@ -173,11 +177,11 @@ async function refresh(){if(loading)return;loading=true;const id=pool,rev=revisi
   }catch(e){if(id===pool&&rev===revision){snapshot=null;render();failure(e);}}finally{loading=false;}
 }
 function renderPending(){
-  const rows=manager.pendings,history=manager.history.slice(-5).reverse(),key=JSON.stringify([account,rows,history,getLanguage()]);
+  const rows=manager.pendings,history=manager.history.slice(-5).reverse(),key=JSON.stringify([account,rows,history,getLanguage(),manager.busy]);
   if(renderPending.key===key)return;renderPending.key=key;
   $('transactions').hidden=!rows.length&&!history.length;$('transaction-list').replaceChildren();$('unknown-test-transaction').hidden=true;
   const names={buy:t('购买','Purchase'),approve:t('授权','Approval'),claimPrizes:t('领取奖金','Prize claim'),refundMany:t('领取退款','Refund claim')};
-  for(const p of rows){const card=el('article','');card.append(el('p',`${poolLabel(p.poolId)} · ${names[p.kind]||p.kind}`),el('p',p.recoveryNeeded?t('nonce 已被使用，原单结果待核实。请填写钱包中的最新交易哈希。','The nonce was used, but the original outcome is unverified. Enter the latest hash from your wallet.'):p.hash?t('等待确认；自动核对加速、取消和替换交易。','Pending; checking for speedups, cancellations and replacements.'):t('钱包未返回哈希，请查看钱包活动恢复。','No hash returned. Restore from your wallet activity.')));
+  for(const p of rows){const card=el('article','');card.append(el('p',`${poolLabel(p.poolId)} · ${names[p.kind]||p.kind}`),el('p',p.recoveryNeeded?t('nonce 已被使用，原单结果待核实。请填写钱包中的最新交易哈希。','The nonce was used, but the original outcome is unverified. Enter the latest hash from your wallet.'):p.hash?t('等待确认；自动核对加速、取消和替换交易。','Pending; checking for speedups, cancellations and replacements.'):manager.busy?t('请在钱包中确认，网页正在等待钱包返回。','Confirm in your wallet; waiting for its response.'):t('钱包未返回哈希，请查看钱包活动恢复。','No hash returned. Restore from your wallet activity.')));
     if(p.hash)card.append(links('tx',p.hash));if(p.candidateHash)card.append(el('br',''),links('tx',p.candidateHash,t('钱包最新交易','Latest wallet transaction')));
     const details=el('details',''),summary=el('summary',t('恢复交易 / 移出等待','Recover / stop waiting')),input=el('input','');input.placeholder='0x…';input.maxLength=66;input.setAttribute('aria-label',t('钱包最新交易哈希','Latest wallet transaction hash'));
     details.append(summary,input,button(t('核验最新哈希','Verify latest hash'),async()=>{const r=await manager.attach(input.value.trim(),p.id);if(r)showTransactionResult(r);refresh();refreshRecords();}),el('p',t('移出等待只移除本页阻塞，不会撤销链上交易。结果未明时，请勿重复购买。','Stopping the wait does not cancel an onchain transaction. Avoid buying again while the outcome is unknown.')),button(t('已核对钱包，移出等待','Wallet checked: stop waiting'),async()=>{await manager.stopTracking(p.id);render();}));card.append(details);$('transaction-list').append(card);
@@ -185,44 +189,66 @@ function renderPending(){
   for(const r of history){const row=el('p',`${names[r.kind]||r.kind} · ${transactionStatus(r.status)}`);if(r.hash)row.append(' ',links('tx',r.hash));$('transaction-list').append(row);}
 }
 function transactionStatus(status){return({confirmed:t('已确认','Confirmed'),reverted:t('链上执行失败','Reverted'),cancelled:t('已被钱包取消','Cancelled in wallet'),replaced:t('已被其他交易替换','Replaced by another transaction'),unverified:t('已移出等待，链上结果未核实','No longer blocking; outcome unverified')})[status]||status;}
-function showTransactionResult(r){note(transactionStatus(r.status));partial(r);}
+function showTransactionResult(r){note(r.kind==='buy'&&r.status==='confirmed'&&r.result?t('购买已确认：{n} 份，实付 {amount} BEM。','Purchase confirmed: {n} tickets, paid {amount} BEM.',{n:r.result.filled,amount:money(r.result.paid)}):r.kind==='approve'&&r.status==='confirmed'?t('授权已确认，可以继续购买。','Approval confirmed. You can continue purchasing.'):transactionStatus(r.status));partial(r);}
 function partial(result){if(!result?.result||result.result.filled>=result.result.requested)return;const r=result.result,dialog=el('dialog','');dialog.className='partial-fill-result';dialog.append(el('h2',t('部分购买成功','Partial purchase completed')),el('p',t('申请 {a} 份，成交 {b} 份；实际扣款 {c} BEM，其余 {d} BEM 未扣除。','Requested {a}, filled {b}; paid {c} BEM. The remaining {d} BEM was not charged.',{a:r.requested,b:r.filled,c:money(r.paid),d:money(r.unspent)})),button(t('知道了','OK'),()=>dialog.close()));document.body.append(dialog);dialog.onclose=()=>dialog.remove();dialog.showModal();}
 async function poll(force=false){try{const r=await manager.check({force});if(r){showTransactionResult(r);refresh();refreshRecords();return r;}}catch(e){failure(e);}return null;}
 async function waitReceipt(hash,key){for(let i=0;i<30;i++){if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});await poll();const r=manager.result(hash);if(r){if(r.status!=='confirmed')throw Error(transactionStatus(r.status));return;}await new Promise(resolve=>setTimeout(resolve,2000));}throw Object.assign(Error('TRANSACTION_PENDING'),{code:'TRANSACTION_PENDING'});}
-async function buy(){if(!poolSalesEnabled(pool)){failure({code:'POOL_SALES_CLOSED'});return;}if(!account)return picker.open();if(flow)return;flow=true;const key=context().key,id=pool;try{
-    note(t('正在核对份数、余额和授权…','Checking tickets, balance and allowance…'));render();
-    const s=selection(),p=profile(id);
-    if(!snapshot?.currentRoundId)throw Object.assign(Error('ROUND_CHANGED'),{code:'ROUND_CHANGED'});
-    // The displayed round is only a query hint. Verify it, balances and stock
-    // together at a fresh block; never use cached balances or allocation data.
-    const current=BigInt(snapshot.currentRoundId),block=await rpc('eth_blockNumber',[]);
-    const [round,r,ownedTickets,b,al,stock]=await Promise.all([call(GAME,p.address,'currentRoundId',[],block),call(GAME,p.address,'rounds',[current],block),call(GAME,p.address,'ticketsOf',[current,account],block),call(TOKEN,F.bem,'balanceOf',[account],block),call(TOKEN,F.bem,'allowance',[account,p.address],block),s.tickets?null:call(GAME,p.address,'ticketWords',[current,0,556],block)]);
-    if(round[0]!==current)throw Object.assign(Error('ROUND_CHANGED'),{code:'ROUND_CHANGED'});
-    const tickets=ownedTickets[0];let stockWords=stock?.[0],stockOwned=tickets,approved=false;
-    const filled=Math.min(s.count,10000-Number(r[1]),5000-Number(tickets));if(filled<=0)throw Object.assign(Error('ADDRESS_LIMIT'),{code:'ADDRESS_LIMIT'});
-    if(b[0]<BigInt(filled)*p.ticketPrice)throw Object.assign(Error('INSUFFICIENT_BEM'),{code:'INSUFFICIENT_BEM'});
+async function preparePurchase(){
+  const key=context().key,id=pool,a=account,s=selection(),p=profile(id);
+  if(!snapshot?.currentRoundId)throw Object.assign(Error('ROUND_CHANGED'),{code:'ROUND_CHANGED'});
+  const current=BigInt(snapshot.currentRoundId),block=await rpc('eth_blockNumber',[]);
+  const [round,r,owned,b,al,stock]=await Promise.all([call(GAME,p.address,'currentRoundId',[],block),call(GAME,p.address,'rounds',[current],block),call(GAME,p.address,'ticketsOf',[current,a],block),call(TOKEN,F.bem,'balanceOf',[a],block),call(TOKEN,F.bem,'allowance',[a,p.address],block),s.tickets?null:call(GAME,p.address,'ticketWords',[current,0,556],block)]);
+  if(round[0]!==current)throw Object.assign(Error('ROUND_CHANGED'),{code:'ROUND_CHANGED'});
+  const filled=Math.min(s.count,10000-Number(r[1]),5000-Number(owned[0]));
+  if(filled<=0)throw Object.assign(Error('ADDRESS_LIMIT'),{code:'ADDRESS_LIMIT'});
+  if(b[0]<BigInt(filled)*p.ticketPrice)throw Object.assign(Error('INSUFFICIENT_BEM'),{code:'INSUFFICIENT_BEM'});
+  if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});
+  const needsApproval=al[0]<BigInt(filled)*p.ticketPrice;
+  const chosen=needsApproval?null:s.tickets||randomUnsoldTickets(stock[0],filled);
+  if(!needsApproval&&!chosen.length)throw Error(t('本期已售完，请等待下一期。','This round has sold out. Wait for the next round.'));
+  const input=needsApproval?{poolId:id,method:'approve',args:[p.address,BigInt(s.count)*p.ticketPrice],kind:'approve'}:{poolId:id,method:'buySelected',args:[current,chosen],kind:'buy',roundId:current,count:chosen.length};
+  await manager.prepare(input);
+  return {needsApproval,input};
+}
+const purchasePreparation=createPurchasePreparation({context,load:preparePurchase});
+function schedulePurchasePreparation(){
+  clearTimeout(preparationTimer);
+  if(!account||chain!==56||!snapshot||flow||manager.busy||!poolSalesEnabled(pool)||manager.blocked({method:'buy'}))return;
+  preparationTimer=setTimeout(()=>purchasePreparation.warm(),180);
+}
+function purchaseProgress(zh,en){walletProgress=t(zh,en);note(walletProgress);render();}
+async function buy(){
+  if(!poolSalesEnabled(pool)){failure({code:'POOL_SALES_CLOSED'});return;}
+  if(!account)return picker.open();if(flow)return;
+  flow=true;const key=context().key;
+  try{
+    if(manager.blocked({method:'buy'})){
+      purchaseProgress('正在核对交易结果…','Checking transaction result…');
+      const result=await poll(true);
+      if(!result)note(t('仍在核对，请查看下方交易记录；结果确认前不会重复购买。','Still checking. See the transaction record below; no duplicate purchase will be sent.'));
+      return;
+    }
+    purchaseProgress('正在打开钱包…','Opening your wallet…');
+    let plan=await purchasePreparation.get();
     if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});
-    render();if(al[0]<BigInt(filled)*p.ticketPrice){note(t('正在估算授权费用，随后请在钱包确认授权…','Estimating approval fees; then confirm approval in your wallet…'));const hash=await manager.execute({poolId:id,method:'approve',args:[p.address,BigInt(s.count)*p.ticketPrice],kind:'approve'});note(t('授权已提交，确认后将请求购买支付…','Approval submitted; the purchase request follows after confirmation…'));await waitReceipt(hash,key);approved=true;}
-    if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});
-    let chosen=s.tickets;
-    if(!chosen){
-      note(t('正在读取未售号码并随机选号…','Reading available tickets and choosing random numbers…'));
-      // An approval can take arbitrarily long: refresh allocation after it is
-      // confirmed. Already-approved purchases reuse this click's fresh reads.
-      if(approved){
-        const freshBlock=await rpc('eth_blockNumber',[]);
-        const [roundNow,owned,words]=await Promise.all([call(GAME,p.address,'currentRoundId',[],freshBlock),call(GAME,p.address,'ticketsOf',[current,account],freshBlock),call(GAME,p.address,'ticketWords',[current,0,556],freshBlock)]);
-        if(roundNow[0]!==current)throw Object.assign(Error('ROUND_CHANGED'),{code:'ROUND_CHANGED'});
-        stockWords=words[0];stockOwned=owned[0];
-      }
-      const count=Math.min(s.count,5000-Number(stockOwned));if(count<=0)throw Object.assign(Error('ADDRESS_LIMIT'),{code:'ADDRESS_LIMIT'});
-      chosen=randomUnsoldTickets(stockWords,count);
-      if(!chosen.length)throw Error(t('本期已售完，请等待下一期。','This round has sold out. Wait for the next round.'));
+    if(plan.needsApproval){
+      purchaseProgress('请在钱包中确认授权…','Confirm approval in your wallet…');
+      const hash=await manager.execute(plan.input);
+      purchaseProgress('授权已提交，等待确认…','Approval sent; awaiting confirmation…');
+      await waitReceipt(hash,key);
+      // Re-read after approval. Background preparation never carries stock,
+      // balances, allowance or gas across an arbitrarily long wallet wait.
+      purchasePreparation.clear();
+      purchaseProgress('正在打开购买确认…','Opening purchase confirmation…');
+      plan=await purchasePreparation.get();
+      if(plan.needsApproval)throw Object.assign(Error('授权额度尚未同步，请稍后点击购买。'),{code:'APPROVAL_NOT_READY'});
     }
     if(context().key!==key)throw Object.assign(Error('CONTEXT_CHANGED'),{code:'CONTEXT_CHANGED'});
-    note(t('正在估算购买费用，随后请在钱包确认支付…','Estimating purchase fees; then confirm payment in your wallet…'));
-    await manager.execute({poolId:id,method:'buySelected',args:[current,chosen],kind:'buy',roundId:current,count:chosen.length});note(t('购买已提交，正在等待确认。','Purchase submitted; awaiting confirmation.'));
-  }catch(e){failure(e);}finally{flow=false;render();}}
+    purchaseProgress('请在钱包中确认购买…','Confirm purchase in your wallet…');
+    await manager.execute(plan.input);
+    note(t('购买已提交，正在核对结果。','Purchase sent; checking the result.'));
+  }catch(e){failure(e);}finally{flow=false;walletProgress='';purchasePreparation.clear();render();}
+}
 async function action(id,method,args){if(!['claimPrizes','refundMany','burnUnclaimedPrize','burnUnclaimed'].includes(method))throw Error('BACKEND_DRAW_ONLY');if(!account)return picker.open();await manager.execute({poolId:id,method,args,kind:method,roundId:Array.isArray(args[0])?0:args[0]});render();}
 function claimButton(r,id){const prize=r.prize,winner=prize?.winner||r.winner;let label=t('领取奖金','Claim prize');if(prize?.claimed)label=t('已领取','Claimed');else if(prize?.burned)label=t('已销毁','Burned');else if(chainNow()>=prize?.claimDeadline)label=t('领取期已结束','Claim window expired');
   const b=button(label,()=>{if(!account)return picker.open();if(account.toLowerCase()!==winner.toLowerCase())return note(t('请连接中奖钱包领取。','Connect the winning wallet to claim.'));return action(id,'claimPrizes',[[r.roundId],account]);});b.disabled=!!prize?.claimed||!!prize?.burned||chainNow()>=prize?.claimDeadline||!!account&&account.toLowerCase()!==winner?.toLowerCase();return b;}

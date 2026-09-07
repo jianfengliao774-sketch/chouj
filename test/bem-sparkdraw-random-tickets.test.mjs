@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {createPurchasePreparation} from '../bem-production-site/web/purchase-preparation.js';
 import {randomBelow,randomUnsoldTickets} from '../bem-production-site/web/random-tickets.js';
 const empty=()=>Array(556).fill(0n);
 function occupy(words,n){words[Math.floor(n/18)]|=1n<<BigInt(n%18*14);}
@@ -29,14 +30,14 @@ function flow({changeContext=false,changeRound=false,readFailure=false,quota=499
   const sent=[],reads=[],failures=[],words=empty();occupy(words,0);
   if(allSold)for(let n=0;n<10000;n++)occupy(words,n);
   let contextChanged=false,approved=false;
-  const c=vm.createContext({poolSalesEnabled:()=>true,account:'wallet',pool:'0.1',snapshot:{currentRoundId:'1'},flow:false,GAME:'game',TOKEN:'token',F:{bem:'bem'},
+  const c=vm.createContext({poolSalesEnabled:()=>true,account:'wallet',pool:'0.1',snapshot:{currentRoundId:'1'},flow:false,walletProgress:'',createPurchasePreparation,GAME:'game',TOKEN:'token',F:{bem:'bem'},
     context:()=>({key:contextChanged?'changed':'same'}),selection:()=>({count:chosen?.length||4,tickets:chosen}),profile:()=>({address:'game',ticketPrice:1000n}),
-    call:async(iface,to,method,args,block)=>{reads.push({method,block});if(method==='currentRoundId')return [changeRound||approved&&roundAfterApproval?2n:1n];if(method==='rounds')return [1n,100n];if(method==='ticketsOf')return [quota];if(method==='balanceOf')return [balance];if(method==='allowance')return [allowance];if(method==='ticketWords'){if(readFailure)throw Error('RPC_UNAVAILABLE');contextChanged=changeContext||contextChanged;return [words];}throw Error(method);},
-    rpc:async()=>approved?'0x101':'0x100',randomUnsoldTickets,manager:{execute:async args=>{sent.push(args);}},
+    call:async(iface,to,method,args,block)=>{reads.push({method,block});if(method==='currentRoundId')return [changeRound||approved&&roundAfterApproval?2n:1n];if(method==='rounds')return [1n,100n];if(method==='ticketsOf')return [quota];if(method==='balanceOf')return [balance];if(method==='allowance')return [approved?1000000n:allowance];if(method==='ticketWords'){if(readFailure)throw Error('RPC_UNAVAILABLE');contextChanged=changeContext||contextChanged;return [words];}throw Error(method);},
+    rpc:async()=>approved?'0x101':'0x100',randomUnsoldTickets,manager:{prepare:async()=>{},blocked:()=>false,execute:async args=>{sent.push(args);}},
     waitReceipt:async()=>{approved=true;if(contextAfterApproval)contextChanged=true;if(stockAfterApproval)for(let n=0;n<10000;n++)if(n!==9999)occupy(words,n);},
     render(){},note(){},failure:e=>failures.push(e),t:zh=>zh,
   });
-  vm.runInContext(source.slice(source.indexOf('async function buy()'),source.indexOf('async function action(')),c);
+  vm.runInContext(source.slice(source.indexOf('async function preparePurchase()'),source.indexOf('async function action(')),c);
   return {run:()=>c.buy(),sent,reads,failures};
 }
 test('already-approved auto purchase reads one fresh block and sends random numbers through existing buySelected',async()=>{
