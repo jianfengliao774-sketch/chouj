@@ -21,7 +21,7 @@ export function parseTickets(mode,count,text){
   if(!set.size)fail('TICKET_RANGE');return{count:set.size,tickets:[...set].sort((a,b)=>a-b)};
 }
 export function createSparkDrawTransactions({rpc,wallet,context,storage=localStorage,onChange=()=>{},locks=globalThis.navigator?.locks,now=Date.now,checkSales=requirePoolSales}){
-  let busy=false,polling=false,cursor=0,prepared=null;const discovery=new Map();
+  let busy=false,polling=false,cursor=0,prepared=null;const discovery=new Map(),inspections=new Map();
   const load=()=>{
     const raw=storage.getItem(KEY),value=raw?JSON.parse(raw):null;
     if(!value)return{version:6,pending:[],history:[]};
@@ -60,9 +60,11 @@ export function createSparkDrawTransactions({rpc,wallet,context,storage=localSto
     if(!['buy','buySelected','approve','refundMany','claimPrizes','closeRound','fulfillRandomness','settle','openRefunds','burnUnclaimed','burnUnclaimedPrize'].includes(method))fail('ACTION_NOT_SUPPORTED');
     if(method==='approve'&&(!same(args[0],dest.address)||BigInt(args[1])<=0n||BigInt(args[1])>5000n*dest.ticketPrice))fail('APPROVAL_AMOUNT');
     if(claims.has(method)&&!same(args[1],c.account))fail('CONTEXT_CHANGED');
-    const to=method==='approve'?F.bem:dest.address,data=(method==='approve'?TOKEN:GAME).encodeFunctionData(method,args),tx={from:c.account,to,data,value:'0x0'};
-    const key=JSON.stringify([c.key,poolId,method,kind,to,data]);
+    // Compare values before ABI encoding: 5,000 tickets produce 320 KB of data.
+    // Never cache by array identity; callers may edit their selection in place.
+    const key=JSON.stringify([c.key,poolId,method,kind,args],(_,v)=>typeof v==='bigint'?String(v):v);
     if(prepared&&prepared.key===key&&prepared.provider===provider&&(!prepared.done||now()-prepared.at<5000))return prepared.promise;
+    const to=method==='approve'?F.bem:dest.address,data=(method==='approve'?TOKEN:GAME).encodeFunctionData(method,args),tx={from:c.account,to,data,value:'0x0'};
     const job={key,provider,at:now(),done:false,promise:null};prepared=job;
     job.promise=Promise.all([rpc('eth_getCode',[dest.address,'latest']),rpc('eth_estimateGas',[tx,'latest']),rpc('eth_gasPrice',[]),rpc('eth_blockNumber',[])]).then(([code,rawGas,rawPrice,startBlock])=>{
       if(keccak256(code)!==dest.runtimeHash)fail('CONTRACT_MISMATCH');
@@ -85,29 +87,52 @@ export function createSparkDrawTransactions({rpc,wallet,context,storage=localSto
     return{id:record.id,account:record.account,poolId:record.poolId,kind:record.kind,roundId:record.roundId,originalHash:record.hash,hash:tx.hash,
       status:matches?(BigInt(receipt.status)===1n?'confirmed':'reverted'):replacementStatus(tx),result,at:now()};
   }
-  async function inspect(record,{force=false}={}){
-    const discover=force||now()>=(discovery.get(record.id)||0);if(discover)discovery.set(record.id,now()+10000);
+  async function inspectRecord(record,{force=false,discover:allowDiscovery=true}={}){
+    const discover=allowDiscovery&&(force||now()>=(discovery.get(record.id)||0));if(discover)discovery.set(record.id,now()+10000);
     const found=await recoverTransaction(rpc,record,{discover});
     if(found.receipt){const result=outcome(record,found);const changed=await mutate(record,(s,i)=>{s.pending.splice(i,1);s.history.push(result);s.history=s.history.slice(-50);});return changed?result:null;}
     if(JSON.stringify(found.updated)!==JSON.stringify(record))await mutate(record,(s,i)=>{s.pending[i]=found.updated;});
     return null;
+  }
+  function inspect(record,options){
+    // A returned hash can arrive while an older no-hash lookup is still running.
+    // Share only identical snapshots; the new hash must not wait for discovery.
+    const key=JSON.stringify(record);
+    if(inspections.has(key))return inspections.get(key);
+    const run=inspectRecord(record,options).finally(()=>inspections.delete(key));
+    inspections.set(key,run);return run;
+  }
+  async function checkHash(hash,{discover=false}={}){
+    const record=own(load().pending).find(r=>same(r.hash,hash)||same(r.candidateHash,hash));
+    return record?inspect(record,{discover}):null;
   }
   async function check({force=false}={}){
     const records=own(load().pending);if(!records.length||polling)return null;polling=true;
     try{for(let n=0;n<Math.min(records.length,4);n++){const record=records[(cursor+n)%records.length],r=await inspect(record,{force});if(r)return r;}return null;}
     finally{cursor++;polling=false;}
   }
-  async function execute({poolId,method,args,kind,count,roundId}){
-    checkSales(poolId,method);
-    const input={poolId,method,args,kind};
+  async function execute(request){
+    if(typeof request!=='function')checkSales(request.poolId,request.method);
     const work=async()=>{
       if(busy)fail('TRANSACTION_IN_FLIGHT');busy=true;
       try{
-        const c=context(),p=wallet();if(!c.account||!p)fail('CONNECT_WALLET');if(blocked(input))fail('TRANSACTION_PENDING');
-        const {to,data,tx,gas,price,startBlock}=await prepare(input);
-        let nonce=BigInt(await p.request({method:'eth_getTransactionCount',params:[c.account,'pending']}));
+        const c=context(),p=wallet();if(!c.account||!p)fail('CONNECT_WALLET');
+        // Start the wallet bridge read on the user action, alongside read-only
+        // chain preparation. Signing still waits for both and a final identity check.
+        const nonceStarted=now();
+        const nonceRead=Promise.resolve().then(()=>p.request({method:'eth_getTransactionCount',params:[c.account,'pending']})).then(value=>({value}),error=>({error}));
+        const plan=Promise.resolve().then(()=>typeof request==='function'?request():request).then(async input=>{
+          checkSales(input.poolId,input.method);if(blocked(input))fail('TRANSACTION_PENDING');
+          return{input,prepared:await prepare(input)};
+        });
+        const [nonceResult,{input,prepared:ready}]=await Promise.all([nonceRead,plan]);
+        if(nonceResult.error)throw nonceResult.error;
+        const rawNonce=nonceResult.value;
+        const {poolId,method,kind,count,roundId}=input,{to,data,tx,gas,price,startBlock}=ready;
+        // A slow RPC retry must not carry an early nonce across a long wait.
+        let nonce=BigInt(now()-nonceStarted<5000?rawNonce:await p.request({method:'eth_getTransactionCount',params:[c.account,'pending']}));
         for(const r of own(load().pending))nonce=nonce>BigInt(r.boundNonce??r.nonce)?nonce:BigInt(r.boundNonce??r.nonce)+1n;
-        await identity(p,c);if(blocked(input))fail('TRANSACTION_PENDING');
+        await identity(p,c);if(wallet()!==p||blocked(input))fail(wallet()!==p?'CONTEXT_CHANGED':'TRANSACTION_PENDING');
         const record={id:globalThis.crypto.randomUUID(),poolId,method,kind,roundId:String(roundId||0),count:count||0,account:getAddress(c.account),to,data,nonce:String(nonce),startBlock,hash:null,at:now()};
         const state=load();state.pending.push(record);save(state);
         try{
@@ -122,7 +147,7 @@ export function createSparkDrawTransactions({rpc,wallet,context,storage=localSto
     };
     if(!locks)fail('LOCK_UNAVAILABLE');return locks.request(KEY,{ifAvailable:true},lock=>{if(!lock)fail('TRANSACTION_IN_FLIGHT');return work();});
   }
-  return{execute,prepare,check,blocked,get pending(){return own(load().pending)[0]||null;},get pendings(){return own(load().pending);},get history(){return own(load().history);},get busy(){return busy;},
+  return{execute,prepare,check,checkHash,blocked,get pending(){return own(load().pending)[0]||null;},get pendings(){return own(load().pending);},get history(){return own(load().history);},get busy(){return busy;},
     result(hash){return own(load().history).findLast(r=>same(r.originalHash,hash)||same(r.hash,hash))||null;},
     async attach(hash,id){
       const record=own(load().pending).find(r=>id?r.id===id:true);if(!record||!/^0x[a-f0-9]{64}$/i.test(hash))fail('TRANSACTION_MISMATCH');

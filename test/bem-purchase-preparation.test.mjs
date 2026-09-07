@@ -19,3 +19,19 @@ test('a failed background query is retried on click instead of poisoning the pre
   let reads=0;const p=createPurchasePreparation({context:()=>({key:'A'}),load:async()=>{if(++reads===1)throw Error('offline');return'fresh';}});
   await assert.rejects(p.get(),/offline/);assert.equal(await p.get(),'fresh');
 });
+
+
+test('a changed selection cannot extend the underlying state freshness window',async()=>{
+  let time=0,key='100',stateReads=0;
+  const state=createPurchasePreparation({context:()=>({key:'account/pool/round'}),now:()=>time,load:async()=>({value:++stateReads,expiresAt:time+5000})});
+  const plan=createPurchasePreparation({context:()=>({key}),now:()=>time,load:()=>state.get(),expiresAt:value=>value.expiresAt});
+  assert.equal((await plan.get()).value,1);
+  time=4000;key='5000';assert.equal((await plan.get()).value,1);
+  time=6000;assert.equal((await plan.get()).value,2);
+});
+test('clearing during an in-flight load prevents it repopulating the new cache',async()=>{
+  const resolves=[];const p=createPurchasePreparation({context:()=>({key:'A'}),load:()=>new Promise(r=>resolves.push(r))});
+  const old=p.get();await Promise.resolve();p.clear();const fresh=p.get();await Promise.resolve();
+  resolves[1]('new');assert.equal(await fresh,'new');resolves[0]('old');await old;
+  assert.equal(await p.get(),'new');
+});

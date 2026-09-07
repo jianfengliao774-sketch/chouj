@@ -8,8 +8,9 @@ export function validReplacement(tx,record,{manual=false}={}){
   const nonce=record.boundNonce??(manual?record.nonce:null);
   return nonce!==null&&BigInt(tx.nonce)===BigInt(nonce);
 }
-export async function canonicalReceipt(rpc,tx){
-  const receipt=await rpc('eth_getTransactionReceipt',[tx.hash]);if(!receipt||!tx.blockHash)return null;
+export async function canonicalReceipt(rpc,tx,receipt){
+  if(receipt===undefined)receipt=await rpc('eth_getTransactionReceipt',[tx.hash]);
+  if(!receipt||!tx.blockHash)return null;
   const block=await rpc('eth_getBlockByNumber',[receipt.blockNumber,false]);
   if(!block||!same(block.hash,receipt.blockHash)||!same(block.hash,tx.blockHash)||!same(tx.hash,receipt.transactionHash))return null;
   if(tx.blockNumber!==receipt.blockNumber||!['0x0','0x1'].includes(receipt.status))mismatch();
@@ -33,12 +34,14 @@ async function replacementAtNonce(rpc,record,head,nonce){
 export async function recoverTransaction(rpc,record,{discover=true}={}){
   let updated={...record};
   for(const hash of [...new Set([record.candidateHash,record.hash].filter(Boolean))]){
-    const tx=await rpc('eth_getTransactionByHash',[hash]);if(!tx)continue;
+    // Both reads depend only on the known hash. Fetch together, then verify the
+    // exact intent and canonical block before accepting either result.
+    const [tx,rawReceipt]=await Promise.all([rpc('eth_getTransactionByHash',[hash]),rpc('eth_getTransactionReceipt',[hash])]);if(!tx)continue;
     if(!same(tx.hash,hash))mismatch();
     const matches=matchesIntent(tx,updated);
     if(!matches&&!validReplacement(tx,updated))mismatch();
     if(matches)updated.boundNonce=String(BigInt(tx.nonce));
-    const receipt=await canonicalReceipt(rpc,tx);
+    const receipt=await canonicalReceipt(rpc,tx,rawReceipt);
     if(receipt)return{updated,tx,receipt,matches};
   }
   if(!discover)return{updated};

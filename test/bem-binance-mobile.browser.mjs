@@ -23,6 +23,11 @@ try{
     {name:'mobile all quantities clamp to wallet remainder, then follow account switch',mobile:true,approval:false,selected:false,sold:6500,held:4200,switchAccount:true},
     {name:'desktop quantity clamps to the pool remainder',mobile:false,approval:false,selected:false,sold:8800,held:0},
     {name:'mobile prepared purchase opens promptly',mobile:true,approval:false,selected:false,warm:true},
+    {name:'mobile changed selection after preparation uses the new quantity',mobile:true,approval:false,selected:false,warm:true,changeAfterWarm:true},
+    {name:'mobile warmed small quantity reuses state when immediately buying 5000',mobile:true,approval:false,selected:false,warm:true,warmSmall:true},
+    {name:'mobile delayed approval receipt opens purchase immediately after confirmation',mobile:true,approval:true,selected:false,approvalReceiptDelayMs:1200},
+    {name:'mobile transient approval receipt read failure recovers before purchase',mobile:true,approval:true,selected:false,transientApprovalReceiptError:true},
+    {name:'mobile approval bypasses a slow unrelated old pending purchase',mobile:true,approval:true,selected:false,approvalReceiptDelayMs:350,slowOldRecordMs:6000},
     {name:'mobile wrapped approval rejection unlocks retry',mobile:true,approval:true,selected:false,rejectApproval:true},
     {name:'wallet-wrapped 5000 purchase confirms and unlocks',mobile:false,approval:false,selected:false,confirmPurchase:'wrapped'},
     {name:'wallet-selected direct nonce confirms and unlocks',mobile:false,approval:false,selected:false,confirmPurchase:'nonce',holdReceipt:true},
@@ -40,15 +45,16 @@ try{
     {name:'TokenPocket mobile switches to BNB before purchasing',mobile:true,approval:false,selected:false,mobileWallet:'tp',switchNetwork:true},
     {name:'sold-out pool disables purchasing and shows zero available',mobile:false,approval:false,selected:false,sold:10000,held:0},
   ].filter(s=>!process.env.SCENARIO_FILTER||s.name.includes(process.env.SCENARIO_FILTER))){
-    let receiptAvailable=!scenario.holdReceipt;
+    let receiptAvailable=!scenario.holdReceipt,approvalReceiptSeenAt=null,approvalReceiptErrorUsed=false;
+    const oldHash='0x'+'d'.repeat(64);
     let expected=Math.min(5000,10000-(scenario.sold||0),5000-(scenario.held||0));
     const context=await browser.newContext({viewport:scenario.mobile?{width:390,height:844}:{width:1280,height:900},isMobile:scenario.mobile,hasTouch:scenario.mobile});
-    const page=await context.newPage(),errors=[],requests=[];
+    const page=await context.newPage(),errors=[],requests=[],rpcTrace=[];
     page.on('pageerror',e=>errors.push(e.message));
     await page.addInitScript(({account,hash,blockHash,mobile,walletDelay,rejectApproval,confirmPurchase,okx,legacyTimeout,mobileWallet,initializedEvent,mixedProviders,switchNetwork})=>{
       if(legacyTimeout)Object.defineProperty(AbortSignal,'timeout',{value:undefined,configurable:true});
       window.__walletRequests=[];window.__purchases=[];window.__wrongWalletRequests=[];let authorized=false,currentAccount=account,currentChain=switchNetwork?'0x1':'0x38';const listeners={};
-      document.addEventListener('click',e=>{if(e.target.closest?.('#buy'))window.__buyClickedAt=performance.now();},true);
+      document.addEventListener('click',e=>{if(e.target.closest?.('#buy')){window.__buyClickedAt=performance.now();window.__buyClickedWallAt=Date.now();}},true);
       const flags=okx?{isOkxWallet:true}:({tp:{isTokenPocket:true,isMetaMask:true},tpLegacy:{isTp:true,isMetaMask:true},metamask:{isMetaMask:true},trust:{isTrust:true,isMetaMask:true}}[mobileWallet]||{isBinance:true});
       const provider={...flags,on(name,fn){(listeners[name]??=[]).push(fn);},async request(q){
         window.__walletRequests.push({method:q.method,params:q.params,at:performance.now()});
@@ -60,7 +66,7 @@ try{
         if(q.method==='eth_getTransactionCount')return window.__approval?'0x2':'0x1';
         if(q.method==='eth_sendTransaction'){
           const tx=q.params[0];
-          if(tx.data.startsWith('0x095ea7b3')){if(rejectApproval)throw{code:-32603,data:{originalError:{code:4001}}};window.__approval={...tx,input:tx.data,hash,blockHash,blockNumber:'0x100'};return hash;}
+          if(tx.data.startsWith('0x095ea7b3')){if(rejectApproval)throw{code:-32603,data:{originalError:{code:4001}}};window.__approvalAt=Date.now();window.__approval={...tx,input:tx.data,hash,blockHash,blockNumber:'0x100'};return hash;}
           if(confirmPurchase){const purchase={...tx,input:tx.data,hash:'0x'+(12+window.__purchases.length).toString(16).repeat(64),blockHash,blockNumber:'0x100'};window.__purchases.push(purchase);return purchase.hash;}
           throw Object.assign(Error('Fixture rejects payment; nothing broadcast'),{code:4001});
         }
@@ -84,6 +90,8 @@ try{
       if(url.pathname==='/rpc'){
         assert.ok(Buffer.byteLength(request.postData())<=524288);
         const input=request.postDataJSON(),rows=Array.isArray(input)?input:[input];requests.push(rows);
+        const trace={startedAt:Date.now(),methods:rows.map(row=>row.method==='eth_call'?GAME.parseTransaction(row.params[0])?.name||TOKEN.parseTransaction(row.params[0])?.name||row.method:row.method),oldRecord:!!scenario.slowOldRecordMs&&rows.some(row=>row.params[0]===oldHash)};
+        rpcTrace.push(trace);
         // Simulated round-trip delay reveals accidental serial query dependencies.
         await new Promise(r=>setTimeout(r,rpcDelay));
         const result=[];
@@ -91,7 +99,7 @@ try{
           const [arg]=row.params;let value;
           if(row.method==='eth_call'){
             const iface=arg.to.toLowerCase()===F.bem.toLowerCase()?TOKEN:GAME,c=iface.parseTransaction(arg);
-            const approval=await page.evaluate(()=>!!window.__approval);
+            const approval=await page.evaluate(delay=>!!window.__approval&&Date.now()-window.__approvalAt>=delay,scenario.approvalReceiptDelayMs||0);
             const words=Array(556).fill(0n);for(let n=0;n<(scenario.sold||0);n++)words[Math.floor(n/18)]|=1n<<BigInt(n%18*14);
             const held=c.name==='ticketsOf'&&c.args[1].toLowerCase()===account.toLowerCase()?(scenario.held||0):0;
             const values={currentRoundId:[1],rounds:[0,scenario.sold||0,0,0,0,0,0,0,0,'0x'+'0'.repeat(40)],ticketsOf:[held],ticketWords:[words],balanceOf:[10000000000n],allowance:[!scenario.approval||approval?10000000000n:0n]};
@@ -102,6 +110,7 @@ try{
           else if(row.method==='eth_blockNumber')value='0x100';
           else if(row.method==='eth_getBalance')value='0xde0b6b3a7640000';
           else if(row.method==='eth_getTransactionByHash'){
+            if(arg===oldHash&&scenario.slowOldRecordMs){await new Promise(resolve=>setTimeout(resolve,scenario.slowOldRecordMs));value=null;result.push({jsonrpc:'2.0',id:row.id,result:value});continue;}
             const tx=await page.evaluate(h=>window.__purchases.find(tx=>tx.hash===h)||(window.__approval?.hash===h?window.__approval:null),arg);
             value=tx;
             if(tx&&['nonce','wrapped'].includes(scenario.confirmPurchase)&&tx.hash==='0x'+'c'.repeat(64)){
@@ -113,17 +122,20 @@ try{
             }
           }
           else if(row.method==='eth_getTransactionReceipt'){
+            if(arg===hash&&scenario.transientApprovalReceiptError&&!approvalReceiptErrorUsed){approvalReceiptErrorUsed=true;result.push({jsonrpc:'2.0',id:row.id,error:{code:-32000,message:'Fixture: receipt temporarily unavailable'}});continue;}
             const tx=await page.evaluate(h=>window.__purchases.find(tx=>tx.hash===h)||null,arg);
             const decoded=tx?GAME.decodeFunctionData('buySelected',tx.data):null;
             const event=decoded?GAME.encodeEventLog(GAME.getEvent('PurchaseResult'),[decoded[0],tx.from,decoded[1].length,decoded[1].length,BigInt(decoded[1].length)*p.ticketPrice,0]):null;
-            value=tx&&!receiptAvailable?null:{transactionHash:arg,status:'0x1',blockNumber:'0x100',blockHash,logs:event?[{...event,address:p.address}]:[]};
+            const approvalAt=arg===hash?await page.evaluate(()=>window.__approvalAt):null;
+            value=scenario.slowOldRecordMs&&arg===oldHash||tx&&!receiptAvailable||approvalAt&&Date.now()-approvalAt<(scenario.approvalReceiptDelayMs||0)?null:{transactionHash:arg,status:'0x1',blockNumber:'0x100',blockHash,logs:event?[{...event,address:p.address}]:[]};
+            if(arg===hash&&value&&approvalReceiptSeenAt===null)approvalReceiptSeenAt=Date.now();
           }
           else if(row.method==='eth_getBlockByNumber')value={number:'0x100',hash:blockHash,transactions:[]};
           else if(row.method==='eth_getTransactionCount')value='0x2';
           else throw Error('Unexpected RPC: '+row.method);
           result.push({jsonrpc:'2.0',id:row.id,result:value});
         }
-        return reply(Array.isArray(input)?result:result[0]);
+        trace.finishedAt=Date.now();return reply(Array.isArray(input)?result:result[0]);
       }
       if(url.pathname==='/api/sparkdraw/state')return reply({version:5,address:p.address,currentRoundId:'1',time:Math.floor(Date.now()/1000),rounds:[{roundId:'1',status:0,sold:scenario.sold||0}],keeper:{}});
       if(url.pathname==='/api/sparkdraw/records')return reply({rows:[],claims:[],total:0,page:1,totalPages:1});
@@ -176,6 +188,7 @@ try{
     if(scenario.selected){await page.locator('#mode-selected').click();await page.locator('#selected-tickets').fill('1-5000');}
     else {await page.locator('[data-count="5000"]').click();assert.equal(await page.locator('#ticket-count').inputValue(),String(expected));}
     if(scenario.repeatPurchase){expected=1000;await page.locator('#ticket-count').fill('1000');}
+    if(scenario.warmSmall){expected=100;await page.locator('#ticket-count').fill('100');}
     await page.waitForFunction(()=>!document.getElementById('buy').disabled);
     if(scenario.warm){
       const deadline=Date.now()+5000;
@@ -183,8 +196,15 @@ try{
       await new Promise(resolve=>setTimeout(resolve,rpcDelay+100));
       assert.equal(await page.evaluate(()=>window.__walletRequests.some(q=>q.method==='eth_sendTransaction')),false);
     }
+    if(scenario.changeAfterWarm){expected=3000;await page.locator('#ticket-count').fill('3000');}
+    if(scenario.warmSmall){expected=5000;await page.locator('[data-count="5000"]').click();}
+    if(scenario.slowOldRecordMs){
+      const oldRecord={id:'old-fixture-purchase',poolId:'5',method:'buySelected',kind:'buy',roundId:'1',count:1,account,to:p.address,data:GAME.encodeFunctionData('buySelected',[1,[9999]]),nonce:'0',startBlock:'0x100',hash:oldHash,at:Date.now()-60000};
+      await page.evaluate(record=>localStorage.setItem('sparkdraw:v5:pending',JSON.stringify({version:6,pending:[record],history:[]})),oldRecord);
+    }
     const started=Date.now();await page.locator('#buy').click();
     const clickedAt=await page.evaluate(()=>window.__buyClickedAt);
+    const clickedWallAt=await page.evaluate(()=>window.__buyClickedWallAt);
     assert.equal(await page.locator('#buy').isDisabled(),true,'Immediate busy state before preflight');
     if(scenario.rejectApproval){
       await page.waitForFunction(()=>window.__walletRequests.some(q=>q.method==='eth_sendTransaction')&&!document.getElementById('buy').disabled);
@@ -230,8 +250,17 @@ try{
       assert.equal(await page.locator('#buy').isDisabled(),false);assert.equal(await page.locator('#buy').textContent(),'购买');
       assert.ok((await page.locator('#notice').textContent()).includes('购买已确认'));
     }
-    if(scenario.warm)assert.ok(sent[0].at-clickedAt<walletDelay*2+400,'warm click must not repeat chain preparation');
-    console.log(JSON.stringify({scenario:scenario.name,rpcDelay,walletDelay,firstWalletPromptMs:Math.round(sent[0].at-clickedAt),purchaseWalletPromptMs:Math.round(sent.at(-1).at-clickedAt),mockPaymentPromptMs:Date.now()-started,tickets:expected,walletPrompts:scenario.repeatPurchase?2:sent.length,passed:true}));
+    if(scenario.warm&&!scenario.changeAfterWarm&&!scenario.warmSmall)assert.ok(sent[0].at-clickedAt<walletDelay*2+400,'warm click must not repeat chain preparation');
+    if(scenario.warmSmall){
+      const beforePrompt=rpcTrace.filter(row=>row.startedAt>=clickedWallAt&&row.startedAt<clickedWallAt+sent[0].at-clickedAt);
+      assert.equal(beforePrompt.some(row=>row.methods.some(method=>['ticketWords','rounds','currentRoundId'].includes(method))),false,'A fresh same-wallet state is shared across quantity changes');
+      assert.ok(beforePrompt.some(row=>row.methods.includes('eth_estimateGas')),'Changed quantity must obtain a new gas estimate');
+    }
+    if(scenario.slowOldRecordMs)assert.ok(sent.at(-1).at-clickedAt<scenario.slowOldRecordMs,'The active approval must not wait for an unrelated old record');
+    if(scenario.approvalReceiptDelayMs){assert.ok(approvalReceiptSeenAt!==null,'Approval must have a confirmed receipt before purchase');assert.ok(sent.at(-1).at-clickedAt>=scenario.approvalReceiptDelayMs,'Do not bypass approval mining');}
+    if(scenario.transientApprovalReceiptError){assert.equal(approvalReceiptErrorUsed,true,'Exercise a transient receipt RPC failure');assert.ok(approvalReceiptSeenAt!==null,'Receipt retry must confirm approval before purchase');}
+    const walletPhases=await page.evaluate(since=>window.__walletRequests.filter(q=>q.at>=since).map(q=>({method:q.method,startedMs:Math.round(q.at-since)})),clickedAt);
+    console.log(JSON.stringify({scenario:scenario.name,rpcDelay,walletDelay,firstWalletPromptMs:Math.round(sent[0].at-clickedAt),purchaseWalletPromptMs:Math.round(sent.at(-1).at-clickedAt),approvalReceiptObservedMs:approvalReceiptSeenAt===null?null:approvalReceiptSeenAt-clickedWallAt,mockPaymentPromptMs:Date.now()-started,tickets:expected,walletPrompts:scenario.repeatPurchase?2:sent.length,walletPhases,rpcPhases:rpcTrace.filter(row=>row.startedAt>=clickedWallAt).map(row=>({methods:row.methods,startedMs:row.startedAt-clickedWallAt,elapsedMs:row.finishedAt?row.finishedAt-row.startedAt:null,...(row.oldRecord?{oldRecord:true}:{})})),passed:true}));
     await page.unrouteAll({behavior:'ignoreErrors'});await context.close();
   }
 }finally{await browser.close();}
