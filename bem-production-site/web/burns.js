@@ -1,4 +1,5 @@
 import {t,getLocale} from './player-i18n.js';
+import {showBurnSummary} from './burn-summary.js';
 import {formatUnits} from 'ethers';
 import {validateRecords,transactionUrl} from './public-record-guards.js';
 const $=id=>document.getElementById(id);let data=null,page=1,version=0,loading=false,error=false;
@@ -13,6 +14,7 @@ async function load(next=1){const request=++version;page=next;loading=true;error
 let initialized=false;
 export function showBurnRecords(){
   if(!$('panel-burns'))return;
+  showBurnSummary();
   if(!initialized){
     initialized=true;
     $('burn-pool').addEventListener('change',()=>{data=null;load();});$('burn-refresh').addEventListener('click',()=>load(page));$('burn-prev').addEventListener('click',()=>{if(page>1)load(page-1);});$('burn-next').addEventListener('click',()=>{if(page<(data?.totalPages??0))load(page+1);});window.addEventListener('bem:languagechange',render);

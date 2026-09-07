@@ -273,6 +273,7 @@ async function harness({ language = 'zh', search = '', balanceHook = null, annou
         gameAddress: poolRegistry().pools.find(pool => pool.id === '1').deployment.address, seriesAuthorized: true,
         vrf: { consumerAuthorized: true }, currentRound: { sold: '0' }, snapshot: { blockNumber: 120000001 } };
       else if (path === '/api/market') result = quote;
+      else if (path === '/api/burns/summary') result = { schemaVersion: 1, chainId: 56, scope: 'all_registered_pools', decimals:8, amountBaseUnits:'12345678',burnCount:2,updatedAt:'2026-09-07T09:00:00Z',nextUpdateAt:'2026-09-07T09:05:00Z',refreshIntervalMs:300000,index:{state:'ready'} };
       else if (path.startsWith('/api/burns')) result = { schemaVersion: 2, chainId: 56, rows: [], page: 1, totalPages: 0, total: 0, index: { state: 'ready' } };
       else if (path.startsWith('/api/announcements')) result = { schemaVersion: 2, chainId: 56, rows: announcements, page: 1, totalPages: announcements.length ? 1 : 0, total: announcements.length, deploymentPending: true, index: { state: 'ready' } };
       else if (path === '/rpc') {
@@ -299,6 +300,7 @@ async function harness({ language = 'zh', search = '', balanceHook = null, annou
     new vm.Script(`(()=>{${source}\n${exports.length ? `Object.assign(globalThis,{${exports.join(',')}});` : ''}\n})()`, { filename: file }).runInContext(context);
   }
   evaluate('player-i18n.js', ['t', 'getLocale', 'initLanguage', 'translateKnown', 'setLanguage', 'updatePageTitle']);
+  evaluate('burn-summary.js', ['showBurnSummary']);
   evaluate('burns.js', ['showBurnRecords']);
   evaluate('pool-selection.js', ['createPoolSelection', 'poolMetadata', 'getPoolRules']);
   evaluate('player-v2-state.js', ['createPendingPlayerState']);
