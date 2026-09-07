@@ -84,3 +84,16 @@ test('once the wrapper nonce is known, another matching call with a different no
   tx.input=tx.data=wrapper.encodeFunctionData('redeemDelegations',[['0x'],['0x'+'0'.repeat(64)],[solidityPacked(['address','uint256','bytes'],[r.to,0,r.data])]]);
   assert.equal(matchesIntent(tx,r),false);delete r.boundNonce;assert.equal(matchesIntent(tx,r),true);
 });
+
+test('a nonce selected by the wallet is bound only through its returned hash, including after reload',async()=>{
+  const f=fixture();await f.buy();const r=f.m.pending;delete r.boundNonce;
+  const tx={...f.sent[0],nonce:'0x6'};
+  assert.equal(matchesIntent(tx,r),true);
+  assert.equal(matchesIntent({...tx,hash:hash(321)},r),false);
+  assert.equal(matchesIntent({...tx,nonce:'0x4'},r),false);
+  assert.equal(matchesIntent(tx,{...r,boundNonce:'6'}),true);
+  assert.equal(matchesIntent({...tx,nonce:'0x7'},{...r,boundNonce:'6'}),false);
+  const mined=f.replace({hash:r.hash,nonce:'0x6'});
+  f.storage.setItem(key,JSON.stringify({version:6,pending:[r],history:[]}));
+  assert.equal((await f.manager().check()).status,'confirmed');
+});

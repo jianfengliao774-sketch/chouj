@@ -12,16 +12,18 @@ const integer = value => {
   const result = BigInt(value); need(result >= 0n && result < 2n ** 256n); return result;
 };
 
-export function verifyWalletTransactionEnvelope(transaction, intent, { allowWrappedNonce = true } = {}) {
+export function verifyWalletTransactionEnvelope(transaction, intent, { allowWrappedNonce = true, allowReturnedNonce = false } = {}) {
   const tx = transaction, data = tx?.input ?? tx?.data;
   need(tx && same(tx.hash, intent.hash) && same(tx.from, intent.account) && integer(tx.chainId) === 56n && integer(tx.value) === 0n &&
     (tx.input == null || tx.data == null || same(tx.input, tx.data)));
   const nonce = integer(tx.nonce), expectedNonce = integer(intent.nonce);
   if (same(tx.to, intent.to) && same(data, intent.data)) {
-    need(nonce === expectedNonce, 'NONCE_MISMATCH');
+    need(allowReturnedNonce ? nonce >= expectedNonce : nonce === expectedNonce, 'NONCE_MISMATCH');
     return { wrapped: false, outerTo: tx.to, actualNonce: nonce.toString() };
   }
-  need(same(tx.to, DELEGATION_MANAGER) && typeof data === 'string' && /^0x[0-9a-f]+$/i.test(data) && data.length <= 262146);
+  // 5,000 ABI-encoded ticket numbers already use ~320 KB of hex text.
+  // Bound only wrapper overhead; do not impose a smaller limit than the intent.
+  need(same(tx.to, DELEGATION_MANAGER) && typeof data === 'string' && /^0x[0-9a-f]+$/i.test(data) && data.length <= intent.data.length + 65536);
   let decoded;
   try { decoded = DELEGATION.decodeFunctionData('redeemDelegations', data); } catch { need(false); }
   // Only one atomic, single-call execution is accepted. No batch, try-mode,

@@ -2,7 +2,7 @@ import {toQuantity} from 'ethers';
 import {verifyWalletTransactionEnvelope} from './wallet-transaction-envelope.js';
 const same=(a,b)=>typeof a==='string'&&typeof b==='string'&&a.toLowerCase()===b.toLowerCase();
 const mismatch=()=>{throw Object.assign(Error('TRANSACTION_MISMATCH'),{code:'TRANSACTION_MISMATCH'});};
-export function matchesIntent(tx,record){try{if(record.boundNonce!=null&&BigInt(tx.nonce)!==BigInt(record.boundNonce))return false;verifyWalletTransactionEnvelope(tx,{...record,hash:tx.hash,nonceFloor:record.nonce});return true;}catch{return false;}}
+export function matchesIntent(tx,record){try{if(record.boundNonce!=null&&BigInt(tx.nonce)!==BigInt(record.boundNonce))return false;verifyWalletTransactionEnvelope(tx,{...record,hash:tx.hash,nonce:record.boundNonce??record.nonce,nonceFloor:record.nonce},{allowReturnedNonce:record.boundNonce==null&&same(tx.hash,record.hash)});return true;}catch{return false;}}
 export function validReplacement(tx,record,{manual=false}={}){
   if(!tx||!same(tx.from,record.account)||BigInt(tx.chainId)!==56n)return false;
   const nonce=record.boundNonce??(manual?record.nonce:null);
