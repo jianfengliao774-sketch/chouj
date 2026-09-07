@@ -5,3 +5,10 @@
 #burn-wallet-records>button,#personal-list>button{margin:8px 8px 8px 0;white-space:normal}
 .quick-picks{flex-wrap:wrap}.pool-selection-options{grid-template-columns:repeat(5,minmax(0,1fr))}
 @media(max-width:600px){.pool-selection-options{grid-template-columns:repeat(2,minmax(0,1fr))}.contract-links dd{margin-left:0;min-width:0}}
+
+/* Each strip moves vertically through full-height digit cells. */
+#reels .reel-strip{height:100%}
+#reels .reel-strip>span{height:100%;display:grid;place-items:center;font-size:45px;line-height:1;color:#ba8857}
+#reels .reel.rolling .reel-strip{filter:blur(.25px)}
+#reel-message a{color:#fff2cf;text-decoration-color:#f5d59a}
+@media(max-width:600px){#reels .reel-strip>span{font-size:36px}}
