@@ -5,11 +5,39 @@ import vm from 'node:vm';
 import { formatUnits } from 'ethers';
 import { POOL_IDS, profile } from '../bem-production-site/web/sparkdraw-profiles.js';
 import { playerPageHtml } from '../bem-production-site/player-page-template.mjs';
+import { formatWalletBalance3 } from '../bem-production-site/web/balance-display.js';
 
 const web = new URL('../bem-production-site/web/', import.meta.url);
 const read = name => fs.readFileSync(new URL(name, web), 'utf8');
 const player = read('sparkdraw-player.js');
 const selector = player.slice(player.indexOf('function renderSelector()'), player.indexOf('\nasync function refresh'));
+
+test('wallet balances round to exactly three decimal places without floating-point loss', () => {
+  assert.equal(formatWalletBalance3(3586919046n, 8), '35.869');
+  assert.equal(formatWalletBalance3(232611110125002939n, 18), '0.233');
+  assert.equal(formatWalletBalance3(0n, 8), '0.000');
+  assert.equal(formatWalletBalance3(100000000n, 8), '1.000');
+  assert.equal(formatWalletBalance3(99950000n, 8), '1.000');
+  assert.equal(formatWalletBalance3(49999n, 8), '0.000');
+  assert.equal(formatWalletBalance3(50000n, 8), '0.001');
+  assert.equal(formatWalletBalance3(123456789012345678901234567890n, 18), '123456789012.346');
+  assert.equal(formatWalletBalance3(1n, 3), '0.001');
+  assert.throws(() => formatWalletBalance3(-1n, 8));
+  assert.throws(() => formatWalletBalance3(1n, 2));
+});
+
+test('rounded values are used only for wallet text and full precision remains available', () => {
+  const lines = player.split('\n').filter(line => line.includes('formatWalletBalance3('));
+  assert.equal(lines.length, 1);
+  assert.ok(lines[0].includes("$('wallet-balances').textContent"));
+  assert.match(player, /Full balance: BEM \{bem\} · BNB \{bnb\}/);
+  assert.doesNotMatch(read('sparkdraw-transactions.js'), /formatWalletBalance3|balance-display/);
+});
+
+test('personal participation is displayed before secondary contract details', () => {
+  const html = read('index.html');
+  assert.ok(html.indexOf('id="panel-mine"') < html.indexOf('class="card verification-card"'));
+});
 class Node {
   constructor(tag, text = '') { this.tag = tag; this.text = text; this.children = []; this.attributes = {}; }
   get textContent() { return this.text + this.children.map(node => node.textContent).join(' '); }

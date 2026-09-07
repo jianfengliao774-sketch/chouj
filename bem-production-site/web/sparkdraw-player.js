@@ -1,4 +1,5 @@
 import {formatUnits,formatEther,getAddress} from 'ethers';
+import {formatWalletBalance3} from './balance-display.js';
 import {POOL_IDS,POOLS,profile,VERIFIER} from './sparkdraw-profiles.js';
 import {SPARKDRAW as F} from './sparkdraw-config.js';
 import {createWalletPicker} from './wallet-picker.js';
@@ -49,7 +50,8 @@ function render(){
   const p=profile(pool),r=snapshot?.rounds.find(x=>x.roundId===snapshot.currentRoundId),gross=BigInt(p.units),prize=gross*(99n-BigInt(p.burnPercent))/100n;
   $('connect-wallet').textContent=account?t('切换钱包','Switch wallet'):t('连接钱包','Connect wallet');
   $('wallet-label').textContent=account?t('已连接钱包','Wallet connected'):t('连接钱包，查看余额与持票','Connect wallet to view balances and tickets');$('wallet-address').textContent=account||'';
-  $('wallet-balances').textContent=balance?`BEM ${money(balance.bem)} · BNB ${formatEther(balance.bnb)}`:'BEM — · BNB —';$('switch-network').hidden=!wallet||chain===56;
+  $('wallet-balances').textContent=balance?`BEM ${formatWalletBalance3(balance.bem,8)} · BNB ${formatWalletBalance3(balance.bnb,18)}`:'BEM — · BNB —';$('switch-network').hidden=!wallet||chain===56;
+  $('wallet-balances').title=balance?t('完整余额：BEM {bem} · BNB {bnb}','Full balance: BEM {bem} · BNB {bnb}',{bem:money(balance.bem),bnb:formatEther(balance.bnb)}):'';
   $('launch-status').textContent=t('新五档合约已部署','Five new pools deployed');$('sale-note').textContent=p.test?t('0.1 BEM 测试场，使用 BNB 主网真实 BEM。','0.1 BEM test with real BEM on BNB mainnet.'):t('首次购买开始 24 小时募集。','The first purchase starts the 24-hour funding period.');
   $('prize-bem').textContent=money(prize);$('payout-burn').textContent=money(gross*BigInt(p.burnPercent)/100n)+' BEM';$('payout-container').textContent=money(gross/100n)+' BEM';$('payout-winner').textContent=money(prize)+' BEM';
   $('community-copy').textContent=t('您的每一份参与，都在为 Tapeout 生态建设添一份力量。\n每次成功开奖，实收金额的 {burn}% 转入销毁地址，1% 进入容器，其余为中奖奖金。','Every entry contributes to the Tapeout ecosystem.\nEach completed draw burns {burn}% of actual receipts, sends 1% to the container and reserves the remainder for the winner.',{burn:p.burnPercent});
