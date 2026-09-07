@@ -47,11 +47,14 @@ test('candidate returns accumulated actual principal after 24 hours, then burns 
     const gameArtifact = artifacts['BemDrandRaffleCandidate.sol'].BemDrandRaffleCandidate;
     assert.ok(gameArtifact.evm.deployedBytecode.object.length / 2 <= 24576, 'deployable runtime size');
     const game = await deploy(gameArtifact, [500000000n, token.target, verifier.target, adminAddress]);
+    assert.equal(await game.REFUND_PUBLIC_NOTICE_DELAY(),43200n);
+    assert.equal(await game.refundPublicNoticeAt(1),0n,'unstarted round has no public notice');
     for (const signer of [alice,bob]) {
       await wait(token.mint(await signer.getAddress(), 10000000000n));
       await wait(token.connect(signer).approve(game.target, MaxUint256));
     }
     await wait(game.connect(alice).buy(1, 3000, gas));
+    assert.equal(await game.refundPublicNoticeAt(1),(await game.refundTriggerAt(1))+43200n);
     await wait(game.connect(alice).buy(1, 2000, gas));
     await wait(game.connect(bob).buy(1, 5000, gas));
     assert.equal(await game.beaconRound(1), BigInt(sample.beacon.round));

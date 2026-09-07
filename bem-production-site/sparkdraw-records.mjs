@@ -1,4 +1,5 @@
 import { getAddress } from 'ethers';
+import { SPARKDRAW } from './web/sparkdraw-config.js';
 const add = (a, b) => (BigInt(a ?? '0') + BigInt(b ?? '0')).toString();
 
 // Derive public and personal records only from receipt-confirmed, persisted logs.
@@ -44,10 +45,28 @@ export function sparkDrawRecords(events, { pool, address }) {
   }
   const all=[...rounds.values()].reverse();
   return {
-    // Pending refunds intentionally never enter the public list.
+    // Wallet details are published only by refundNotices, after the 12-hour gate.
     publicRounds:all.map(({wallets,...r})=>r), burns:burns.reverse(),
     pendingPrizes:all.filter(r=>r.prize&&!r.prize.claimed&&!r.prize.burned).map(r=>({poolId:pool,roundId:r.roundId,
       gameAddress:address,winner:r.prize.winner,amountBaseUnits:r.prize.amount,claimDeadline:r.prize.claimDeadline})),
+    refundNotices(now) {
+      const notices=[];
+      for(const r of all) {
+        const trigger=r.drawDeadline||r.fundingDeadline;
+        const publicAt=trigger+SPARKDRAW.refundPublicNoticeDelay, deadline=trigger+SPARKDRAW.claimSeconds;
+        if(!trigger||r.status===5||r.principalBurned||now<publicAt)continue;
+        for(const [account,w] of Object.entries(r.wallets)) {
+          const unclaimed=BigInt(w.paid)-BigInt(w.refunded);
+          if(unclaimed<=0n)continue;
+          const ticketPrice=BigInt(SPARKDRAW.pools[pool].units)/10000n;
+          notices.push({poolId:pool,roundId:r.roundId,gameAddress:address,account,
+            tickets:Number(unclaimed/ticketPrice),amountBaseUnits:unclaimed.toString(),
+            refundTriggerAt:trigger,publicAt,claimDeadline:deadline,
+            state:now<deadline?'claimable':'awaiting_burn'});
+        }
+      }
+      return notices;
+    },
     wallet(wallet, now) {
       const account=getAddress(wallet);
       return all.filter(r=>r.wallets[account]||r.prize?.winner===account).map(r=>{
@@ -55,6 +74,7 @@ export function sparkDrawRecords(events, { pool, address }) {
         const trigger=r.drawDeadline||r.fundingDeadline, deadline=trigger+86400;
         const eligible=r.status!==5&&trigger>0&&now>=trigger&&now<deadline&&!r.principalBurned;
         return {...r,wallets:undefined,account,...w,refundTriggerAt:trigger,refundClaimDeadline:deadline,
+          refundPublicNoticeAt:trigger?trigger+SPARKDRAW.refundPublicNoticeDelay:0,
           refundablePrincipal:eligible?(BigInt(w.paid)-BigInt(w.refunded)).toString():'0',
           unclaimedPrincipal:(BigInt(w.paid)-BigInt(w.refunded)).toString(),
           claimablePrize:r.prize?.winner===account&&!r.prize.claimed&&!r.prize.burned&&now<r.prize.claimDeadline?r.prize.amount:'0'};

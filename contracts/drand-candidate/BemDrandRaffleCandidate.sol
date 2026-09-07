@@ -32,6 +32,7 @@ contract BemDrandRaffleCandidate {
     uint32 public constant MAX_TICKETS_PER_PURCHASE = 5000;
     uint32 public constant MAX_TICKETS_PER_ADDRESS = 5000;
     uint64 public constant REFUND_CLAIM_WINDOW = 24 hours;
+    uint64 public constant REFUND_PUBLIC_NOTICE_DELAY = 12 hours;
     mapping(uint256 => uint256) public refundedPrincipal;
     mapping(uint256 => bool) public unclaimedPrincipalBurned;
     uint256 public immutable ROUND_POOL;
@@ -558,6 +559,13 @@ contract BemDrandRaffleCandidate {
     function refundClaimDeadline(uint256 roundId) public view returns (uint64) {
         uint64 trigger = refundTriggerAt(roundId);
         return trigger == 0 ? 0 : trigger + REFUND_CLAIM_WINDOW;
+    }
+
+    /// @notice Website public notice begins halfway through the fixed refund window.
+    /// The original refund claim deadline is never extended by publication.
+    function refundPublicNoticeAt(uint256 roundId) public view returns (uint64) {
+        uint64 trigger = refundTriggerAt(roundId);
+        return trigger == 0 ? 0 : trigger + REFUND_PUBLIC_NOTICE_DELAY;
     }
 
     function refundablePrincipal(uint256 roundId, address participant) public view returns (uint256) {

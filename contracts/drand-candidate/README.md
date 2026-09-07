@@ -27,7 +27,7 @@ Local Ganache fixtures, not mainnet transactions: 5,000 scattered selected ticke
 
 - Pin deployment artifacts and verify the actual verifier runtime, official BEM, deployer and revenue-container binding before registering new contracts. The base candidate currently starts funding on the first purchase; its authorization hooks are intentionally not a finished series wrapper.
 - Connect the new ABI and ticket bitmaps to the deployment/test page and permanent server index. `sparkdraw-records.mjs` is an integration draft, not a live registered source.
-- Personal-only pending refund countdowns; public pending prize countdowns; permanent public records after actual burns. The existing live burn summary counts only registered, confirmed events and is refreshed every five minutes.
+- Refund countdowns are personal-only for the first 12 hours after the refund trigger. From trigger + 12 hours, publish unclaimed wallet addresses and ticket quantities, grouped by pool and round, with the remaining claim time. A confirmed claim removes that wallet from pending notices. At trigger + 24 hours the claim expires; show awaiting burn until a confirmed burn replaces the notice with a permanent public record. Public prize countdowns start immediately upon settlement. The live burn summary counts only registered, confirmed events and is refreshed every five minutes.
 - A funded transaction sender or user transaction is needed to seal due rounds, relay the fixed beacon, settle, and burn expired claims. Solidity does not execute itself. No automatic drand keeper has been funded or enabled.
 - Cross-contract aggregate claims are not implemented. `refundMany` aggregates rounds within one contract.
 
