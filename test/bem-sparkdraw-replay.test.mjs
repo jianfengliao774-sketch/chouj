@@ -50,9 +50,9 @@ test('a stale animation cannot overwrite the next round',async()=>{
   assert.equal(f.reels.map(r=>r.placeholder.textContent).join(''),'10000');
 });
 
-test('confirmed digits reveal at 5, 10, 15, 20 and 25 seconds without gating claims',async()=>{
+test('confirmed digits reveal at 3, 6, 9, 12 and 15 seconds without gating claims',async()=>{
   const f=fixture(),win={roundId:'8',winningTicket:8380};f.reveal(win);
-  assert.deepEqual(f.animations.map(a=>a.options.duration),[5000,10000,15000,20000,25000]);
+  assert.deepEqual(f.animations.map(a=>a.options.duration),[3000,6000,9000,12000,15000]);
   assert.ok(f.reels.every(r=>r.placeholder.hidden));
   for(let i=0;i<5;i++){
     f.animations[i].finish();await new Promise(resolve=>setImmediate(resolve));

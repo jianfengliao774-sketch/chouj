@@ -38,8 +38,7 @@ html[lang="en-US"] .sparkdraw-wordmark strong { font-size: 26px; }
 .player-page .winner-broadcast-dock { box-shadow: none; }
 .player-page .pool-selection { padding: 24px; border-radius: 16px; margin: 8px 0 18px; background: #fffaf0; }
 .player-page .pool-selection-heading { font-size: 21px; color: var(--spark-ink); margin-bottom: 16px; }
-.player-page .pool-selection-options { gap: 16px; }
-.player-page .pool-choice:first-child strong { font-size: 23px; }
+.player-page .pool-selection-options { gap: 16px; grid-template-columns:repeat(3,minmax(0,1fr)); }
 .player-page .pool-choice { padding: 18px 22px; border-radius: 12px; position: relative; }
 .player-page .pool-choice[aria-checked="true"] { padding: 17px 21px; border-color: var(--spark-red); background: #fff0df; }
 .player-page .pool-choice[aria-checked="true"]::after { content: "✦"; position: absolute; top: 18px; right: 18px; color: var(--spark-red); font-size: 24px; }
@@ -322,4 +321,91 @@ html[lang="en-US"] .player-page .tabs button, html[lang="en-US"] .player-page .t
 @media(prefers-reduced-motion:reduce) {
   .player-page .reel.is-revealed { animation:none; }
   .player-page #funding-progress > i { transition:none; }
+}
+
+/* Stronger contrast, supplied BEM artwork and one-record winner rotation. */
+.player-page { --spark-ink:#242b36; --spark-muted:#4b5563; --muted:#4b5563; color:#242b36; }
+.player-page .sparkdraw-wordmark { gap:20px; }
+.player-page .sparkdraw-wordmark img { width:132px; height:108px; object-fit:cover; object-position:center; border-radius:20px; }
+.player-page .sparkdraw-wordmark strong, html[lang="en-US"] .player-page .sparkdraw-wordmark strong { font-family:"Microsoft YaHei","Segoe UI",sans-serif; font-size:42px; font-weight:800; line-height:1.35; letter-spacing:-.025em; color:#8f1729; }
+.player-page .hero .brand-kicker { font-size:22px; font-weight:800; letter-spacing:.07em; line-height:1.5; color:#384152; }
+.player-page .draw-hero:has(.prize-card) .hero-content { padding-left:14px; }
+.player-page .draw-hero:has(.prize-card) .hero-heading h1 { font-size:52px; color:#242b36; }
+html[lang="en-US"] .player-page .draw-hero:has(.prize-card) .hero-heading h1 { font-size:46px; }
+.player-page .draw-hero:has(.prize-card) .processor-chip-art { border-radius:22px; }
+.player-page .draw-hero:has(.prize-card) .processor-chip-caption { font-size:18px; font-weight:800; letter-spacing:.07em; line-height:1.6; white-space:normal; color:#343f50; margin-top:12px; }
+.player-page .draw-hero:has(.prize-card) .rank-feature { align-self:end; }
+.player-page .draw-hero:has(.prize-card) .rank-feature b { color:#8f1729; }
+.player-page .draw-hero:has(.prize-card) .rank-feature small { color:#374151; }
+.player-page .draw-hero:has(.prize-card) .prize-card { align-self:stretch; height:100%; }
+.player-page .hero .prize-card-label { font-size:20px; color:#343f50; }
+.player-page .draw-hero .prize-equivalents { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; padding:18px 0; }
+.player-page .draw-hero .prize-equivalents > div { display:flex; justify-content:space-between; align-items:baseline; gap:10px; min-width:0; }
+.player-page .draw-hero .prize-equivalents small { margin:0; color:#374151; font-size:18px; font-weight:650; line-height:1.6; }
+.player-page .draw-hero .prize-equivalents b { color:#8f1729; font-size:23px; line-height:1.6; font-weight:750; white-space:nowrap; }
+.player-page .hero .market-footer, .player-page .site-clock, .player-page .sparkdraw-tagline { color:#4b5563; }
+.player-page .wallet-foot, .player-page .wallet-bar .wallet-foot, .player-page .wallet-address,
+.player-page .eyebrow, .player-page .wallet-bar .eyebrow, .player-page label,
+.player-page .purchase-card label, .player-page .refund-card label, .player-page .notice,
+.player-page .muted, .player-page .fine-print, .player-page .record-note,
+.player-page .purchase-card .muted, .player-page .purchase-card .fine-print, .player-page .refund-card .fine-print,
+.player-page .history-card .section-heading .muted, .player-page .pool-choice span, .player-page .pool-choice small,
+.player-page .pool-selection-status, .player-page .pool-selection-detail, .player-page footer { color:#4b5563; }
+.player-page .wallet-identity #wallet-label, .player-page .wallet-address-row #wallet-address,
+.player-page #wallet-balances, .player-page .progress-label, .player-page .round-heading,
+.player-page .timing-card p, .player-page .verification-card p, .player-page #panel-mine p,
+.player-page .burn-intro p, .player-page .about-card .onchain-copy,
+.player-page .hero .hero-message .community-copy, .player-page .hero .hero-message .local-mode-note { color:#303947; }
+.player-page .entry-reminder { margin:16px 0 24px; padding:16px; border-left:3px solid #ab792c; border-radius:10px; background:#f8edda; color:#303947; }
+.player-page .entry-reminder > strong { display:block; font-size:19px; font-weight:800; margin-bottom:10px; color:#252d39; }
+.player-page .entry-reminder p { font-size:17px; line-height:1.9; margin:8px 0; color:#303947; }
+.player-page #purchase-round-label { font-size:22px; font-weight:750; color:#343f50; letter-spacing:.01em; overflow-wrap:anywhere; }
+.player-page .payout > div { display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; gap:8px; min-height:120px; }
+.player-page .payout span { color:#374151; font-size:18px; line-height:1.6; }
+.player-page .payout strong { margin:0; color:#9f1d2e; }
+.player-page .machine .reel-message, .player-page .machine .reel-message a { color:#fff8e8; font-size:23px; line-height:1.8; }
+.player-page .machine .steps { color:#fff2d8; font-size:20px; gap:14px 22px; }
+.player-page .machine #replay { font-size:21px; min-height:56px; color:#fff8e8; }
+.player-page .machine .animation-note { font-size:19px; line-height:1.8; color:#fff0d7; }
+.player-page .machine button:disabled { opacity:.8; }
+.player-page .winner-broadcast-dock .winner-broadcast { gap:14px; padding:10px 0; }
+.player-page .winner-broadcast-dock .ticker-window { color:#303947; font-size:17px; line-height:1.8; white-space:normal; overflow-wrap:anywhere; }
+.player-page .winner-broadcast-dock .winner-broadcast > b { color:#a01b2e; font-size:17px; }
+.player-page .notice.error, .player-page .error-copy { color:#a12632; }
+.player-page .notice.success, .player-page .success-copy { color:#315f32; }
+.player-page .notice.pending { color:#78501c; }
+@media(max-width:1360px){
+  .player-page .draw-hero:has(.prize-card) .prize-card { height:auto; }
+}
+@media(max-width:760px){
+  .player-page .sparkdraw-wordmark img { width:88px; height:88px; border-radius:16px; }
+  .player-page .sparkdraw-wordmark strong, html[lang="en-US"] .player-page .sparkdraw-wordmark strong { font-size:30px; }
+  .player-page .draw-hero:has(.prize-card) .hero-content { padding-left:4px; }
+  .player-page .hero .brand-kicker { font-size:19px; }
+  .player-page .draw-hero:has(.prize-card) .hero-heading h1,
+  html[lang="en-US"] .player-page .draw-hero:has(.prize-card) .hero-heading h1 { font-size:36px; }
+  .player-page .draw-hero:has(.prize-card) .processor-chip-caption { font-size:16px; letter-spacing:.035em; }
+}
+@media(max-width:560px){
+  .player-page .sparkdraw-wordmark { gap:12px; }
+  .player-page .sparkdraw-wordmark img { width:72px; height:72px; }
+  .player-page .sparkdraw-wordmark strong, html[lang="en-US"] .player-page .sparkdraw-wordmark strong { font-size:24px; }
+  .player-page .hero .brand-kicker { font-size:18px; }
+  .player-page .draw-hero:has(.prize-card) .hero-content { padding-left:0; }
+  .player-page .draw-hero:has(.prize-card) .hero-heading h1,
+  html[lang="en-US"] .player-page .draw-hero:has(.prize-card) .hero-heading h1 { font-size:32px; }
+  .player-page .draw-hero .prize-equivalents small { font-size:16px; }
+  .player-page .draw-hero .prize-equivalents b { font-size:20px; }
+  .player-page .machine .reel-message, .player-page .machine .reel-message a { font-size:20px; }
+  .player-page .machine .steps { font-size:18px; gap:12px; }
+  .player-page .machine .animation-note { font-size:18px; }
+  .player-page .winner-broadcast-dock { position:static; }
+  .player-page .winner-broadcast-dock .winner-broadcast { flex-wrap:wrap; gap:8px; }
+  .player-page .winner-broadcast-dock .ticker-window { flex-basis:100%; order:3; }
+  .player-page .winner-broadcast-dock #ticker-pause { margin-left:auto; }
+}
+@media(max-width:380px){
+  .player-page .draw-hero:has(.prize-card) .hero-heading h1,
+  html[lang="en-US"] .player-page .draw-hero:has(.prize-card) .hero-heading h1 { font-size:28px; }
+  .player-page .hero .brand-kicker { font-size:16px; }
 }
