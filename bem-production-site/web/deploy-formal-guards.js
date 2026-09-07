@@ -2,7 +2,8 @@ import { ContractFactory, Interface, getAddress, getCreateAddress, keccak256, to
 
 export const DEPLOY_FIXED = Object.freeze({
   chainId: 56, processor: '0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C', processorId: '2075',
-  deployer: '0x304F06903324B8056cB1ED627144EfB2C34df3a8',
+  deployer: '0x7674fa446D42b1f7f150DC5e678cc525d275Ea53',
+  subscriptionOwner: '0x304F06903324B8056cB1ED627144EfB2C34df3a8',
   authorizationOwner: '0x7674fa446D42b1f7f150DC5e678cc525d275Ea53',
   authorizationContainer: '0x001f110422F04a90bF7D6eC96714f75046BD7126',
   authorizationNft: '0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C', authorizationTokenId: '13061',
@@ -22,8 +23,9 @@ export const DEPLOY_MODES = Object.freeze({
   pool100: Object.freeze({ name: '正式合约 · 每期 100 BEM', contractName: 'BemOwnContainer13061Pool100BSC', pool: '10000000000', ticketPrice: '1000000', tickets: '10000', maxPerPurchase: '1000', blackhole: '400000000', organizer: '100000000', winner: '9500000000' }),
 });
 export const FORMAL_VERSION = 'container13061-authorized-2075-computation';
-export const FORMAL_STORAGE_KEY = 'bem13061-formal-deployment-records-v3';
-export const FORMAL_LOCK_KEY = 'bem13061-formal-deployment-v3';
+// A different deployer uses separate durable intents; never clear or import the old wallet's records.
+export const FORMAL_STORAGE_KEY = `bem13061-formal-deployment-records-v3:${DEPLOY_FIXED.deployer.toLowerCase()}`;
+export const FORMAL_LOCK_KEY = `bem13061-formal-deployment-v3:${DEPLOY_FIXED.deployer.toLowerCase()}`;
 export const CONSTRUCTOR = ['constructor(uint256 vrfSubscriptionId,uint16 confirmations,uint32 vrfCallbackGasLimit)'];
 export const CONSTRUCTOR_ARGS = Object.freeze([DEPLOY_FIXED.subscriptionId, DEPLOY_FIXED.requestConfirmations, DEPLOY_FIXED.callbackGasLimit]);
 const HEX = /^0x(?:[0-9a-f]{2})+$/i;
@@ -46,7 +48,7 @@ export function normalizeReadResult(method, value) {
   return copy;
 }
 export function deploymentMode(mode) { need(Object.hasOwn(DEPLOY_MODES, mode), '请选择 10、50 或 100 BEM 新正式合约。'); return DEPLOY_MODES[mode]; }
-export function assertDeployer(account) { need(sameAddress(account, DEPLOY_FIXED.deployer), '请连接此前的部署钱包 0x304F…f3a8。13061 持有人钱包用于后续启动，不是本页指定的部署钱包。'); }
+export function assertDeployer(account) { need(sameAddress(account, DEPLOY_FIXED.deployer), '请连接指定部署钱包 0x7674…Ea53。该钱包持有 13061 容器，并通过容器完成后续授权启动。'); }
 
 // The artifacts are compiled into this page's build, never fetched from a user-provided URL.
 export function validateDeploymentArtifact(artifact, mode) {

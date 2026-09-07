@@ -7,6 +7,7 @@ import { getAddress, formatUnits } from 'ethers';
 import { previewPoolSelection } from '../bem-production-site/web/player-v2-state.js';
 import { FORMAL_PLAYER_PROFILES, getFormalPlayerProfile } from '../bem-production-site/web/formal-player-profiles.js';
 import { createFormalPlayerTransactions as realFactory } from '../bem-production-site/web/formal-player-transactions.js';
+import { verifyWalletTransactionEnvelope } from '../bem-production-site/web/wallet-transaction-envelope.js';
 
 const ACCOUNT = '0x1111111111111111111111111111111111111111', OTHER = '0x2222222222222222222222222222222222222222';
 const TXHASH = '0x' + 'a'.repeat(64), OTHERHASH = '0x' + 'b'.repeat(64), ZERO = '0x' + '0'.repeat(40);
@@ -18,7 +19,7 @@ const F = Object.freeze({ poolId: '10', chainId: 56n, address: '0x44444444444444
   container: '0x001f110422F04a90bF7D6eC96714f75046BD7126', recipient: '0x001f110422F04a90bF7D6eC96714f75046BD7126',
   authorizationNft: '0xb1024b89886B9a34Aa4ff5F31C411D708b20a14C', authorizationTokenId: 13061n,
   processor: '0x1F5Cb4aeaE1807Bf60c3b9C0D8aDBCC14e91f12C', ticketPrice: 100000n, pool: 1000000000n, gasCap: 16777216n });
-const context = vm.createContext({ Interface, getAddress, keccak256, toQuantity, previewPoolSelection,
+const context = vm.createContext({ Interface, getAddress, keccak256, toQuantity, previewPoolSelection, verifyWalletTransactionEnvelope,
   getFormalPlayerProfile: id => id === '10' ? F : null, setTimeout, clearTimeout, JSON, crypto: globalThis.crypto });
 const source = fs.readFileSync(new URL('../bem-production-site/web/formal-player-transactions.js', import.meta.url), 'utf8');
 vm.runInContext(source.replace(/^import .*;$/gm, '').replace(/^export /gm, '') +
@@ -291,4 +292,17 @@ test('result dialog is shown once per confirmed hash and language refresh change
   lang = 'en'; popup.refreshLanguage(); assert.equal(dialog.children[0].textContent, 'Purchase result confirmed');
   assert.equal(dialog.children[4].href, `https://bscscan.com/tx/${TXHASH}`);
   dialog.children[5].listeners.click(); popup.accept([record]); assert.equal(dialog.shows, 1); assert.equal(dialog.open, false);
+});
+
+test('MetaMask-wrapped partial purchase verifies the original inner intent and actual PurchaseResult', async () => {
+  const s = setup({ sold: 9200n }); await purchase(s);
+  const delegation = new Interface(['function redeemDelegations(bytes[],bytes32[],bytes[])']);
+  const packed = F.address + '0'.repeat(64) + s.sent[0].data.slice(2);
+  const input = delegation.encodeFunctionData('redeemDelegations', [['0x'], ['0x' + '0'.repeat(64)], [packed]]);
+  const outer = '0xdb9b1e94b5b69df7e401ddbede43491141047db3';
+  s.mine(logs(s, 1000, 800), 1, { to: outer, input, data: undefined, nonce: '0x8', type: '0x4' });
+  const result = await s.manager.checkPending(), record = result.records[0];
+  assert.equal(result.blocking, false); assert.equal(record.walletWrapped, true); assert.equal(record.to, F.address);
+  assert.equal(record.evidence.filled, '800'); assert.equal(record.evidence.unspent, '20000000');
+  assert.equal(isVerifiedFormalResult(record), true);
 });

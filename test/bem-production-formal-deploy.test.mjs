@@ -88,21 +88,23 @@ test('registry and ERC6551-style token bindings must agree for both containers',
   for (const mutate of [b => b.revenue.token[2] = 2075n, b => b.authorization.account = OLD_AUTH,
     b => b.revenue.opened = false, b => b.authorization.token[0] = 1n, b => b.chainId = 1,
     b => b.dependencyCodes[0] = '0x', b => b.decimals = 18n, b => b.circuitInfo[3] = 72n,
-    b => b.authorizationOwner = ACCOUNT, b => b.authorizationNftOwner = OTHER, b => b.authorization.token[1] = F.processor]) {
+    b => b.authorizationOwner = OTHER, b => b.authorizationNftOwner = OTHER, b => b.authorization.token[1] = F.processor]) {
     const binding = bindingFixture(); mutate(binding); assert.throws(() => assertContainerBindings(binding));
   }
 });
 
-test('deployer remains 304F while 13061 authorization belongs to 7674, with isolated V3 records', () => {
+test('7674 deploys and owns the 13061 activation container while 304F manages the independent VRF subscription', () => {
   assertDeployer(ACCOUNT);
-  assert.notEqual(F.authorizationOwner, ACCOUNT);
-  assert.throws(() => assertDeployer(F.authorizationOwner));
+  assert.equal(ACCOUNT, '0x7674fa446D42b1f7f150DC5e678cc525d275Ea53');
+  assert.equal(F.authorizationOwner, ACCOUNT);
+  assert.equal(F.subscriptionOwner, '0x304F06903324B8056cB1ED627144EfB2C34df3a8');
+  assert.throws(() => assertDeployer(F.subscriptionOwner));
   assertContainerBindings(bindingFixture());
   assert.equal(expectedReadback('pool10', 100).AUTHORIZATION_TOKEN_ID, '13061');
   assert.equal(expectedReadback('pool10', 100).CIRCUIT_ID, '2075');
   assert.equal(expectedReadback('pool10', 100).AUTHORIZATION_NFT, F.authorizationNft);
-  assert.equal(FORMAL_STORAGE_KEY, 'bem13061-formal-deployment-records-v3');
-  assert.equal(FORMAL_LOCK_KEY, 'bem13061-formal-deployment-v3');
+  assert.equal(FORMAL_STORAGE_KEY, `bem13061-formal-deployment-records-v3:${ACCOUNT.toLowerCase()}`);
+  assert.equal(FORMAL_LOCK_KEY, `bem13061-formal-deployment-v3:${ACCOUNT.toLowerCase()}`);
 });
 
 test('reset requires fresh affirmative proof and exact record identity', () => {
@@ -171,7 +173,7 @@ async function pageHarness(options = {}) {
         else if (name === 'decimals') values = [8];
         else if (name === 'netlist') values = [netlist];
         else if (name === 'circuitInfo') values = [12, 9, 0, 71];
-        else if (name === 'getSubscription') values = [0n, 10000000000000000n, 0n, ACCOUNT, []];
+        else if (name === 'getSubscription') values = [0n, 10000000000000000n, 0n, F.subscriptionOwner, []];
         else throw Error('Unexpected simulated read: ' + name);
         return api.rpcInterface.encodeFunctionResult(name, values);
       }
@@ -208,14 +210,14 @@ test('actual formal HTML has only three modes and connecting/estimating sends no
   const p = await pageHarness({ initialAccountEvent: true });
   assert.equal(p.api.state.ready, true); await p.review();
   assert.equal(sends(p).length, 0); assert.equal(p.api.state.account, ACCOUNT);
-  const wrong = await pageHarness({ account: F.authorizationOwner }); await wrong.choose('pool10'); await wrong.connect();
+  const wrong = await pageHarness({ account: F.subscriptionOwner }); await wrong.choose('pool10'); await wrong.connect();
   assert.equal(wrong.elements.get('estimate').disabled, true); assert.equal(sends(wrong).length, 0);
 });
 
 test('changing modes invalidates an actual fee review and rechecking changed 13061 owner prevents signing', async () => {
   const p = await pageHarness(); await p.review('pool10'); await p.choose('pool50');
   assert.equal(p.api.state.estimate, null); assert.equal(p.elements.get('deploy').disabled, true);
-  await p.review('pool10'); p.setOwner(ACCOUNT); await p.elements.get('deploy').click();
+  await p.review('pool10'); p.setOwner(OTHER); await p.elements.get('deploy').click();
   assert.equal(sends(p).length, 0); assert.equal(p.api.state.records.pool10, undefined);
   assert.match(p.elements.get('notice').textContent, /持有人/);
 });
@@ -340,4 +342,27 @@ test('only independently confirmed failed creation or a verified same-nonce EOA 
     const invalid = structuredClone(cancel); mutate(invalid); assert.throws(() => assertUnsuccessfulDeployment(invalid));
   }
   assert.throws(() => assertUnsuccessfulDeployment(evidence()));
+});
+
+
+test('changing the independent VRF subscription owner prevents deployment before any signature', async () => {
+  const p = await pageHarness(); await p.review();
+  p.override(async (method, params) => {
+    if (method !== 'eth_call') return null;
+    const tx = p.api.rpcInterface.parseTransaction({ data: params[0].data });
+    if (tx.name !== 'getSubscription') return null;
+    return { handled: true, value: p.api.rpcInterface.encodeFunctionResult('getSubscription', [0n, 10000000000000000n, 0n, ACCOUNT, []]) };
+  });
+  await p.elements.get('deploy').click();
+  assert.equal(sends(p).length, 0); assert.equal(p.api.state.records.pool10, undefined);
+  assert.match(p.elements.get('notice').textContent, /VRF 订阅持有人/);
+});
+
+test('new deployer keeps old-wallet durable intents untouched instead of importing or deleting them', async () => {
+  const oldKey = 'bem13061-formal-deployment-records-v3';
+  const old = JSON.stringify({ pool10: { account: F.subscriptionOwner, status: 'unknown', hash: HASH } });
+  const saved = new Map([[oldKey, old]]); const p = await pageHarness({ saved });
+  await p.review(); assert.equal(sends(p).length, 0); assert.equal(p.api.state.storageError, false);
+  assert.equal(saved.get(oldKey), old); assert.equal(saved.get(FORMAL_STORAGE_KEY), undefined);
+  assert.equal(p.api.state.records.pool10, undefined);
 });

@@ -24,7 +24,9 @@ export function createPendingReadPoller({ getManager, onResolved = () => {}, onE
       try {
         await manager.checkPending();
         const after = manager.getState();
-        if (!destroyed && manager === getManager() && before.blocking && !after.blocking) await onResolved(manager, after);
+        const newlyResolved = after.records?.filter(record => !unfinished(record) && before.records?.some(previous =>
+          unfinished(previous) && previous.id === record.id && previous.hash === record.hash)) ?? [];
+        if (!destroyed && manager === getManager() && before.blocking && !after.blocking) await onResolved(manager, after, newlyResolved);
         return after;
       } catch (error) {
         if (!destroyed) onError(error);

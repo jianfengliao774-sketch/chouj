@@ -10,6 +10,7 @@ import { createPendingReadPoller, hasFastPendingRead } from '../bem-production-s
 import { poolRegistry } from '../bem-production-site/pools.mjs';
 import { quoteView } from '../bem-production-site/web/market-guards.js';
 import { validateRecords, transactionUrl } from '../bem-production-site/web/public-record-guards.js';
+import { playerPageHtml } from '../bem-production-site/player-page-template.mjs';
 
 const WEB = new URL('../bem-production-site/web/', import.meta.url);
 const A = '0x1111111111111111111111111111111111111111', B = '0x2222222222222222222222222222222222222222';
@@ -33,6 +34,36 @@ test('the player accepts the first permission accountsChanged event without requ
     assert.equal(app.wallet.calls.filter(call => call.method === 'eth_requestAccounts').length, 1, timing);
     assert.ok(app.wallet.calls.every(call => !['eth_sendTransaction', 'personal_sign', 'eth_signTypedData_v4'].includes(call.method)));
   }
+});
+
+test('burn records share the player shell and preserve the connected wallet and ticket selection across tabs', async () => {
+  const app = await harness({ search: '?pool=1' });
+  await app.connect();
+  app.$('ticket-count').value = '1000'; await app.$('ticket-count').emit('input');
+  assert.equal(app.calls.filter(call => call.path.startsWith('/api/burns')).length, 0);
+  await app.$('tab-burns').emit('click'); await tick();
+  assert.equal(app.$('panel-burns').hidden, false);
+  assert.equal(app.$('panel-draw').hidden, true);
+  assert.equal(app.$('wallet-address').textContent, A);
+  assert.equal(app.$('ticket-count').value, '1000');
+  assert.equal(app.context.location.pathname, '/burns.html');
+  assert.match(app.context.document.title, /销毁记录 · 芯火夺宝/);
+  await app.$('language-en').emit('click');
+  assert.match(app.context.document.title, /Burn records · 芯火夺宝/);
+  assert.equal(app.$('burn-refresh').textContent, 'Refresh records');
+  await app.$('tab-draw').emit('click');
+  assert.equal(app.$('panel-draw').hidden, false);
+  assert.equal(app.$('panel-burns').hidden, true);
+  assert.equal(app.$('ticket-count').value, '1000');
+  assert.equal(app.$('wallet-address').textContent, A);
+  assert.equal(app.wallet.calls.filter(call => call.method === 'eth_requestAccounts').length, 1);
+  assert.equal(app.wallet.calls.filter(call => call.method === 'eth_sendTransaction').length, 0);
+  await app.choose('50');
+  assert.equal(new URLSearchParams(app.context.location.search).get('pool'), '50');
+  assert.equal(app.$('tab-burns').getAttribute('href'), '/burns.html?pool=50');
+  await app.$('tab-burns').emit('click');
+  assert.equal(app.context.location.pathname, '/burns.html');
+  assert.equal(new URLSearchParams(app.context.location.search).get('pool'), '50');
 });
 
 test('the player rejects a different account emitted while initial permission is still pending', async () => {
@@ -163,6 +194,7 @@ test('an approval shows submitted status then the fast read loop refreshes allow
   const [id, callback] = [...timers][0]; timers.delete(id); callback();
   await until(() => !app.$('buy').disabled, 'confirmed allowance refreshed');
   assert.match(app.$('transaction-list').textContent, /已上链确认/);
+  assert.match(app.$('notice').textContent, /授权成功，可以确认购买/);
   assert.equal(reads, 2, 'one initial view and one completion refresh'); assert.equal(checks, 2);
   assert.equal(timers.size, 0); assert.deepEqual(actions, ['approve']);
   await app.surface.emit('beforeunload');
@@ -191,7 +223,7 @@ class Element {
 }
 
 async function harness({ language = 'zh', search = '', balanceHook = null, announcements = [], testFactory = null, formalFactory = null, openTest = false, pendingTimers = null } = {}) {
-  const html = fs.readFileSync(new URL('index.html', WEB), 'utf8'), elements = new Map(), all = [];
+  const html = playerPageHtml(fs.readFileSync(new URL('index.html', WEB), 'utf8'), fs.readFileSync(new URL('burns.html', WEB), 'utf8')), elements = new Map(), all = [];
   for (const match of html.matchAll(/<([\w-]+)\b([^>]*)>([^<]*)/g)) {
     const node = new Element(match[1]); node.textContent = match[3];
     for (const attr of match[2].matchAll(/([\w-]+)="([^"]*)"/g)) node.setAttribute(attr[1], attr[2]);
@@ -224,7 +256,9 @@ async function harness({ language = 'zh', search = '', balanceHook = null, annou
   const sandbox = { createTestPlayerTransactions: testFactory ?? createTestPlayerTransactions, createFormalPlayerTransactions: formalFactory ?? createFormalPlayerTransactions,
     createPartialFillResult, hasFastPendingRead, createPendingReadPoller: options => createPendingReadPoller({ ...options, document, ...(pendingTimers ?? {}) }),
     Interface, formatUnits, getAddress, toQuantity, quoteView, validateRecords, transactionUrl,
-    document, window: surface, location: { href: `https://example.invalid/${search}`, origin: 'https://example.invalid', search },
+    document, window: surface, location: { href: `https://example.invalid/${search}`, origin: 'https://example.invalid', pathname: '/', hash: '', search },
+    history: { pushState(_state, _title, url) { Object.assign(sandbox.location, { href: String(url), pathname: url.pathname, hash: url.hash, search: url.search }); },
+      replaceState(...args) { this.pushState(...args); } },
     navigator: { clipboard: { writeText: async () => {} } }, localStorage: { getItem: key => storage.get(key) ?? null, setItem: (key, value) => storage.set(key, value) },
     createWalletPicker: options => { options.onChange(new Map([['fixture', { provider: wallet, name: 'Synthetic wallet' }]])); return { open: () => options.onSelect({ provider: wallet }) }; },
     fetch: async (path, options = {}) => {
@@ -234,6 +268,7 @@ async function harness({ language = 'zh', search = '', balanceHook = null, annou
         gameAddress: poolRegistry().pools.find(pool => pool.id === '1').deployment.address, seriesAuthorized: true,
         vrf: { consumerAuthorized: true }, currentRound: { sold: '0' }, snapshot: { blockNumber: 120000001 } };
       else if (path === '/api/market') result = quote;
+      else if (path.startsWith('/api/burns')) result = { schemaVersion: 2, chainId: 56, rows: [], page: 1, totalPages: 0, total: 0, index: { state: 'ready' } };
       else if (path.startsWith('/api/announcements')) result = { schemaVersion: 2, chainId: 56, rows: announcements, page: 1, totalPages: announcements.length ? 1 : 0, total: announcements.length, deploymentPending: true, index: { state: 'ready' } };
       else if (path === '/rpc') {
         const payload = JSON.parse(options.body);
@@ -258,7 +293,8 @@ async function harness({ language = 'zh', search = '', balanceHook = null, annou
     const source = fs.readFileSync(new URL(file, WEB), 'utf8').replace(/^import[\s\S]*?;\s*/gm, '').replace(/^export /gm, '');
     new vm.Script(`(()=>{${source}\n${exports.length ? `Object.assign(globalThis,{${exports.join(',')}});` : ''}\n})()`, { filename: file }).runInContext(context);
   }
-  evaluate('player-i18n.js', ['t', 'getLocale', 'initLanguage', 'translateKnown', 'setLanguage']);
+  evaluate('player-i18n.js', ['t', 'getLocale', 'initLanguage', 'translateKnown', 'setLanguage', 'updatePageTitle']);
+  evaluate('burns.js', ['showBurnRecords']);
   evaluate('pool-selection.js', ['createPoolSelection', 'poolMetadata', 'getPoolRules']);
   evaluate('player-v2-state.js', ['createPendingPlayerState']);
   evaluate('read-rpc-batcher.js', ['createReadRpcBatcher']);

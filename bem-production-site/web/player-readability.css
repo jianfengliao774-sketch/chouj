@@ -77,6 +77,8 @@
 .player-page .burn-table .hash{font-size:14px;line-height:1.8}
 .player-page .burn-list .empty-state{font-size:15px;line-height:1.8}
 .player-page .burn-pager{flex-wrap:wrap;font-size:14px}
+.player-page .tabs a[aria-selected="true"]{color:#b2232e;border-bottom:2px solid #b2232e}
+.player-page #panel-burns .burn-intro{border-top:2px solid #bd2932}
 
 @media(max-width:760px){
   .player-page .wallet-actions{display:grid;grid-template-columns:auto minmax(0,1fr);width:100%;gap:8px}

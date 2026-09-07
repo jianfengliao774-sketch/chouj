@@ -1,5 +1,6 @@
 import { Interface, formatUnits, getAddress, toQuantity } from 'ethers';
-import { t, getLocale, initLanguage, translateKnown } from './player-i18n.js';
+import { t, getLocale, initLanguage, translateKnown, updatePageTitle } from './player-i18n.js';
+import { showBurnRecords } from './burns.js';
 import { createWalletPicker } from './wallet-picker.js';
 import { createPoolSelection, poolMetadata } from './pool-selection.js';
 import { createPendingPlayerState } from './player-v2-state.js';
@@ -91,13 +92,16 @@ function onPoolChange(selection) {
   const before = model.getState();
   model.selectPool(selection.id);
   if (before.poolId === selection.id) model.invalidate();
-  model.setSelection({ mode: 'auto', count: '1', text: '' });
+  if (before.poolId !== selection.id) model.setSelection({ mode: 'auto', count: '1', text: '' });
+  const url = new URL(location.href); url.searchParams.set('pool', selection.id);
+  history.replaceState(null, '', url);
+  $('tab-burns')?.setAttribute('href', `/burns.html?pool=${selection.id}`);
   state.balanceAbort?.abort(); applySelectionFields();
   state.poolStatus = null; state.poolStatusError = false; state.poolGeneration++;
   clearTestViews();
   put('refund-round', ''); if ($('refund-round')) $('refund-round').value = '';
   hidden('proof-detail', true); render();
-  notice(t('已切换至 {amount} BEM 场次，正在读取状态，选号已重置。',
+  if (before.poolId !== selection.id) notice(t('已切换至 {amount} BEM 场次，正在读取状态，选号已重置。',
     'Selected the {amount} BEM pool. Checking its state; ticket selection has been reset.', { amount: selection.id }));
   dispatchPool(); refreshBalance(); refreshPoolStatus(); refreshTestState();
 }
@@ -361,6 +365,9 @@ function transactionStatusCopy(record) {
   if (record.status === 'pending') return ['approve', 'buy'].includes(record.kind)
     ? t('已提交，等待上链；每 2 秒自动更新状态。', 'Submitted; awaiting inclusion. Status refreshes every 2 seconds.')
     : t('已提交，等待上链。', 'Submitted; awaiting inclusion.');
+  if (['TRANSACTION_MISMATCH', 'NONCE_MISMATCH', 'EVENT_MISMATCH', 'WRONG_CHAIN', 'CHAIN_MISMATCH'].includes(record.reason))
+    return t('交易已找到，但调用或成交记录与本订单不一致。请点击下方哈希核对。', 'Transaction found, but its call or events do not match this order. Open the hash below to check it.');
+  if (record.reason === 'REORG') return t('区块信息正在更新，稍后自动读取交易结果。', 'Block information is updating. The transaction result will refresh automatically.');
   return record.hash ? t('已提交，节点暂未返回明确结果，正在自动刷新。', 'Submitted; the node has not returned a definite result. Refreshing automatically.')
     : t('钱包未返回交易哈希，请查看钱包或填写哈希核实。', 'No transaction hash was returned. Check your wallet or enter its hash.');
 }
@@ -432,8 +439,12 @@ async function connect(entry) {
   }
 }
 function selectTab(tab) {
+  if (!['draw', 'proof', 'burns'].includes(tab)) return;
   state.tab = tab;
-  for (const name of ['draw', 'proof']) { hidden('panel-' + name, name !== tab); $('tab-' + name)?.setAttribute('aria-selected', String(name === tab)); }
+  document.body.dataset.activeTab = tab;
+  for (const name of ['draw', 'proof', 'burns']) { hidden('panel-' + name, name !== tab); $('tab-' + name)?.setAttribute('aria-selected', String(name === tab)); }
+  updatePageTitle();
+  if (tab === 'burns') showBurnRecords();
   if (tab === 'proof') refreshHistory();
 }
 
@@ -442,8 +453,17 @@ testTransactions = createTestPlayerTransactions({ wallet: () => state.wallet, ge
 for (const poolId of ['10', '50', '100']) formalTransactions.set(poolId,
   createFormalPlayerTransactions({ poolId, wallet: () => state.wallet, getContext: () => model.getState(), readRpc: rpc, onUpdate: () => render() }));
 pendingPoller = createPendingReadPoller({ getManager: currentTransactions,
-  onResolved: async manager => {
+  onResolved: async (manager, after, resolved = []) => {
     if (manager !== currentTransactions()) return;
+    const record = resolved[0];
+    if (record?.status === 'reverted') notice(t('交易未成功，未完成购买。请查看钱包中的失败原因。', 'The transaction reverted; no purchase was completed. Check the failure reason in your wallet.'), true);
+    else if (record?.kind === 'buy') {
+      const count = record.evidence?.filled ?? record.evidence?.tickets?.length ?? record.input?.quantity;
+      notice(Number(count) === 0 ? t('本次未成交，未扣除 BEM。', 'No tickets were filled. No BEM was charged.')
+        : t('购买成功，已成交 {count} 份。', 'Purchase confirmed: {count} tickets.', { count }));
+    }
+    else if (record?.kind === 'approve') notice(t('授权成功，可以确认购买。', 'Approval confirmed. You can now confirm your purchase.'));
+    else if (record) notice(t('交易已上链确认。', 'Transaction confirmed onchain.'));
     clearTestViews(); render();
     await refreshTestState(); refreshBalance(); refreshHistory();
   },
@@ -478,11 +498,24 @@ $('refund-round')?.addEventListener('input', () => { state.refundView = null; re
 $('settle-test')?.addEventListener('click', () => executeTestAction('settle'));
 $('check-transactions')?.addEventListener('click', async () => { try { await checkPlayerTransactions(); } catch(error) { notice(errorCopy(error), true); } });
 $('attach-test-hash')?.addEventListener('click', async () => { try { await currentTransactions()?.attachHash($('unknown-test-hash')?.value.trim()); await refreshTestState(); } catch(error) { notice(errorCopy(error), true); } });
-for (const tab of ['draw', 'proof']) $('tab-' + tab)?.addEventListener('click', () => selectTab(tab));
+for (const tab of ['draw', 'proof', 'burns']) $('tab-' + tab)?.addEventListener('click', event => {
+  if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+  event.preventDefault(); selectTab(tab);
+  const url = new URL(location.href);
+  url.pathname = tab === 'burns' ? '/burns.html' : '/';
+  url.searchParams.set('pool', model.getState().poolId);
+  url.hash = tab === 'proof' ? 'proof' : '';
+  history.pushState(null, '', url);
+});
+window.addEventListener('popstate', () => {
+  const pool = new URLSearchParams(location.search).get('pool') ?? '100';
+  if (pools?.getState().visibleIds.includes(pool) && pool !== model.getState().poolId) pools.select(pool);
+  selectTab(location.pathname === '/burns.html' ? 'burns' : location.hash === '#proof' ? 'proof' : 'draw');
+});
 window.addEventListener('bem:languagechange', () => { render(); partialFillResult.refreshLanguage(); if (!state.noticeError) notice(t('请核对所选场次与钱包，交易需在钱包中确认。', 'Review the selected pool and wallet. Confirm transactions in your wallet.')); else put('notice', translateKnown($('notice')?.textContent ?? '')); });
 put('history-summary', t('本场次暂无已确认的往期开奖。', 'No confirmed past draws are available for this pool.'));
 notice(t('正在读取场次信息。连接钱包后可查看余额与参与状态。', 'Reading pool information. Connect your wallet to view balances and participation status.'));
-applySelectionFields(); render(); dispatchPool(); pools.load();
+applySelectionFields(); selectTab(document.body.dataset.initialTab === 'burns' || location.pathname === '/burns.html' ? 'burns' : location.hash === '#proof' ? 'proof' : 'draw'); render(); dispatchPool(); pools.load();
 setInterval(() => { if (document.visibilityState === 'visible') {
   refreshBalance(); refreshPoolStatus(); refreshTestState();
   const transactions = currentTransactions();

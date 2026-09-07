@@ -1,5 +1,6 @@
 import { Interface, getAddress, keccak256, toQuantity } from 'ethers';
 import { previewPoolSelection } from './player-v2-state.js';
+import { verifyWalletTransactionEnvelope } from './wallet-transaction-envelope.js';
 
 // This isolated entry never uses a registry-provided destination or a V1 profile.
 export const TEST_PLAYER = Object.freeze({
@@ -116,7 +117,15 @@ export function createTestPlayerTransactions({ wallet, getContext, readRpc, onUp
   const load = () => {
     try {
       need(storage && typeof storage.getItem === 'function' && typeof storage.setItem === 'function' && typeof storage.removeItem === 'function', 'PENDING_STORAGE_UNAVAILABLE');
-      const raw = storage.getItem(TEST_PLAYER_STORAGE_KEY); pending = raw == null ? null : validRecord(JSON.parse(raw)); storageError = false;
+      const raw = storage.getItem(TEST_PLAYER_STORAGE_KEY);
+      const restored = raw == null ? null : validRecord(JSON.parse(raw));
+      // A poll revalidates durable identity without turning the same submitted
+      // record into unknown while its next read is still in flight.
+      const unchanged = pending && restored && ['id', 'hash', 'account', 'to', 'data', 'nonce', 'nonceFloor', 'fromBlock']
+        .every(key => String(pending[key] ?? '').toLowerCase() === String(restored[key] ?? '').toLowerCase());
+      pending = unchanged ? { ...restored, status: pending.status, reason: pending.reason,
+        confirmations: pending.confirmations, requiredConfirmations: pending.requiredConfirmations, evidence: pending.evidence } : restored;
+      storageError = false;
     } catch { storageError = true; }
   };
   const persist = (value, expectedId = undefined) => {
@@ -258,12 +267,10 @@ export function createTestPlayerTransactions({ wallet, getContext, readRpc, onUp
       return await withLock(run);
     } finally { busy = false; update(); }
   }
-  function verifyTransaction(tx, record) {
-    need(tx && same(tx.hash, record.hash) && same(tx.from, record.account) && same(tx.to, record.to) &&
-      integer(tx.chainId) === 56n && integer(tx.value) === 0n && same(tx.input ?? tx.data, record.data) &&
-      (tx.input == null || tx.data == null || same(tx.input, tx.data)), 'TRANSACTION_MISMATCH');
-    need(integer(tx.nonce) === integer(record.nonce), 'NONCE_MISMATCH');
+  function verifyTransaction(tx, record, options) {
+    const envelope = verifyWalletTransactionEnvelope(tx, record, options);
     if (tx.blockNumber != null) need(integer(tx.blockNumber) >= integer(record.fromBlock), 'OLD_TRANSACTION');
+    return envelope;
   }
   function evidence(receipt, record) {
     const input = selectionInput(record.kind, record.input), matches = [], progress = [], attempts = [];
@@ -310,34 +317,57 @@ export function createTestPlayerTransactions({ wallet, getContext, readRpc, onUp
   }
   async function checkPending() {
     if (checking) return checking;
-    checking = withLock(async () => {
-      if (busy) return getState(); load(); update();
-      if (storageError || !pending) return getState();
-      const record = clone(pending); if (!record.hash) return getState();
+    checking = (async () => {
+      // Browser locks protect the durable record, never the network round-trip.
+      const record = await withLock(async () => {
+        if (busy) return null;
+        load(); update();
+        return !storageError && pending?.hash ? clone(pending) : null;
+      });
+      if (!record) return getState();
+      let checked;
       try {
-        need(integer(await rpc('eth_chainId', [])) === 56n, 'RPC_NETWORK');
-        const latest = await header('latest');
-        const [tx, receipt] = await Promise.all([rpc('eth_getTransactionByHash', [record.hash]), rpc('eth_getTransactionReceipt', [record.hash])]);
-        if (!tx || !receipt) { if (tx) verifyTransaction(tx, record); persist({ ...record, status: 'pending', reason: 'AWAITING_RECEIPT' }, record.id); return getState(); }
-        verifyTransaction(tx, record);
-        need(same(receipt.transactionHash, record.hash) && same(receipt.from, record.account) && same(receipt.to, record.to) &&
-          same(receipt.blockHash, tx.blockHash) && integer(receipt.blockNumber) === integer(tx.blockNumber), 'RECEIPT_MISMATCH');
-        const status = integer(receipt.status); need(status === 0n || status === 1n, 'RECEIPT_MISMATCH');
-        const block = await header(toQuantity(integer(receipt.blockNumber)));
-        need(same(block.hash, receipt.blockHash) && Array.isArray(block.transactions) && block.transactions.some(h => same(h, record.hash)), 'REORG');
-        need(integer(latest.number) >= integer(block.number) && same((await header(latest.number)).hash, latest.hash), 'REORG');
-        const count = integer(latest.number) - integer(block.number) + 1n;
-        const proof = status === 1n ? evidence(receipt, record) : null;
-        // Approvals and purchases unlock after their first verified onchain
-        // receipt. Refunds/settlement retain the longer confirmation threshold.
-        const requiredConfirmations = ['approve', 'buy'].includes(record.kind) ? 1 : confirmations;
-        const checked = { ...record, status: count >= BigInt(requiredConfirmations) ? status === 1n ? 'confirmed' : 'reverted' : 'confirming',
-          reason: count >= BigInt(requiredConfirmations) ? 'RECEIPT_CONFIRMED' : 'AWAITING_CONFIRMATIONS', confirmations: Number(count), requiredConfirmations, evidence: proof };
-        if (count >= BigInt(requiredConfirmations)) { if (persist(null, record.id)) { history.unshift(checked); if (history.length > 25) history.pop(); } }
-        else persist(checked, record.id);
-      } catch (error) { persist({ ...record, status: 'unknown', reason: error.code ?? 'RPC_UNAVAILABLE' }, record.id); }
+        const [chain, tx, receipt] = await Promise.all([
+          rpc('eth_chainId', []), rpc('eth_getTransactionByHash', [record.hash]), rpc('eth_getTransactionReceipt', [record.hash]),
+        ]);
+        need(integer(chain) === 56n, 'RPC_NETWORK');
+        if (!tx || !receipt) {
+          if (tx) verifyTransaction(tx, record);
+          checked = { ...record, status: 'pending', reason: 'AWAITING_RECEIPT' };
+        } else {
+          const envelope = verifyTransaction(tx, record);
+          need(same(receipt.transactionHash, record.hash) && same(receipt.from, record.account) && same(receipt.to, envelope.outerTo) &&
+            (tx.blockHash == null || same(receipt.blockHash, tx.blockHash)) &&
+            (tx.blockNumber == null || integer(receipt.blockNumber) === integer(tx.blockNumber)) &&
+            integer(receipt.blockNumber) >= integer(record.fromBlock), 'RECEIPT_MISMATCH');
+          const status = integer(receipt.status); need(status === 0n || status === 1n, 'RECEIPT_MISMATCH');
+          const requiredConfirmations = ['approve', 'buy'].includes(record.kind) ? 1 : confirmations;
+          const [block, latest] = await Promise.all([
+            header(toQuantity(integer(receipt.blockNumber))),
+            requiredConfirmations > 1 ? header('latest') : null,
+          ]);
+          need(same(block.hash, receipt.blockHash) && Array.isArray(block.transactions) && block.transactions.some(h => same(h, record.hash)), 'REORG');
+          // The receipt's canonical block proves inclusion. A lagging latest
+          // response must not turn an already mined purchase into unknown.
+          const count = latest && integer(latest.number) >= integer(block.number)
+            ? integer(latest.number) - integer(block.number) + 1n : 1n;
+          const proof = status === 1n ? evidence(receipt, record) : null;
+          checked = { ...record, status: count >= BigInt(requiredConfirmations) ? status === 1n ? 'confirmed' : 'reverted' : 'confirming',
+            reason: count >= BigInt(requiredConfirmations) ? 'RECEIPT_CONFIRMED' : 'AWAITING_CONFIRMATIONS',
+            confirmations: Number(count), requiredConfirmations, evidence: proof,
+            walletWrapped: envelope.wrapped, actualNonce: envelope.actualNonce };
+        }
+      } catch (error) { checked = { ...record, status: 'unknown', reason: error.code ?? 'RPC_UNAVAILABLE' }; }
+      await withLock(async () => {
+        load();
+        if (storageError || !pending || !['id', 'hash', 'account', 'to', 'data', 'nonce'].every(key =>
+          String(pending[key] ?? '').toLowerCase() === String(record[key] ?? '').toLowerCase())) return;
+        if (['confirmed', 'reverted'].includes(checked.status)) {
+          if (persist(null, record.id)) { history.unshift(checked); if (history.length > 25) history.pop(); }
+        } else persist(checked, record.id);
+      });
       return getState();
-    });
+    })();
     try { return await checking; } finally { checking = null; update(); }
   }
   async function attachHash(value) {
@@ -345,7 +375,7 @@ export function createTestPlayerTransactions({ wallet, getContext, readRpc, onUp
     await withLock(async () => {
       load(); need(!storageError && pending && !pending.hash, 'NO_UNKNOWN_INTENT');
       const record = { ...pending, hash: hash(value) }; need(integer(await rpc('eth_chainId', [])) === 56n, 'RPC_NETWORK');
-      const tx = await rpc('eth_getTransactionByHash', [record.hash]); verifyTransaction(tx, record);
+      const tx = await rpc('eth_getTransactionByHash', [record.hash]); verifyTransaction(tx, record, { allowWrappedNonce: false });
       need(persist({ ...record, status: 'pending', reason: 'HASH_ATTACHED_RECHECK_REQUIRED' }, record.id), 'PENDING_CHANGED'); update();
     });
     return checkPending();

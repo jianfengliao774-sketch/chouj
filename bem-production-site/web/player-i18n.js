@@ -45,9 +45,16 @@ function original(element, name, read) {
   return attributes.get(name);
 }
 
+export function updatePageTitle() {
+  const section = document.body?.dataset?.activeTab ?? document.body?.dataset?.initialTab;
+  document.title = section === 'burns' ? t('销毁记录 · 芯火夺宝', 'Burn records · 芯火夺宝')
+    : globalThis.location?.pathname === '/legacy.html' ? t('原合约记录 · 芯火夺宝', 'Original contract records · 芯火夺宝')
+    : t('芯火夺宝 · BNB 主网', '芯火夺宝 · BNB Mainnet');
+}
+
 export function applyStaticLanguage() {
   document.documentElement.lang = getLocale();
-  document.title = t("2075 开奖终端 · BNB 主网", "2075 Draw Terminal · BNB Mainnet");
+  updatePageTitle();
   document.querySelectorAll("[data-en]").forEach(element => {
     // Never replace a parent holding live amounts, record counts or controls.
     if (element.children.length) return;

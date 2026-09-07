@@ -85,7 +85,7 @@ function render() {
   }
   fields('fixed-fields', [
     ['本次类型', selected?.name ?? '待选择'], ['网络', 'BNB Chain 主网（56）'],
-    ['指定部署钱包', F.deployer, 'address'], ['后续启动钱包', F.authorizationOwner, 'address'],
+    ['部署与容器启动钱包', F.deployer, 'address'], ['VRF 订阅管理钱包', F.subscriptionOwner, 'address'],
     ['收款容器', F.revenueContainer, 'address'], ['容器所属电路', 'TapeOut #13061'],
     ['开奖计算', 'BEHEMOTH #2075'], ['开奖处理器', F.processor, 'address'],
     ['启动授权容器', F.authorizationContainer, 'address'], ['授权电路身份', 'TapeOut #13061'], ['BEM 合约', F.bem, 'address'],
@@ -118,7 +118,7 @@ function renderRecord() {
     ['部署交易', record.hash ?? '尚未取得哈希，请查看钱包', record.hash ? 'tx' : null],
     ['运行代码哈希', record.runtimeCodeHash], ['创建时间', record.createdAt ? new Date(record.createdAt).toLocaleString('zh-CN') : '—']]);
   $('record-note').textContent = record.status === 'verified'
-    ? '已核对创建交易、运行代码及固定参数。接下来由订阅钱包添加此新地址为 VRF 消费者，再由 13061 持有人钱包授权启动。创建合约不会赋予部署钱包启动权限。'
+    ? '已核对创建交易、运行代码及固定参数。由 0x304F…f3a8 管理的 VRF 订阅添加新合约为消费者，再使用本页部署钱包 0x7674…Ea53 通过其 13061 容器授权启动。'
     : record.status?.startsWith('resolved_') ? '已从主链证明本次部署失败或取消。您可下载记录后，单独点击重置并重新核对部署费用。'
       : '已有本类型的部署记录，新增部署已锁定。加速后可粘贴新交易哈希重新核对；未拿到哈希时请先查看钱包，页面不会自动重发。';
   if (document.activeElement !== $('recovery-hash')) $('recovery-hash').value = record.hash ?? '';
@@ -203,7 +203,7 @@ async function checkBindings(context) {
   assertContainerBindings({ chainId: 56, authorization: { account: authorizationAccount[0], opened: authorizationOpened[0], token: authorizationToken },
     revenue: { account: revenueAccount[0], opened: revenueOpened[0], token: revenueToken }, authorizationOwner: owner[0], authorizationNftOwner: nftOwner[0],
     decimals: decimals[0], netlistHash: keccak256(netlist[0]), circuitInfo, dependencyCodes });
-  need(sameAddress(subscription.owner, F.deployer), 'VRF 订阅持有人已变化，请重新核对订阅与后续消费者配置权限。');
+  need(sameAddress(subscription.owner, F.subscriptionOwner), 'VRF 订阅持有人已变化，请重新核对订阅与后续消费者配置权限。');
   const canonical = await read(context, 'eth_getBlockByNumber', [blockTag, false]);
   need(canonical && sameAddress(canonical.hash, block.hash), '区块快照变化，请重新核对绑定。');
   await checkIdentity(context); return blockTag;

@@ -229,7 +229,7 @@ test('concurrent modules sharing a tab lock can issue only one request', async (
   assert.equal(results.filter(x => x.status === 'fulfilled').length, 1); assert.equal(s.sent.length, 1);
 });
 
-test('receipt checking holds the same cross-tab lock and cannot erase the next transaction intent', async () => {
+test('receipt network reads release the cross-tab lock without permitting a duplicate or erasing a later intent', async () => {
   const s = setup(); await s.manager.execute('buy', { roundId: 1n, quantity: 2 });
   s.mine([s.event('TicketsPurchased', [1n, ACCOUNT, 1n, 3n, 20000n])]); s.state.nonce = 8n;
   let entered, release, blocked = false;
@@ -237,9 +237,9 @@ test('receipt checking holds the same cross-tab lock and cannot erase the next t
   s.setHook(async method => { if (method === 'eth_getTransactionByHash' && !blocked) { blocked = true; entered(); await gate; } });
   const checking = s.manager.checkPending(); await reached;
   const second = createTestPlayerTransactions(s.options); s.setSendHook(() => OTHERHASH);
-  const buying = second.execute('buy', { roundId: 1n, quantity: 2 });
-  await Promise.resolve(); assert.equal(s.sent.length, 1);
-  release(); await checking; await buying;
+  await rejects(() => second.execute('buy', { roundId: 1n, quantity: 2 }), 'TRANSACTION_UNRESOLVED');
+  assert.equal(s.sent.length, 1);
+  release(); await checking; await second.execute('buy', { roundId: 1n, quantity: 2 });
   const stored = JSON.parse(s.storage.getItem(TEST_PLAYER_STORAGE_KEY));
   assert.equal(stored.hash, OTHERHASH); assert.equal(stored.nonce, '8'); assert.equal(s.sent.length, 2);
   assert.equal((await s.manager.checkPending()).blocking, true);
@@ -301,4 +301,48 @@ test('exact approve and self-refund receipts confirm, altered paid amounts stay 
   b.state.tip = 111n; assert.equal((await b.manager.checkPending()).blocking, false);
   const c = setup(); await c.manager.execute('buy', { roundId: 1n, quantity: 2 });
   c.mine([c.event('TicketsPurchased', [1n, ACCOUNT, 1n, 3n, 10000n])]); assert.equal((await c.manager.checkPending()).blocking, true);
+});
+
+test('the real MetaMask type-4 wrapped purchase is recovered from its matching canonical receipt', async () => {
+  const fixture = JSON.parse(fs.readFileSync(new URL('fixtures/bem-test-wallet-wrapped-buy.json', import.meta.url)));
+  const tx = fixture.transaction, receipt = fixture.receipt, storage = memoryStorage(), reads = [];
+  const expectedNonce = (BigInt(tx.nonce) - 1n).toString();
+  storage.setItem(TEST_PLAYER_STORAGE_KEY, JSON.stringify({ version: 1, id: 'real-wrapped-recovery', kind: 'buy', account: tx.from,
+    to: F.address, data: GAME.encodeFunctionData('buy', [1n, 1000]), input: { roundId: '1', quantity: '1000', tickets: null },
+    fromBlock: Number(BigInt(tx.blockNumber) - 1n), nonce: expectedNonce, nonceFloor: expectedNonce,
+    hash: tx.hash, status: 'unknown', reason: 'TRANSACTION_MISMATCH' }));
+  const manager = createTestPlayerTransactions({ wallet: () => null, getContext: () => ({}), storage, locks: createLocks(),
+    readRpc: async (method, params) => {
+      reads.push(method);
+      if (method === 'eth_chainId') return '0x38';
+      if (method === 'eth_getTransactionByHash') { assert.equal(params[0], tx.hash); return tx; }
+      if (method === 'eth_getTransactionReceipt') return receipt;
+      assert.equal(method, 'eth_getBlockByNumber'); assert.equal(params[0], receipt.blockNumber);
+      return { number: receipt.blockNumber, timestamp: receipt.logs[0].blockTimestamp, hash: receipt.blockHash, transactions: [tx.hash] };
+    } });
+  const result = await manager.checkPending(); assert.equal(result.blocking, false);
+  assert.equal(result.records[0].status, 'confirmed'); assert.equal(result.records[0].walletWrapped, true);
+  assert.equal(result.records[0].actualNonce, BigInt(tx.nonce).toString());
+  assert.equal(result.records[0].evidence.amount, '10000000'); assert.equal(result.records[0].evidence.tickets.length, 1000);
+  assert.equal(result.records[0].evidence.tickets[0], 1001); assert.equal(result.records[0].evidence.tickets.at(-1), 2000);
+  assert.deepEqual(reads, ['eth_chainId', 'eth_getTransactionByHash', 'eth_getTransactionReceipt', 'eth_getBlockByNumber']);
+});
+
+test('submitted status does not flicker into unknown while its receipt query is in flight', async () => {
+  const s = setup(); await s.manager.execute('buy', { roundId: 1n, quantity: 2 });
+  let reached, release;
+  const entered = new Promise(resolve => reached = resolve), gate = new Promise(resolve => release = resolve);
+  s.setHook(async method => { if (method === 'eth_getTransactionByHash') { reached(); await gate; } });
+  const checking = s.manager.checkPending(); await entered;
+  assert.equal(s.manager.getState().records[0].status, 'pending');
+  assert.equal(s.manager.getState().records[0].reason, 'AWAITING_RECEIPT');
+  release(); await checking;
+});
+
+test('a canonical purchase receipt does not wait for a lagging latest-head response', async () => {
+  const s = setup(); await s.manager.execute('buy', { roundId: 1n, quantity: 2 });
+  s.mine([s.event('TicketsPurchased', [1n, ACCOUNT, 1n, 3n, 20000n])]); s.state.tip = 99n;
+  s.reads.length = 0; const result = await s.manager.checkPending();
+  assert.equal(result.records[0].status, 'confirmed'); assert.equal(result.blocking, false);
+  assert.equal(s.reads.length, 4); assert.ok(s.reads.every(read => !read.params.includes('latest')));
 });
