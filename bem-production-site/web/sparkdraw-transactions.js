@@ -34,8 +34,11 @@ export function createSparkDrawTransactions({rpc,wallet,context,storage=localSto
   const methodOf=r=>r.method||(r.kind==='approve'?'approve':GAME.parseTransaction({data:r.data})?.name);
   const claims=new Set(['claimPrizes','refundMany']);
   function conflicts(r,input){
-    const method=methodOf(r),next=input.method||input.kind;
-    if(['buy','buySelected','approve'].includes(next))return ['buy','buySelected','approve'].includes(method);
+    const next=input.method||input.kind;
+    // Each explicit purchase/approval is an independent intent. Pending records
+    // still reserve distinct nonces and retain their own confirmation history.
+    if(['buy','buySelected','approve'].includes(next))return false;
+    const method=methodOf(r);
     if(method!==next||r.poolId!==input.poolId)return false;
     if(!claims.has(next))return true;
     const existing=GAME.decodeFunctionData(method,r.data)[0].map(String),requested=(input.args?.[0]||[]).map(String);

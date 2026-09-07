@@ -26,6 +26,7 @@ try{
     {name:'mobile wrapped approval rejection unlocks retry',mobile:true,approval:true,selected:false,rejectApproval:true},
     {name:'wallet-wrapped 5000 purchase confirms and unlocks',mobile:false,approval:false,selected:false,confirmPurchase:'wrapped'},
     {name:'wallet-selected direct nonce confirms and unlocks',mobile:false,approval:false,selected:false,confirmPurchase:'nonce',holdReceipt:true},
+    {name:'mobile allows a second intentional purchase while the first is pending',mobile:true,approval:false,selected:false,confirmPurchase:'direct',holdReceipt:true,repeatPurchase:true},
     {name:'sold-out pool disables purchasing and shows zero available',mobile:false,approval:false,selected:false,sold:10000,held:0},
   ]){
     let receiptAvailable=!scenario.holdReceipt;
@@ -34,7 +35,7 @@ try{
     const page=await context.newPage(),errors=[],requests=[];
     page.on('pageerror',e=>errors.push(e.message));
     await page.addInitScript(({account,hash,blockHash,mobile,walletDelay,rejectApproval,confirmPurchase})=>{
-      window.__walletRequests=[];let authorized=false,currentAccount=account;const listeners={};
+      window.__walletRequests=[];window.__purchases=[];let authorized=false,currentAccount=account;const listeners={};
       document.addEventListener('click',e=>{if(e.target.closest?.('#buy'))window.__buyClickedAt=performance.now();},true);
       const provider={isBinance:true,on(name,fn){(listeners[name]??=[]).push(fn);},async request(q){
         window.__walletRequests.push({method:q.method,params:q.params,at:performance.now()});
@@ -46,7 +47,7 @@ try{
         if(q.method==='eth_sendTransaction'){
           const tx=q.params[0];
           if(tx.data.startsWith('0x095ea7b3')){if(rejectApproval)throw{code:-32603,data:{originalError:{code:4001}}};window.__approval={...tx,input:tx.data,hash,blockHash,blockNumber:'0x100'};return hash;}
-          if(confirmPurchase){window.__purchase={...tx,input:tx.data,hash:'0x'+'c'.repeat(64),blockHash,blockNumber:'0x100'};return window.__purchase.hash;}
+          if(confirmPurchase){const purchase={...tx,input:tx.data,hash:'0x'+(12+window.__purchases.length).toString(16).repeat(64),blockHash,blockNumber:'0x100'};window.__purchases.push(purchase);return purchase.hash;}
           throw Object.assign(Error('Fixture rejects payment; nothing broadcast'),{code:4001});
         }
         throw Error('Unexpected wallet method: '+q.method);
@@ -80,9 +81,9 @@ try{
           else if(row.method==='eth_blockNumber')value='0x100';
           else if(row.method==='eth_getBalance')value='0xde0b6b3a7640000';
           else if(row.method==='eth_getTransactionByHash'){
-            const tx=await page.evaluate(h=>window.__purchase?.hash===h?window.__purchase:window.__approval?.hash===h?window.__approval:null,arg);
+            const tx=await page.evaluate(h=>window.__purchases.find(tx=>tx.hash===h)||(window.__approval?.hash===h?window.__approval:null),arg);
             value=tx;
-            if(tx&&scenario.confirmPurchase&&tx.hash==='0x'+'c'.repeat(64)){
+            if(tx&&['nonce','wrapped'].includes(scenario.confirmPurchase)&&tx.hash==='0x'+'c'.repeat(64)){
               value={...tx,nonce:toQuantity(BigInt(tx.nonce)+1n)};
               if(scenario.confirmPurchase==='wrapped'){
                 const data=wrapper.encodeFunctionData('redeemDelegations',[['0x'],['0x'+'0'.repeat(64)],[solidityPacked(['address','uint256','bytes'],[tx.to,0,tx.data])]]);
@@ -91,7 +92,7 @@ try{
             }
           }
           else if(row.method==='eth_getTransactionReceipt'){
-            const tx=await page.evaluate(h=>window.__purchase?.hash===h?window.__purchase:null,arg);
+            const tx=await page.evaluate(h=>window.__purchases.find(tx=>tx.hash===h)||null,arg);
             const decoded=tx?GAME.decodeFunctionData('buySelected',tx.data):null;
             const event=decoded?GAME.encodeEventLog(GAME.getEvent('PurchaseResult'),[decoded[0],tx.from,decoded[1].length,decoded[1].length,BigInt(decoded[1].length)*p.ticketPrice,0]):null;
             value=tx&&!receiptAvailable?null:{transactionHash:arg,status:'0x1',blockNumber:'0x100',blockHash,logs:event?[{...event,address:p.address}]:[]};
@@ -145,6 +146,7 @@ try{
     }
     if(scenario.selected){await page.locator('#mode-selected').click();await page.locator('#selected-tickets').fill('1-5000');}
     else {await page.locator('[data-count="5000"]').click();assert.equal(await page.locator('#ticket-count').inputValue(),String(expected));}
+    if(scenario.repeatPurchase){expected=1000;await page.locator('#ticket-count').fill('1000');}
     await page.waitForFunction(()=>!document.getElementById('buy').disabled);
     if(scenario.warm){
       const deadline=Date.now()+5000;
@@ -173,19 +175,33 @@ try{
     assert.deepEqual(errors,[]);
     if(scenario.confirmPurchase){
       if(scenario.holdReceipt){
-        await page.waitForFunction(()=>document.getElementById('buy').textContent==='核对购买结果'&&!document.getElementById('buy').disabled);
-        await page.locator('#buy').click();
-        await page.waitForFunction(()=>!document.getElementById('buy').disabled);
-        assert.equal(await page.evaluate(()=>window.__walletRequests.filter(q=>q.method==='eth_sendTransaction').length),1,'Check result must never send another purchase');
+        await page.waitForFunction(()=>document.getElementById('buy').textContent==='购买'&&!document.getElementById('buy').disabled);
+        assert.ok((await page.locator('#purchase-state').textContent()).includes('可继续发起新的购买'));
+        await page.locator('#check-transactions').click();
+        await page.waitForTimeout(600);
+        assert.equal(await page.evaluate(()=>window.__walletRequests.filter(q=>q.method==='eth_sendTransaction').length),1,'Polling and preparation do not submit another purchase');
+        if(scenario.repeatPurchase){
+          await page.locator('#buy').click();
+          await page.waitForFunction(()=>window.__purchases.length===2&&!document.getElementById('buy').disabled);
+          const rows=await page.evaluate(()=>JSON.parse(localStorage.getItem('sparkdraw:v5:pending')).pending);
+          assert.equal(rows.length,2);assert.equal(new Set(rows.map(r=>r.id)).size,2);assert.equal(new Set(rows.map(r=>r.hash)).size,2);
+          assert.deepEqual(rows.map(r=>r.nonce),['1','2'],'Even a stale wallet nonce cannot overwrite the earlier purchase');
+          assert.ok(rows.every(r=>r.count===1000));
+          assert.ok((await page.locator('#purchase-state').textContent()).includes('有 2 笔交易待确认'));
+        }
         receiptAvailable=true;
-        await page.locator('#buy').click();
+        await page.locator('#check-transactions').click();
       }
       await page.waitForFunction(()=>document.getElementById('transaction-list').textContent.includes('购买 · 已确认'),null,{timeout:10000});
+      if(scenario.repeatPurchase){
+        await page.waitForFunction(()=>{const state=JSON.parse(localStorage.getItem('sparkdraw:v5:pending'));return state.pending.length===0&&state.history.filter(r=>r.kind==='buy'&&r.status==='confirmed').length===2;},null,{timeout:10000});
+        assert.equal(await page.evaluate(()=>window.__purchases.length),2,'Each confirmation belongs to an explicit click');
+      }
       assert.equal(await page.locator('#buy').isDisabled(),false);assert.equal(await page.locator('#buy').textContent(),'购买');
       assert.ok((await page.locator('#notice').textContent()).includes('购买已确认'));
     }
     if(scenario.warm)assert.ok(sent[0].at-clickedAt<walletDelay*2+400,'warm click must not repeat chain preparation');
-    console.log(JSON.stringify({scenario:scenario.name,rpcDelay,walletDelay,firstWalletPromptMs:Math.round(sent[0].at-clickedAt),purchaseWalletPromptMs:Math.round(sent.at(-1).at-clickedAt),mockPaymentPromptMs:Date.now()-started,tickets:expected,walletPrompts:sent.length,passed:true}));
+    console.log(JSON.stringify({scenario:scenario.name,rpcDelay,walletDelay,firstWalletPromptMs:Math.round(sent[0].at-clickedAt),purchaseWalletPromptMs:Math.round(sent.at(-1).at-clickedAt),mockPaymentPromptMs:Date.now()-started,tickets:expected,walletPrompts:scenario.repeatPurchase?2:sent.length,passed:true}));
     await page.unrouteAll({behavior:'ignoreErrors'});await context.close();
   }
 }finally{await browser.close();}

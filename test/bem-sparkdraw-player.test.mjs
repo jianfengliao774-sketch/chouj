@@ -23,7 +23,7 @@ test('V5 purchase caps fees, retries only on user action and confirms actual par
   const s=setup(),input={poolId:'0.1',method:'buy',args:[1,1000],kind:'buy',count:1000,roundId:1};s.setPrice(1_000_000_000n);
   await assert.rejects(s.manager.execute(input),{code:'GAS_FEE_CAP_EXCEEDED'});assert.equal(s.sent.length,0);assert.equal(s.manager.pending,null);
   s.setPrice(50_000_000n);await s.manager.execute(input);assert.equal(s.sent.length,1);assert.equal(BigInt(s.sent[0].gas),1200000n);
-  await assert.rejects(s.manager.execute(input),{code:'TRANSACTION_PENDING'});s.mine();const result=await s.manager.check();assert.equal(result.result.filled,800);assert.equal(result.result.unspent,'200000');assert.equal(s.manager.pending,null);
+  s.mine();const result=await s.manager.check();assert.equal(result.result.filled,800);assert.equal(result.result.unspent,'200000');assert.equal(s.manager.pending,null);
 });
 test('receipt with another recipient never clears a submitted purchase',async()=>{
   const s=setup();await s.manager.execute({poolId:'0.1',method:'buy',args:[1,1000],kind:'buy',count:1000,roundId:1});s.mine({recipient:other});await assert.rejects(s.manager.check(),{code:'TRANSACTION_MISMATCH'});assert.ok(s.manager.pending);
