@@ -1,5 +1,6 @@
 import {waitForWalletResponse} from './wallet-response.js';
 import {prizeResult} from './prize-result.js';
+import {purchasedTicketDetails,ticketViewStates} from './purchased-ticket-view.js';
 import {walletPageUrl} from './wallet-mobile-links.js';
 import {compatibleDialog} from './dialog-compat.js';
 import {createWinnerRotation,latestWinnerForPool} from './winner-rotation.js';
@@ -355,22 +356,22 @@ async function claimRefunds(){
   }catch(e){refundError=true;throw e;}finally{refundFlow=false;renderRefund();}
 }
 async function queryRecords(kind,filter={}){const params=new URLSearchParams({kind,...filter});params.sort();return api('/api/sparkdraw/records?'+params);}
-function roundCard(r,personal=false){const card=el('article','');card.className='scope-note';card.append(el('h3',`${poolLabel(r.poolId)} · `+roundName(r)));
+function roundCard(r,personal=false,ticketStates=new Map()){const card=el('article','');card.className='scope-note';card.append(el('h3',`${poolLabel(r.poolId)} · `+roundName(r)));
   if(r.status===5){card.append(el('p',t('中奖号码：','Winning number: ')+String(r.winningTicket+1).padStart(5,'0')),links('address',r.winner));if(r.prize){card.append(el('p',t('奖金：','Prize: ')+money(r.prize.amount)+' BEM'));}card.append(claimButton(r,r.poolId));if(prizeResult(r,account,chainNow())==='claimable'){const timer=el('p','');countdown(timer,r.prize.claimDeadline);card.append(timer);}}
   if(personal){card.append(el('p',t('购买 {n} 份 · {times} 次 · 实付 {amount} BEM','{n} tickets · {times} purchases · Paid {amount} BEM',{n:r.tickets,times:r.purchases.length,amount:money(r.paid)})));
     card.append(el('p',t('待退本金：{refund} BEM · 已销毁本金：{burn} BEM · 已销毁奖金：{prize} BEM','Refund available: {refund} BEM · Burned principal: {burn} BEM · Burned prize: {prize} BEM',{refund:money(r.refundablePrincipal),burn:burnMoney(r.burnedPrincipal),prize:burnMoney(r.burnedPrize)})));
     if(BigInt(r.refundablePrincipal)>0n&&account?.toLowerCase()===r.account.toLowerCase()){const timer=el('p','');countdown(timer,r.refundClaimDeadline);card.append(timer,button(t('领取本期本金','Claim this round’s refund'),()=>action(r.poolId,'refundMany',[[r.roundId],account])));}
-    for(const purchase of r.purchases){card.append(links('tx',purchase.transactionHash,`${formatSiteTime(purchase.timeUtc,getLanguage())} · ${purchase.tickets} `+t('份','tickets')));card.append(el('br',''));}
+    for(const [index,purchase] of r.purchases.entries()){const key=`${r.poolId}:${r.roundId}:${purchase.transactionHash}:${index}`;card.append(links('tx',purchase.transactionHash,`${formatSiteTime(purchase.timeUtc,getLanguage())} · ${purchase.tickets} `+t('份','tickets')),purchasedTicketDetails(purchase,key,ticketStates.get(key)));}
     for(const burn of r.burns||[])card.append(links('tx',burn.transactionHash,t('查看已销毁交易','View burn transaction')));
   }
   if(r.settlementTransactionHash)card.append(links('tx',r.settlementTransactionHash,t('开奖交易','Settlement transaction')));return card;
 }
-function walletCards(container,rows,claims=[],owner=account){container.replaceChildren();
+function walletCards(container,rows,claims=[],owner=account){const viewer=JSON.stringify([owner?.toLowerCase(),account?.toLowerCase()]),ticketStates=container.dataset.ticketViewer===viewer?ticketViewStates(container):new Map();container.dataset.ticketViewer=viewer;container.replaceChildren();
   for(const group of claims)for(const kind of ['refunds','prizes']){const ids=group[kind];if(!ids.length)continue;
     const b=button(t('{pool} · 合并领取 {n} 期{type}','{pool} · Claim {type} for {n} rounds',{pool:poolLabel(group.poolId),n:ids.length,type:kind==='refunds'?t('本金','refunds'):t('奖金','prizes')}),()=>action(group.poolId,kind==='refunds'?'refundMany':'claimPrizes',[ids,account]));
     b.disabled=!account||owner.toLowerCase()!==account.toLowerCase();container.append(b);
   }
-  container.append(...rows.map(r=>roundCard(r,true)));if(!rows.length)container.append(el('p',t('此钱包暂无已确认记录。','No confirmed records for this wallet.')));
+  container.append(...rows.map(r=>roundCard(r,true,ticketStates)));if(!rows.length)container.append(el('p',t('此钱包暂无已确认记录。','No confirmed records for this wallet.')));
 }
 function renderHistory(){$('history-list').replaceChildren(...historyRows.filter(r=>r.poolId===pool).map(r=>roundCard(r)));}
 async function refreshRecords(){if(document.hidden)return;const version=++recordsVersion,id=pool,queriedAccount=account;const jobs=[];
