@@ -14,6 +14,7 @@ import {createWalletPicker} from './wallet-picker.js';
 import {createWalletSession} from './wallet-connection.js';
 import {createReadRpcBatcher} from './read-rpc-batcher.js';
 import {withRequestTimeout} from './request-timeout.js';
+import {createInFlightReads} from './in-flight-reads.js';
 import {availablePurchaseLimit,clampPurchaseCount} from './purchase-limit.js';
 import {createPurchasePreparation} from './purchase-preparation.js';
 import {walletRequestRejected} from './wallet-request-errors.js';
@@ -24,7 +25,7 @@ const burnMoney=x=>{const milli=(BigInt(x||0)+50000n)/100000n;return `${milli/10
 const url=new URL(location.href);let pool=POOL_IDS.includes(url.searchParams.get('pool'))&&url.searchParams.get('pool')!=='0.1'?url.searchParams.get('pool'):DEFAULT_POOL_ID;
 let wallet=null,account=null,chain=null,revision=0,mode='auto',snapshot=null,balance=null,allowance=0n,held=0n,loading=false,flow=false,tab=document.body.dataset.initialTab||location.hash.slice(1)||'draw';
 let personalPage=1,burnPage=1,burnWalletPage=1,historyPage=1,recordsVersion=0,activeResult=null;
-let heldContext=null,preparationTimer,walletProgress='';
+let heldContext=null,preparationTimer,walletProgress='',lastRefreshAt=0;
 if(url.searchParams.get('mode')==='selected'){
   mode='selected';const text=url.searchParams.get('tickets')||'';
   try{parseTickets('selected',0,text);$('selected-tickets').value=text;}catch{$('selected-tickets').value='';}
@@ -35,7 +36,9 @@ const poolLabel=id=>id==='0.1'?t('历史场次','Archived pool'):id+' BEM';
 const roundName=r=>r?.displayRoundId?roundDisplay(r):r?.status===0?t('待开盘','Not opened'):t('期号同步中','Number syncing');
 const context=()=>({account,key:JSON.stringify([revision,account,pool,chain,snapshot?.currentRoundId,mode,$('ticket-count').value,$('selected-tickets').value])});
 const note=x=>{$('notice').textContent=x;};
-async function api(path,body){return withRequestTimeout(15000,async signal=>{const r=await fetch(path,{cache:'no-store',signal,...(body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{})});let d;try{d=await r.json();}catch{throw Error(t('服务暂时无法响应，正在自动重试。','Service temporarily unavailable; retrying.'));}if(!r.ok)throw Error(d.error||'Network unavailable');return d;});}
+async function readApi(path,body){return withRequestTimeout(15000,async signal=>{const r=await fetch(path,{cache:'no-store',signal,...(body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{})});if(r.status===429)throw Object.assign(Error(t('访问繁忙，请稍后刷新。','Service is busy. Refresh shortly.')),{status:429,retryAfter:r.headers.get('retry-after')});let d;try{d=await r.json();}catch{throw Error(t('服务暂时无法响应，正在自动重试。','Service temporarily unavailable; retrying.'));}if(!r.ok)throw Error(d.error||'Network unavailable');return d;});}
+const readApiGet=createInFlightReads(path=>readApi(path));
+function api(path,body){return body?readApi(path,body):readApiGet(path);}
 const rpc=createReadRpcBatcher();
 const call=async(iface,to,name,args,block='latest')=>iface.decodeFunctionResult(name,await rpc('eth_call',[{to,data:iface.encodeFunctionData(name,args)},block]));
 const manager=createSparkDrawTransactions({rpc,wallet:()=>wallet,context,onChange:()=>render()});
@@ -205,7 +208,7 @@ function revealReels(win, replay=false){
   }
 }
 function renderSelector(){const list=$('pool-selection');list.className='pool-selection';list.replaceChildren(Object.assign(el('h3',t('请选择场次（每个场次份额均为10,000份）','Please choose a pool (10,000 tickets per pool)')),{className:'pool-selection-heading'}));const group=el('div','');group.className='pool-selection-options';for(const id of SALES_POOL_IDS){const b=button('',()=>{if(pool===id)return;pool=id;revision++;snapshot=null;held=0n;heldContext=null;historyPage=1;url.searchParams.set('pool',id);history.replaceState(null,'',url);render();refresh();refreshRecords();});b.className='pool-choice';b.append(el('strong',`${id} BEM`),el('span',t('每份 {price} BEM','{price} BEM per ticket',{price:money(profile(id).ticketPrice)})));b.setAttribute('aria-checked',String(id===pool));b.setAttribute('role','radio');group.append(b);}list.append(group);}
-async function refresh(){if(loading)return;loading=true;const id=pool,rev=revision;
+async function refresh(){if(loading)return;loading=true;lastRefreshAt=Date.now();const id=pool,rev=revision;
   try{const s=await api('/api/sparkdraw/state?pool='+id);if(s.version!==5||s.address.toLowerCase()!==profile(id).address.toLowerCase())throw Error('Contract mismatch');if(id!==pool||rev!==revision)return;snapshot={...s,receivedAt:Date.now()};
     if(account&&chain===56){const a=account,p=profile(id);const[b,al,native,tickets]=await Promise.all([call(TOKEN,F.bem,'balanceOf',[a]),call(TOKEN,F.bem,'allowance',[a,p.address]),rpc('eth_getBalance',[a,'latest']),call(GAME,p.address,'ticketsOf',[s.currentRoundId,a])]);if(id!==pool||rev!==revision)return;balance={bem:b[0],bnb:BigInt(native)};allowance=al[0];held=tickets[0];heldContext={account:a,pool:id,round:s.currentRoundId};}
     render();
@@ -274,9 +277,9 @@ async function preparePurchase(){
 const purchasePreparation=createPurchasePreparation({context,load:preparePurchase,expiresAt:plan=>plan.expiresAt});
 function schedulePurchasePreparation(){
   clearTimeout(preparationTimer);
-  if(!account||chain!==56||!snapshot||flow||manager.busy||!poolSalesEnabled(pool))return;
+  if(document.hidden||tab!=='draw'||!account||chain!==56||!snapshot||flow||manager.busy||!poolSalesEnabled(pool))return;
   purchaseState.warm();
-  preparationTimer=setTimeout(()=>purchasePreparation.warm(),180);
+  preparationTimer=setTimeout(()=>{if(!document.hidden&&tab==='draw'&&!flow&&!manager.busy)purchasePreparation.warm();},180);
 }
 function purchaseProgress(zh,en){walletProgress=t(zh,en);note(walletProgress);render();}
 async function buy(){
@@ -339,7 +342,7 @@ async function claimRefunds(){
     await action(id,'refundMany',[group.refunds,target]);await refreshRecords();
   }catch(e){refundError=true;throw e;}finally{refundFlow=false;renderRefund();}
 }
-async function queryRecords(kind,filter={}){return api('/api/sparkdraw/records?'+new URLSearchParams({kind,...filter}));}
+async function queryRecords(kind,filter={}){const params=new URLSearchParams({kind,...filter});params.sort();return api('/api/sparkdraw/records?'+params);}
 function roundCard(r,personal=false){const card=el('article','');card.className='scope-note';card.append(el('h3',`${poolLabel(r.poolId)} · `+roundName(r)));
   if(r.status===5){card.append(el('p',t('中奖号码：','Winning number: ')+String(r.winningTicket+1).padStart(5,'0')),links('address',r.winner));if(r.prize){card.append(el('p',t('奖金：','Prize: ')+money(r.prize.amount)+' BEM'),claimButton(r,r.poolId));if(!r.prize.claimed&&!r.prize.burned){const timer=el('p','');countdown(timer,r.prize.claimDeadline);card.append(timer);}}}
   if(personal){card.append(el('p',t('购买 {n} 份 · {times} 次 · 实付 {amount} BEM','{n} tickets · {times} purchases · Paid {amount} BEM',{n:r.tickets,times:r.purchases.length,amount:money(r.paid)})));
@@ -357,21 +360,21 @@ function walletCards(container,rows,claims=[],owner=account){container.replaceCh
   }
   container.append(...rows.map(r=>roundCard(r,true)));if(!rows.length)container.append(el('p',t('此钱包暂无已确认记录。','No confirmed records for this wallet.')));
 }
-async function refreshRecords(){const version=++recordsVersion,id=pool,queriedAccount=account;const jobs=[];
-  jobs.push(queryRecords('winners',{pool:id,page:historyPage}).then(d=>{if(version!==recordsVersion)return;$('history-list').replaceChildren(...d.rows.map(r=>roundCard(r)));$('history-summary').textContent=t('已确认 {n} 条中奖记录','{n} confirmed wins',{n:d.total});$('history-page').textContent=`${d.page} / ${d.totalPages}`;$('history-prev').disabled=d.page<=1;$('history-next').disabled=d.page>=d.totalPages;}));
+async function refreshRecords(){if(document.hidden)return;const version=++recordsVersion,id=pool,queriedAccount=account;const jobs=[];
+  if(tab==='proof')jobs.push(queryRecords('winners',{pool:id,page:historyPage}).then(d=>{if(version!==recordsVersion)return;$('history-list').replaceChildren(...d.rows.map(r=>roundCard(r)));$('history-summary').textContent=t('已确认 {n} 条中奖记录','{n} confirmed wins',{n:d.total});$('history-page').textContent=`${d.page} / ${d.totalPages}`;$('history-prev').disabled=d.page<=1;$('history-next').disabled=d.page>=d.totalPages;}));
   for(const winnerPool of SALES_POOL_IDS)jobs.push(queryRecords('winners',{pool:winnerPool,page:1}).then(d=>{
     if(version!==recordsVersion)return;
     winnerByPool.set(winnerPool,latestWinnerForPool(d.rows,winnerPool));
     winnerRotation.update(SALES_POOL_IDS.map(id=>winnerByPool.get(id)).filter(Boolean));
   }));
-  if(account){jobs.push(queryRecords('wallet',{pool:'all',address:account,page:burnWalletPage}).then(d=>{if(version!==recordsVersion)return;refundData={account:queriedAccount,groups:d.claims||[]};refundError=false;renderRefund();$('burn-wallet-status').textContent=account;walletCards($('burn-wallet-records'),d.rows,d.claims);const pager=el('p',`${d.page} / ${d.totalPages}`);if(d.page>1)pager.append(button(t('上一页','Previous'),()=>{burnWalletPage--;refreshRecords();}));if(d.page<d.totalPages)pager.append(button(t('下一页','Next'),()=>{burnWalletPage++;refreshRecords();}));$('burn-wallet-records').append(pager);}).catch(e=>{if(version===recordsVersion){refundError=true;renderRefund();}throw e;}));}else{$('burn-wallet-status').textContent=t('连接钱包自动查询待领取和已销毁记录。','Connect your wallet to view claims and burned balances.');$('burn-wallet-records').replaceChildren();}
-  const a=$('personal-wallet').value.trim();if(/^0x[a-fA-F0-9]{40}$/.test(a))jobs.push(queryRecords('wallet',{pool:$('personal-pool').value,address:a,page:personalPage,...($('personal-round').value.trim()?{round:$('personal-round').value.trim()}:{})}).then(d=>{if(version!==recordsVersion)return;walletCards($('personal-list'),d.rows,d.claims,a);$('personal-status').textContent=t('已确认 {n} 期记录','{n} confirmed rounds',{n:d.total});$('personal-page').textContent=`${d.page} / ${d.totalPages}`;$('personal-prev').disabled=d.page<=1;$('personal-next').disabled=d.page>=d.totalPages;}));
-  jobs.push(queryRecords('burns',{pool:$('burn-pool').value,page:burnPage}).then(d=>{if(version!==recordsVersion)return;$('burn-records').replaceChildren(...d.rows.map(r=>{const card=el('p',`${poolLabel(r.poolId)} · ${roundName(r)} · ${burnMoney(r.amountBaseUnits)} BEM · ${formatSiteTime(r.timeUtc,getLanguage())} `);card.append(links('tx',r.transactionHash));return card;}));$('burn-status').textContent=t('已确认 {n} 笔销毁','{n} confirmed burns',{n:d.total});$('burn-page').textContent=`${d.page} / ${d.totalPages}`;$('burn-prev').disabled=d.page<=1;$('burn-next').disabled=d.page>=d.totalPages;}));
-  for(const kind of ['prizes','refunds'])jobs.push(queryRecords(kind,{pool:'all'}).then(d=>{if(version!==recordsVersion)return;const box=$(kind==='prizes'?'pending-prizes':'pending-refunds');box.replaceChildren(...d.rows.map(r=>{const card=el('article',`${poolLabel(r.poolId)} · ${roundName(r)} · ${money(r.amountBaseUnits)} BEM`);card.className='scope-note';card.append(el('p',r.account||r.winner));const timer=el('p','');countdown(timer,r.claimDeadline);card.append(timer);if(kind==='prizes')card.append(claimButton({...r,prize:{amount:r.amountBaseUnits,claimDeadline:r.claimDeadline,winner:r.winner}},r.poolId));else card.append(el('p',`${r.tickets} `+t('份','tickets')));if(chainNow()>=r.claimDeadline)card.append(button(t('销毁已过期余额','Burn expired balance'),()=>action(r.poolId,kind==='prizes'?'burnUnclaimedPrize':'burnUnclaimed',[r.roundId])));return card;}));if(!d.rows.length)box.append(el('p',t('暂无待公示记录。','No pending notices.')));}));
+  if(account&&(tab==='draw'||tab==='burns')){jobs.push(queryRecords('wallet',{pool:'all',address:account,page:burnWalletPage}).then(d=>{if(version!==recordsVersion)return;refundData={account:queriedAccount,groups:d.claims||[]};refundError=false;renderRefund();if(tab!=='burns')return;$('burn-wallet-status').textContent=account;walletCards($('burn-wallet-records'),d.rows,d.claims);const pager=el('p',`${d.page} / ${d.totalPages}`);if(d.page>1)pager.append(button(t('上一页','Previous'),()=>{burnWalletPage--;refreshRecords();}));if(d.page<d.totalPages)pager.append(button(t('下一页','Next'),()=>{burnWalletPage++;refreshRecords();}));$('burn-wallet-records').append(pager);}).catch(e=>{if(version===recordsVersion){refundError=true;renderRefund();}throw e;}));}else if(!account){$('burn-wallet-status').textContent=t('连接钱包自动查询待领取和已销毁记录。','Connect your wallet to view claims and burned balances.');$('burn-wallet-records').replaceChildren();}
+  const a=$('personal-wallet').value.trim();if(tab==='mine'&&/^0x[a-fA-F0-9]{40}$/.test(a))jobs.push(queryRecords('wallet',{pool:$('personal-pool').value,address:a,page:personalPage,...($('personal-round').value.trim()?{round:$('personal-round').value.trim()}:{})}).then(d=>{if(version!==recordsVersion)return;walletCards($('personal-list'),d.rows,d.claims,a);$('personal-status').textContent=t('已确认 {n} 期记录','{n} confirmed rounds',{n:d.total});$('personal-page').textContent=`${d.page} / ${d.totalPages}`;$('personal-prev').disabled=d.page<=1;$('personal-next').disabled=d.page>=d.totalPages;}));
+  if(tab==='burns')jobs.push(queryRecords('burns',{pool:$('burn-pool').value,page:burnPage}).then(d=>{if(version!==recordsVersion)return;$('burn-records').replaceChildren(...d.rows.map(r=>{const card=el('p',`${poolLabel(r.poolId)} · ${roundName(r)} · ${burnMoney(r.amountBaseUnits)} BEM · ${formatSiteTime(r.timeUtc,getLanguage())} `);card.append(links('tx',r.transactionHash));return card;}));$('burn-status').textContent=t('已确认 {n} 笔销毁','{n} confirmed burns',{n:d.total});$('burn-page').textContent=`${d.page} / ${d.totalPages}`;$('burn-prev').disabled=d.page<=1;$('burn-next').disabled=d.page>=d.totalPages;}));
+  if(tab==='burns')for(const kind of ['prizes','refunds'])jobs.push(queryRecords(kind,{pool:'all'}).then(d=>{if(version!==recordsVersion)return;const box=$(kind==='prizes'?'pending-prizes':'pending-refunds');box.replaceChildren(...d.rows.map(r=>{const card=el('article',`${poolLabel(r.poolId)} · ${roundName(r)} · ${money(r.amountBaseUnits)} BEM`);card.className='scope-note';card.append(el('p',r.account||r.winner));const timer=el('p','');countdown(timer,r.claimDeadline);card.append(timer);if(kind==='prizes')card.append(claimButton({...r,prize:{amount:r.amountBaseUnits,claimDeadline:r.claimDeadline,winner:r.winner}},r.poolId));else card.append(el('p',`${r.tickets} `+t('份','tickets')));if(chainNow()>=r.claimDeadline)card.append(button(t('销毁已过期余额','Burn expired balance'),()=>action(r.poolId,kind==='prizes'?'burnUnclaimedPrize':'burnUnclaimed',[r.roundId])));return card;}));if(!d.rows.length)box.append(el('p',t('暂无待公示记录。','No pending notices.')));}));
   for(const r of await Promise.allSettled(jobs))if(r.status==='rejected'){$('personal-status').textContent=t('记录同步中，请稍后刷新。','Records are syncing. Refresh shortly.');}
 }
-async function burnSummary(){try{const d=await api('/api/burns/summary');$('burn-total').textContent=burnMoney(d.totalBaseUnits);$('burn-summary-status').textContent=t('更新于 ','Updated ')+formatSiteTime(d.updatedAt,getLanguage());}catch{$('burn-summary-status').textContent=t('统计读取失败，稍后重试。','Summary unavailable; retrying.');}}
-function switchTab(next){tab=['draw','proof','burns','mine'].includes(next)?next:'draw';for(const id of ['draw','proof','burns','mine']){$('panel-'+id).hidden=id!==tab;$('tab-'+id).setAttribute('aria-selected',String(id===tab));}document.body.dataset.activeTab=tab;if(tab==='draw')renderDraw();url.hash=tab;history.replaceState(null,'',url);refreshRecords();}
+async function burnSummary(){if(document.hidden||tab!=='burns'||burnSummary.loading)return;burnSummary.loading=true;try{const d=await api('/api/burns/summary');$('burn-total').textContent=burnMoney(d.totalBaseUnits);$('burn-summary-status').textContent=t('更新于 ','Updated ')+formatSiteTime(d.updatedAt,getLanguage());}catch{$('burn-summary-status').textContent=t('统计读取失败，稍后重试。','Summary unavailable; retrying.');}finally{burnSummary.loading=false;}}
+function switchTab(next){tab=['draw','proof','burns','mine'].includes(next)?next:'draw';for(const id of ['draw','proof','burns','mine']){$('panel-'+id).hidden=id!==tab;$('tab-'+id).setAttribute('aria-selected',String(id===tab));}document.body.dataset.activeTab=tab;if(tab==='draw')renderDraw();url.hash=tab;history.replaceState(null,'',url);schedulePurchasePreparation();refresh();refreshRecords();if(tab==='burns')burnSummary();}
 for(const id of ['draw','proof','burns','mine'])$('tab-'+id).onclick=e=>{e.preventDefault();switchTab(id);};
 for(const id of ['auto','selected'])$('mode-'+id).onclick=()=>{mode=id;revision++;render();};
 for(const id of ['ticket-count','selected-tickets'])$(id).oninput=()=>{revision++;render();};
@@ -398,6 +401,7 @@ document.addEventListener('visibilitychange',()=>winnerRotation.setHidden(docume
 window.addEventListener('beforeunload',()=>winnerRotation.dispose());
 window.addEventListener('bem:languagechange',()=>winnerRotation.render());
 winnerRotation.setHidden(document.hidden);
-initLanguage();render();switchTab(tab);refresh();burnSummary();
-setInterval(()=>{$('site-time').textContent=formatSiteTime(chainNow(),getLanguage());document.querySelectorAll('[data-deadline]').forEach(n=>countdown(n,Number(n.dataset.deadline)));},1000);
-setInterval(()=>{if(!document.hidden){refresh();if(!flow)poll();}},2000);setInterval(()=>{if(!document.hidden)refreshRecords();},10000);setInterval(burnSummary,300000);
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clearTimeout(preparationTimer);else{refresh();refreshRecords();burnSummary();}});
+initLanguage();render();switchTab(tab);
+setInterval(()=>{if(document.hidden)return;$('site-time').textContent=formatSiteTime(chainNow(),getLanguage());document.querySelectorAll('[data-deadline]').forEach(n=>countdown(n,Number(n.dataset.deadline)));},1000);
+setInterval(()=>{if(!document.hidden){if(tab==='draw'||Date.now()-lastRefreshAt>=10000)refresh();if(!flow)poll();}},2000);setInterval(()=>{if(!document.hidden)refreshRecords();},10000);setInterval(burnSummary,300000);
