@@ -68,6 +68,15 @@ try{
     if(connected)await page.waitForFunction(()=>document.getElementById('wallet-address').textContent.length===42);
     await settle();const startup=summary(requests);
     if(!connected){verify(startup.records,tab==='burns'?6:3,'Only visible records plus ticker load');verify(startup.burnSummary,tab==='burns'?1:0,'Hidden burn summary is deferred');}
+    if(!connected){
+      assert.equal(await page.locator('#notice').textContent(),'场次数据已加载。','Successful state loading clears the initial checking notice');
+      await page.locator('#language-en').click();await settle();assert.equal(await page.locator('#notice').textContent(),'Pool data loaded.','Loaded notice follows English selection');
+      await page.locator('#language-zh').click();await settle();assert.equal(await page.locator('#notice').textContent(),'场次数据已加载。','Loaded notice switches back to Chinese');
+      if(tab==='draw')for(const message of ['正在打开钱包…','请在钱包中确认交易…','自定义状态，请勿覆盖','操作未完成：模拟错误']){
+        await page.locator('#notice').evaluate((node,text)=>{node.textContent=text;},message);
+        await page.evaluate(()=>window.__tick(2000));await settle();assert.equal(await page.locator('#notice').textContent(),message,'Later polling preserves wallet progress, custom notices and errors');
+      }
+    }
     if(connected&&tab!=='draw')verify(startup.estimates,0,'Non-purchase tab never estimates gas');
     if(connected&&tab==='draw')assert.match(await page.locator('#refund-state').textContent(),/暂无可退本金/,'Homepage refund remains populated');
     if(connected&&tab==='mine')assert.match(await page.locator('#personal-status').textContent(),/已确认/,'Personal records remain populated');

@@ -37,6 +37,7 @@ let refundData=null,refundError=false,refundFlow=false;
 const poolLabel=id=>id==='0.1'?t('历史场次','Archived pool'):id+' BEM';
 const roundName=r=>r?.displayRoundId?roundDisplay(r):r?.status===0?t('待开盘','Not opened'):t('期号同步中','Number syncing');
 const context=()=>({account,key:JSON.stringify([revision,account,pool,chain,snapshot?.currentRoundId,mode,$('ticket-count').value,$('selected-tickets').value])});
+const initialNotice=$('notice').textContent;
 const note=x=>{$('notice').textContent=x;};
 async function readApi(path,body){return withRequestTimeout(15000,async signal=>{const r=await fetch(path,{cache:'no-store',signal,...(body?{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(body)}:{})});if(r.status===429)throw Object.assign(Error(t('访问繁忙，请稍后刷新。','Service is busy. Refresh shortly.')),{status:429,retryAfter:r.headers.get('retry-after')});let d;try{d=await r.json();}catch{throw Error(t('服务暂时无法响应，正在自动重试。','Service temporarily unavailable; retrying.'));}if(!r.ok)throw Error(d.error||'Network unavailable');return d;});}
 const readApiGet=createInFlightReads(path=>readApi(path));
@@ -213,7 +214,7 @@ function renderSelector(){const list=$('pool-selection');list.className='pool-se
 async function refresh(){if(loading)return;loading=true;lastRefreshAt=Date.now();const id=pool,rev=revision;
   try{const s=await api('/api/sparkdraw/state?pool='+id);if(s.version!==5||s.address.toLowerCase()!==profile(id).address.toLowerCase())throw Error('Contract mismatch');if(id!==pool||rev!==revision)return;snapshot={...s,receivedAt:Date.now()};
     if(account&&chain===56){const a=account,p=profile(id);const[b,al,native,tickets]=await Promise.all([call(TOKEN,F.bem,'balanceOf',[a]),call(TOKEN,F.bem,'allowance',[a,p.address]),rpc('eth_getBalance',[a,'latest']),call(GAME,p.address,'ticketsOf',[s.currentRoundId,a])]);if(id!==pool||rev!==revision)return;balance={bem:b[0],bnb:BigInt(native)};allowance=al[0];held=tickets[0];heldContext={account:a,pool:id,round:s.currentRoundId};}
-    render();
+    render();if($('notice').textContent===initialNotice)note(t('场次数据已加载。','Pool data loaded.'));
   }catch(e){if(id===pool&&rev===revision){snapshot=null;render();failure(e);}}finally{loading=false;}
 }
 function renderPending(){
