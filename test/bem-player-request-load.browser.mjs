@@ -23,6 +23,7 @@ try{
       Object.defineProperty(document,'hidden',{get:()=>hidden});
       window.__hidden=value=>{hidden=value;document.dispatchEvent(new Event('visibilitychange'));};
       window.__changeAccount=()=>{current=other;for(const fn of listeners.accountsChanged||[])fn([other]);};
+      window.__disconnect=()=>{current=null;for(const fn of listeners.disconnect||[])fn({code:4900});};
       if(connected)window.ethereum={isMetaMask:true,on(name,fn){(listeners[name]??=[]).push(fn);},request:async({method})=>{
         if(method==='eth_accounts')return[current];if(method==='eth_chainId')return'0x38';
         throw Error('Fixture forbids interactive wallet requests: '+method);
@@ -39,7 +40,11 @@ try{
       if(url.pathname==='/api/sparkdraw/records'){
         // A small delay makes duplicate consumers overlap on the same request.
         await new Promise(resolve=>setTimeout(resolve,recordDelay));
-        return reply({rows:[],claims:connected?[{poolId:'5',refunds:[],prizes:[],refundCount:0,refundablePrincipal:'0'}]:[],total:0,page:1,totalPages:1});
+        const viewer=url.searchParams.get('address'),kind=url.searchParams.get('kind');
+        const rows=kind==='winners'&&url.searchParams.get('pool')==='5'?[account,other].map((winner,index)=>({poolId:'5',roundId:String(7+index),displayRoundId:String(7+index),status:5,winningTicket:6+index,winner,
+          prize:{amount:'100000000',claimDeadline:Math.floor(Date.now()/1000)+86400,claimed:false,burned:false},
+          ...(viewer?{viewerAccount:viewer,viewerTickets:viewer===account?2:0}:{})})):[];
+        return reply({rows,claims:connected?[{poolId:'5',refunds:[],prizes:[],refundCount:0,refundablePrincipal:'0'}]:[],total:rows.length,page:1,totalPages:1});
       }
       if(url.pathname==='/api/burns/summary')return reply({totalBaseUnits:'0',updatedAt:new Date().toISOString()});
       if(url.pathname==='/api/market')return reply({});
@@ -66,15 +71,42 @@ try{
     if(connected&&tab!=='draw')verify(startup.estimates,0,'Non-purchase tab never estimates gas');
     if(connected&&tab==='draw')assert.match(await page.locator('#refund-state').textContent(),/暂无可退本金/,'Homepage refund remains populated');
     if(connected&&tab==='mine')assert.match(await page.locator('#personal-status').textContent(),/已确认/,'Personal records remain populated');
+    if(tab==='proof'){
+      assert.equal(await page.locator('#history-list article').count(),2,'Proof tab renders confirmed history rows');
+      verify(await page.locator('#history-list button').count(),connected?1:0,'Only the connected winner sees a claim button');
+      verify(await page.locator('#history-list').getByText('本期未中奖，感谢参与',{exact:true}).count(),connected?1:0,'Only ticket evidence for the connected account produces a losing message');
+      if(connected)assert.match(await page.locator('#history-list article').first().textContent(),/领取奖金/);
+    }
     requests.length=0;await page.evaluate(()=>window.__tick(10000));await settle();const recordsTick=summary(requests);
-    verify(recordsTick.records,tab==='burns'?(connected?7:6):tab==='draw'||tab==='mine'?(connected?4:3):3,'One records tick requests only current content');
+    verify(recordsTick.records,tab==='burns'?(connected?7:6):(connected?4:3),'One records tick requests only current content');
+    if(tab==='proof'&&connected){
+      const winners=requests.filter(r=>r.query.kind==='winners');
+      assert.equal(winners.filter(r=>r.query.address===account).length,1,'Proof keeps its personalized winner query');
+      assert.equal(winners.filter(r=>!r.query.address).length,3,'Ticker keeps three public queries, distinct from account-specific results');
+    }
     requests.length=0;for(let i=0;i<5;i++){await page.evaluate(()=>window.__tick(2000));await settle();}const stateTicks=summary(requests);
     verify(stateTicks.state,tab==='draw'?5:1,'Non-draw state refresh slows to ten seconds');
     if(connected&&tab!=='draw')verify(stateTicks.estimates,0,'Non-draw polling never estimates gas');
     requests.length=0;await page.evaluate(()=>{window.__hidden(true);window.__tick(10000);window.__tick(2000);window.__tick(300000);});await settle();verify(summary(requests).api,0,'Hidden tab issues no automatic API reads');verify(summary(requests).estimates,0,'Hidden tab does not prewarm');
     await page.evaluate(()=>window.__hidden(false));await settle();
-    if(connected){requests.length=0;await page.evaluate(()=>window.__changeAccount());await settle();const walletRows=requests.filter(r=>r.query.kind==='wallet');verify(walletRows.every(r=>r.query.address===other),true,'Changed identity only queries the new account');if(tab==='draw'||tab==='mine'||tab==='burns')assert.ok(walletRows.length,'Relevant account records refresh');}
+    if(connected){requests.length=0;const immediate=await page.evaluate(()=>{window.__changeAccount();return{buttons:[...document.querySelectorAll('#history-list article')].map(n=>n.querySelectorAll('button').length),text:document.getElementById('history-list').textContent};});
+      if(tab==='proof'){assert.deepEqual(immediate.buttons,[0,1],'Cached history removes the previous wallet claim control before the new response arrives');assert.doesNotMatch(immediate.text,/本期未中奖，感谢参与/,'Cached participation belongs only to its original viewer');}
+      await settle();const walletRows=requests.filter(r=>r.query.kind==='wallet');verify(walletRows.every(r=>r.query.address===other),true,'Changed identity only queries the new account');if(tab==='draw'||tab==='mine'||tab==='burns')assert.ok(walletRows.length,'Relevant account records refresh');
+      if(tab==='proof'){
+        assert.equal(requests.filter(r=>r.query.kind==='winners'&&r.query.address===other).length,1,'Proof refreshes ownership for the new account');
+        assert.equal(await page.locator('#history-list article').first().locator('button').count(),0,'The old winning account immediately loses its claim control');
+        assert.equal(await page.locator('#history-list article').nth(1).locator('button').count(),1,'The new winning account receives its own claim control');
+        assert.equal(await page.locator('#history-list').getByText('本期未中奖，感谢参与',{exact:true}).count(),0,'Previous account participation does not transfer to the new account');
+      }
+    }
     await page.locator('#language-en').click();await settle();
+    if(tab==='proof'&&connected){
+      assert.equal(await page.locator('#history-list').getByRole('button',{name:'Claim prize',exact:true}).count(),1,'History rerenders with the current language');
+      requests.length=0;await page.evaluate(()=>window.__disconnect());await settle();
+      assert.equal(await page.locator('#history-list button').count(),0,'Disconnect immediately removes all claim controls');
+      assert.equal(requests.filter(r=>r.query.kind==='winners'&&r.query.address).length,0,'Disconnected proof refresh requests public history only');
+      assert.equal(requests.filter(r=>r.query.kind==='winners').length,3,'Disconnected proof shares its public page with the ticker again');
+    }
     if(!connected&&tab==='proof'){
       requests.length=0;recordDelay=250;
       await page.evaluate(()=>{document.getElementById('refresh-history').click();document.getElementById('refresh-history').click();});await settle();
