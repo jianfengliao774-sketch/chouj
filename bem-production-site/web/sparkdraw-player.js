@@ -1,4 +1,5 @@
 import {waitForWalletResponse} from './wallet-response.js';
+import {prizeResult} from './prize-result.js';
 import {walletPageUrl} from './wallet-mobile-links.js';
 import {compatibleDialog} from './dialog-compat.js';
 import {createWinnerRotation,latestWinnerForPool} from './winner-rotation.js';
@@ -24,6 +25,7 @@ const burnMoney=x=>{const milli=(BigInt(x||0)+50000n)/100000n;return `${milli/10
 const url=new URL(location.href);let pool=POOL_IDS.includes(url.searchParams.get('pool'))&&url.searchParams.get('pool')!=='0.1'?url.searchParams.get('pool'):DEFAULT_POOL_ID;
 let wallet=null,account=null,chain=null,revision=0,mode='auto',snapshot=null,balance=null,allowance=0n,held=0n,loading=false,flow=false,tab=document.body.dataset.initialTab||location.hash.slice(1)||'draw';
 let personalPage=1,burnPage=1,burnWalletPage=1,historyPage=1,recordsVersion=0,activeResult=null;
+let historyRows=[];
 let heldContext=null,preparationTimer,walletProgress='';
 if(url.searchParams.get('mode')==='selected'){
   mode='selected';const text=url.searchParams.get('tickets')||'';
@@ -54,7 +56,7 @@ Object.assign(errors,{
 const bound=new WeakSet();
 function bind(p){if(bound.has(p))return;bound.add(p);
   p.on?.('accountsChanged',a=>{if(wallet!==p)return;const next=a[0]?getAddress(a[0]):null;if(next===account)return;account=next;revision++;balance=null;heldContext=null;allowance=0n;$('personal-wallet').value=account||'';render();refresh();refreshRecords();});
-  p.on?.('disconnect',()=>{if(wallet!==p)return;revision++;account=null;chain=null;balance=null;heldContext=null;allowance=0n;walletSession.cancel();render();note(t('钱包已断开，请重新连接。','Wallet disconnected. Connect again to continue.'));});
+  p.on?.('disconnect',()=>{if(wallet!==p)return;revision++;account=null;chain=null;balance=null;heldContext=null;allowance=0n;walletSession.cancel();render();refreshRecords();note(t('钱包已断开，请重新连接。','Wallet disconnected. Connect again to continue.'));});
   p.on?.('chainChanged',c=>{if(wallet!==p)return;const next=Number(BigInt(c));if(next===chain)return;chain=next;revision++;snapshot=null;heldContext=null;render();refresh();});
 }
 let discoveredWallets=new Map(),restoreTimer,connectingWallet=false;
@@ -144,7 +146,7 @@ function render(){
   $('round-label').textContent=roundName(r);$('purchase-round-label').textContent=roundName(r);
   $('round-phase').textContent=r?statusText(r.status):t('读取中','Loading');$('funding-amount').textContent=`${money(BigInt(r?.sold||0)*p.ticketPrice)} / ${pool} BEM`;$('funding-tickets').textContent=`${r?.sold||0} / 10,000`;$('funding-progress').firstElementChild.style.width=((r?.sold||0)/100)+'%';
   window.dispatchEvent(new CustomEvent('bem:poolchange',{detail:{pool:{winnerBaseUnits:prize.toString()}}}));
-  renderDraw();renderPending();renderSelector();renderRefund();schedulePurchasePreparation();
+  renderDraw();renderPending();renderSelector();renderRefund();renderHistory();schedulePurchasePreparation();
 }
 const statusText=n=>[t('首次购买即开盘','Starts with first purchase'),t('购买中','Open'),t('已封盘','Closed'),t('等待随机数','Awaiting randomness'),t('等待计算结算','Awaiting settlement'),t('已开奖','Settled'),t('退款中','Refunding')][n];
 const chainNow=()=>snapshot?snapshot.time+Math.floor((Date.now()-snapshot.receivedAt)/1000):Math.floor(Date.now()/1000);
@@ -312,8 +314,17 @@ async function buy(){
   }catch(e){failure(e);}finally{flow=false;walletProgress='';purchaseState.clear();purchasePreparation.clear();render();}
 }
 async function action(id,method,args){if(!['claimPrizes','refundMany','burnUnclaimedPrize','burnUnclaimed'].includes(method))throw Error('BACKEND_DRAW_ONLY');if(!account)return picker.open();await manager.execute({poolId:id,method,args,kind:method,roundId:Array.isArray(args[0])?0:args[0]});render();}
-function claimButton(r,id){const prize=r.prize,winner=prize?.winner||r.winner;let label=t('领取奖金','Claim prize');if(prize?.claimed)label=t('已领取','Claimed');else if(prize?.burned)label=t('已销毁','Burned');else if(chainNow()>=prize?.claimDeadline)label=t('领取期已结束','Claim window expired');
-  const b=button(label,()=>{if(!account)return picker.open();if(account.toLowerCase()!==winner.toLowerCase())return note(t('请连接中奖钱包领取。','Connect the winning wallet to claim.'));return action(id,'claimPrizes',[[r.roundId],account]);});b.disabled=!!prize?.claimed||!!prize?.burned||chainNow()>=prize?.claimDeadline||!!account&&account.toLowerCase()!==winner?.toLowerCase();return b;}
+function claimButton(r,id){
+  const result=prizeResult(r,account,chainNow());
+  if(result!=='claimable'){
+    const labels={lost:t('本期未中奖，感谢参与','No win this round. Thank you for participating.'),claimed:t('奖金已领取','Prize claimed'),burned:t('奖金已销毁','Prize burned'),expired:t('领取期已结束','Claim window expired')};
+    const message=el('p',labels[result]||'');message.hidden=!result;return message;
+  }
+  return button(t('领取奖金','Claim prize'),()=>{
+    if(prizeResult(r,account,chainNow())!=='claimable')return refreshRecords();
+    return action(id,'claimPrizes',[[r.roundId],account]);
+  });
+}
 function renderRefund(){
   const group=refundData?.account===account?refundData.groups.find(g=>g.poolId===pool):null,b=$('refund');
   $('refund-amount').textContent=group?money(group.refundablePrincipal)+' BEM':'— BEM';
@@ -341,7 +352,7 @@ async function claimRefunds(){
 }
 async function queryRecords(kind,filter={}){return api('/api/sparkdraw/records?'+new URLSearchParams({kind,...filter}));}
 function roundCard(r,personal=false){const card=el('article','');card.className='scope-note';card.append(el('h3',`${poolLabel(r.poolId)} · `+roundName(r)));
-  if(r.status===5){card.append(el('p',t('中奖号码：','Winning number: ')+String(r.winningTicket+1).padStart(5,'0')),links('address',r.winner));if(r.prize){card.append(el('p',t('奖金：','Prize: ')+money(r.prize.amount)+' BEM'),claimButton(r,r.poolId));if(!r.prize.claimed&&!r.prize.burned){const timer=el('p','');countdown(timer,r.prize.claimDeadline);card.append(timer);}}}
+  if(r.status===5){card.append(el('p',t('中奖号码：','Winning number: ')+String(r.winningTicket+1).padStart(5,'0')),links('address',r.winner));if(r.prize){card.append(el('p',t('奖金：','Prize: ')+money(r.prize.amount)+' BEM'));}card.append(claimButton(r,r.poolId));if(prizeResult(r,account,chainNow())==='claimable'){const timer=el('p','');countdown(timer,r.prize.claimDeadline);card.append(timer);}}
   if(personal){card.append(el('p',t('购买 {n} 份 · {times} 次 · 实付 {amount} BEM','{n} tickets · {times} purchases · Paid {amount} BEM',{n:r.tickets,times:r.purchases.length,amount:money(r.paid)})));
     card.append(el('p',t('待退本金：{refund} BEM · 已销毁本金：{burn} BEM · 已销毁奖金：{prize} BEM','Refund available: {refund} BEM · Burned principal: {burn} BEM · Burned prize: {prize} BEM',{refund:money(r.refundablePrincipal),burn:burnMoney(r.burnedPrincipal),prize:burnMoney(r.burnedPrize)})));
     if(BigInt(r.refundablePrincipal)>0n&&account?.toLowerCase()===r.account.toLowerCase()){const timer=el('p','');countdown(timer,r.refundClaimDeadline);card.append(timer,button(t('领取本期本金','Claim this round’s refund'),()=>action(r.poolId,'refundMany',[[r.roundId],account])));}
@@ -357,8 +368,9 @@ function walletCards(container,rows,claims=[],owner=account){container.replaceCh
   }
   container.append(...rows.map(r=>roundCard(r,true)));if(!rows.length)container.append(el('p',t('此钱包暂无已确认记录。','No confirmed records for this wallet.')));
 }
+function renderHistory(){$('history-list').replaceChildren(...historyRows.filter(r=>r.poolId===pool).map(r=>roundCard(r)));}
 async function refreshRecords(){const version=++recordsVersion,id=pool,queriedAccount=account;const jobs=[];
-  jobs.push(queryRecords('winners',{pool:id,page:historyPage}).then(d=>{if(version!==recordsVersion)return;$('history-list').replaceChildren(...d.rows.map(r=>roundCard(r)));$('history-summary').textContent=t('已确认 {n} 条中奖记录','{n} confirmed wins',{n:d.total});$('history-page').textContent=`${d.page} / ${d.totalPages}`;$('history-prev').disabled=d.page<=1;$('history-next').disabled=d.page>=d.totalPages;}));
+  jobs.push(queryRecords('winners',{pool:id,page:historyPage,...(queriedAccount?{address:queriedAccount}:{})}).then(d=>{if(version!==recordsVersion||queriedAccount!==account)return;historyRows=d.rows;renderHistory();$('history-summary').textContent=t('已确认 {n} 条中奖记录','{n} confirmed wins',{n:d.total});$('history-page').textContent=`${d.page} / ${d.totalPages}`;$('history-prev').disabled=d.page<=1;$('history-next').disabled=d.page>=d.totalPages;}));
   for(const winnerPool of SALES_POOL_IDS)jobs.push(queryRecords('winners',{pool:winnerPool,page:1}).then(d=>{
     if(version!==recordsVersion)return;
     winnerByPool.set(winnerPool,latestWinnerForPool(d.rows,winnerPool));

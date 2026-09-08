@@ -67,3 +67,23 @@ test('V5 service exposes only the five new pools, routes old pages away and reje
   const replay=await request('/api/admin/login',{method:'POST',headers,body:JSON.stringify(withOtp)});assert.equal(replay.status,403);assert.equal(replay.headers.get('set-cookie'),null);
   const records=await(await request('/api/sparkdraw/records?kind=wallet&address=0x1111111111111111111111111111111111111111')).json();assert.equal(records.rows.length,0);assert.equal(records.claims.length,3);
 });
+
+test('winner pages attach confirmed participation for the queried wallet and exact pool/round',async t=>{
+  const directory=await fs.mkdtemp(path.join(os.tmpdir(),'sparkdraw-winner-view-'));
+  const buyer='0x1111111111111111111111111111111111111111',winner='0x2222222222222222222222222222222222222222';
+  for(const id of ['5','10']){
+    const p=profile(id),event=(name,args,i)=>({name,args:{roundId:'1',...args},blockNumber:p.deploymentBlock,logIndex:i,transactionHash:'0x'+'a'.repeat(64),timeUtc:'2026-09-07T00:00:00.000Z'});
+    const events=[event('RoundStarted',{fundingDeadline:'2000000000'},0),event('TicketsAllocated',{buyer,count:id==='5'?'2':'7',paid:'10',bitmap:[]},1),event('Settled',{winner,winningTicket:'0'},2),event('PrizeAvailable',{winner,amount:'100',claimDeadline:'2000000100'},3)];
+    await fs.writeFile(path.join(directory,'sparkdraw-v5-'+id+'.json'),JSON.stringify({version:5,address:p.address,through:p.deploymentBlock,hash:null,events}));
+  }
+  const service=await createSparkDrawService({rpc:async()=>{throw Error('No chain request expected');},directory,verify:false,origin:'http://127.0.0.1:18992',credential:await createAdminCredential('fixture-admin','test-only-password')});
+  await new Promise(r=>service.server.listen(18992,'127.0.0.1',r));
+  t.after(async()=>{await new Promise(r=>service.server.close(r));await fs.rm(directory,{recursive:true});});
+  const read=async suffix=>{const r=await fetch('http://127.0.0.1:'+service.server.address().port+'/api/sparkdraw/records?kind=winners&pool=all&'+suffix);assert.equal(r.status,200);return r.json();};
+  const personal=await read('address='+buyer);assert.equal(personal.rows.length,2);
+  assert.deepEqual(Object.fromEntries(personal.rows.map(r=>[r.poolId,r.viewerTickets])),{'5':2,'10':7});
+  assert.ok(personal.rows.every(r=>r.viewerAccount===buyer));
+  const visitor=await read('address=0x3333333333333333333333333333333333333333');assert.ok(visitor.rows.every(r=>r.viewerTickets===0));
+  const publicPage=await read('');assert.ok(publicPage.rows.every(r=>!('viewerAccount' in r)&&!('viewerTickets' in r)));
+  const filtered=await read('address='+buyer+'&round=2');assert.equal(filtered.rows.length,0);
+});
