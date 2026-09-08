@@ -201,7 +201,7 @@ function revealReels(win, replay=false){
     strip.replaceChildren(...Array.from({length:steps+1},(_,n)=>el('span',String(n%10))));
     strip.setAttribute('aria-hidden','true');placeholder.hidden=true;reel.classList.add('rolling');
     const animation=strip.animate([{transform:'translateY(0)'},{transform:`translateY(-${steps*100}%)`}],
-      {duration:3000*(i+1),easing:'linear',fill:'forwards'});
+      {duration:[1000,2000,3000,4000,7000][i],easing:'linear',fill:'forwards'});
     reelAnimations.push(animation);
     animation.finished.then(()=>{
       if(generation!==reelGeneration)return;
