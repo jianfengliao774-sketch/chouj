@@ -170,7 +170,10 @@ html[lang="en-US"] .player-page .tabs button, html[lang="en-US"] .player-page .t
 .player-page .purchased-ticket-details { margin: 10px 0 20px; border: 1px solid var(--spark-line); border-radius: 10px; overflow: hidden; }
 .player-page .purchased-ticket-details summary { padding: 8px 12px; cursor: pointer; color: #a82c34; font-size: 16px; line-height: 1.5; font-weight: 650; }
 .player-page .purchased-ticket-body { padding: 0 12px 10px; }
-.player-page textarea.purchased-ticket-list { display: block; box-sizing: border-box; width: 100%; min-width: 0; height: 160px; max-height: 160px; margin: 0 0 12px; padding: 12px; border: 1px solid var(--spark-line); border-radius: 8px; background: #fffdf7; color: var(--spark-ink); font: 15px/1.8 ui-monospace, monospace; resize: none; overflow: auto; overscroll-behavior: contain; }
+.player-page textarea.purchased-ticket-list { display: block; box-sizing: border-box; width: 100%; min-width: 0; height: 320px; min-height: 160px; max-height: 50vh; margin: 0 0 12px; padding: 12px; border: 1px solid var(--spark-line); border-radius: 8px; background: #fffdf7; color: var(--spark-ink); font: 15px/1.8 ui-monospace, monospace; resize: none; overflow: auto; overscroll-behavior: contain; }
+@media (max-width: 600px) {
+  .player-page textarea.purchased-ticket-list { height: 160px; max-height: 160px; }
+}
 .player-page :is(#personal-list, #burn-wallet-records) .purchased-ticket-body > button { min-height: 0; padding: 6px 12px; font-size: 15px; line-height: 1.5; }
 .player-page :is(#personal-list, #burn-wallet-records) .purchased-ticket-feedback { margin: 8px 0 0; font-size: 14px; line-height: 1.5; }
 .player-page .purchased-ticket-feedback:empty { display: none; }

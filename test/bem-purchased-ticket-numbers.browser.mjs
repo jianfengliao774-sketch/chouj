@@ -95,7 +95,7 @@ try{
     const checkCompactNumbers=async()=>{
       const dimensions=await details(1).evaluate(node=>{
         const field=node.querySelector('textarea'),style=getComputedStyle(field),rect=field.getBoundingClientRect();
-        return{viewport:innerWidth,height:rect.height,detailsHeight:node.getBoundingClientRect().height,
+        return{viewport:innerWidth,viewportHeight:innerHeight,height:rect.height,detailsHeight:node.getBoundingClientRect().height,
           clientHeight:field.clientHeight,scrollHeight:field.scrollHeight,resize:style.resize,overflowY:style.overflowY,
           overscrollBehavior:style.overscrollBehavior,left:rect.left,right:rect.right,
           documentWidth:document.documentElement.scrollWidth,bodyWidth:document.body.scrollWidth,
@@ -104,21 +104,20 @@ try{
               marginTop:css.marginTop,marginBottom:css.marginBottom,paddingTop:css.paddingTop,paddingBottom:css.paddingBottom,fontSize:css.fontSize,lineHeight:css.lineHeight};
           })};
       });
-      if(mobile&&process.env.ARTIFACT_DIR){
+      if(process.env.ARTIFACT_DIR){
         await fs.mkdir(process.env.ARTIFACT_DIR,{recursive:true});
         await details(1).scrollIntoViewIfNeeded();
-        await page.screenshot({path:path.join(process.env.ARTIFACT_DIR,`purchased-numbers-mobile-${dimensions.viewport}.png`)});
+        await page.screenshot({path:path.join(process.env.ARTIFACT_DIR,`purchased-numbers-${mobile?'mobile':'desktop'}-${dimensions.viewport}x${dimensions.viewportHeight}.png`)});
       }
-      assert.equal(dimensions.height,160,'A 5000-number list retains the fixed 160px height');
+      const expectedHeight=dimensions.viewport<=600?160:Math.max(160,Math.min(320,dimensions.viewportHeight/2));
+      assert.equal(dimensions.height,expectedHeight,'Desktop numbers gain space within the viewport; mobile numbers stay compact');
       assert.ok(dimensions.scrollHeight>dimensions.clientHeight,'Remaining numbers scroll inside the field');
       assert.equal(dimensions.resize,'none','Dragging cannot expand the number field');
       assert.equal(dimensions.overflowY,'auto','Number field owns its vertical scrolling');
       assert.equal(dimensions.overscrollBehavior,'contain','Reaching the list edge does not scroll the surrounding page');
-      assert.ok(dimensions.detailsHeight<320,`Expanded number details stay below 320px: ${JSON.stringify(dimensions)}`);
-      if(mobile){
-        assert.ok(dimensions.documentWidth<=dimensions.viewport+1&&dimensions.bodyWidth<=dimensions.viewport+1,JSON.stringify(dimensions));
-        assert.ok(dimensions.left>=0&&dimensions.right<=dimensions.viewport+1,'Compact number field fits a narrow mobile viewport');
-      }
+      assert.ok(Math.abs(dimensions.detailsHeight-(expectedHeight+116.5))<=1,`Expanded details retain compact surrounding controls: ${JSON.stringify(dimensions)}`);
+      assert.ok(dimensions.documentWidth<=dimensions.viewport+1&&dimensions.bodyWidth<=dimensions.viewport+1,JSON.stringify(dimensions));
+      assert.ok(dimensions.left>=0&&dimensions.right<=dimensions.viewport+1,'Number field fits without horizontal overflow');
       numberDimensions.push(dimensions);
     };
     const waitRows=async count=>page.waitForFunction(count=>document.querySelectorAll('#personal-list details').length===count,count);
@@ -139,6 +138,13 @@ try{
     assert.equal(await details(1).locator('textarea').inputValue(),expectedBig,'Every one of 5000 numbers is present without truncation');
     assert.equal((await details(1).locator('textarea').inputValue()).split(' ').length,5000);
     await checkCompactNumbers();
+    if(!mobile){
+      await page.setViewportSize({width:1440,height:500});
+      await checkCompactNumbers();
+      await page.setViewportSize({width:1440,height:280});
+      await checkCompactNumbers();
+      await page.setViewportSize({width:1440,height:1000});
+    }
     if(mobile){
       await page.setViewportSize({width:320,height:844});
       await checkCompactNumbers();
@@ -203,7 +209,7 @@ try{
     assert.ok(walletCalls.every(method=>['eth_accounts','eth_chainId'].includes(method)),'No interactive wallet requests occurred');
     assert.deepEqual(errors,[],'No page runtime errors');
     console.log(JSON.stringify({case:mode,passed:true,largeAllocation:5000,boundaries:[0,255,256,9999],partialAllocation:3,
-      scenarios:['lazy-details','fixed-height-scrollable-list','multiple-purchases-and-rounds','missing-and-invalid-evidence','empty-allocation','clipboard-success-and-fallback','refresh-open-and-scroll','language','identity-change',...(mobile?['mobile-width-390-and-320']:[])],numberDimensions,walletCalls,errors}));
+      scenarios:['lazy-details','bounded-height-scrollable-list','multiple-purchases-and-rounds','missing-and-invalid-evidence','empty-allocation','clipboard-success-and-fallback','refresh-open-and-scroll','language','identity-change',...(mobile?['mobile-width-390-and-320']:['desktop-height-1000-500-and-280'])],numberDimensions,walletCalls,errors}));
     await context.close();
   }
 }finally{await browser.close();}
