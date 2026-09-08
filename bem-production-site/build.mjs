@@ -1,6 +1,7 @@
 import { build } from 'vite';
 import path from 'node:path';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 const SITE=path.dirname(fileURLToPath(import.meta.url));
 import { playerPageHtml } from './player-page-template.mjs';
@@ -18,4 +19,12 @@ await build({ configFile: false, root: path.join(SITE, 'web'), logLevel: 'warn',
       burns: path.join(SITE, 'web/burns.html'),
       drawGuide: path.join(SITE, 'web/draw-guide.html'),
  } } } });
-console.log('Built independent mainnet player website. No wallets or transactions used.');
+// Nginx can send these precompressed public assets without recompressing each visit.
+const assets = path.join(SITE, 'dist/assets');
+for (const name of readdirSync(assets)) {
+  if (!/\.(js|css|svg)$/.test(name)) continue;
+  const bytes = readFileSync(path.join(assets, name));
+  const compressed = gzipSync(bytes, { level: 6 });
+  if (compressed.length < bytes.length) writeFileSync(path.join(assets, name + '.gz'), compressed);
+}
+console.log('Built independent mainnet player website with precompressed assets. No wallets or transactions used.');

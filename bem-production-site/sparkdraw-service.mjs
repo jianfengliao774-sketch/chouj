@@ -13,6 +13,7 @@ import {createKeyStore} from './sparkdraw-key-store.mjs';
 import {walletClaimGroups} from './sparkdraw-claims.mjs';
 import {createAdminAuth} from './auth.mjs';
 import {createMarketPriceService} from './market-price.mjs';
+import {createAsyncCache} from './async-cache.mjs';
 const SITE=path.dirname(fileURLToPath(import.meta.url));
 const json=x=>JSON.stringify(x,(_,v)=>typeof v==='bigint'?v.toString():v);
 const int=x=>Number(BigInt(x));
@@ -42,9 +43,7 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
   const vault=await createSparkDrawVault({directory,secret:vaultSecret,keyStore,statusFile:automationStatusFile,...(automationControlFile?{controlFile:automationControlFile}:{})});
   const evidence=JSON.parse(await fs.readFile(path.join(SITE,'web/public/sparkdraw/deployed-contracts.json'),'utf8'));
   const registry={version:5,chainId:56,verifier:evidence.deployments[0],pools:Object.fromEntries(evidence.deployments.slice(1).map(x=>[x.kind,x]))};
-  const cache=new Map();
-  function cached(key,ttl,fn){const old=cache.get(key);if(old&&Date.now()-old.at<ttl)return old.promise;
-    const item={at:Date.now(),promise:Promise.resolve().then(fn)};cache.set(key,item);item.promise.catch(()=>{if(cache.get(key)===item)cache.delete(key);});return item.promise;}
+  const cached=createAsyncCache();
   async function readRound(id,roundId,tag){
     const [r,early,sealed,beacon,prize,burned]=await Promise.all(['rounds','earlyDrawDeadline','sealedAt','beaconRound','prizes','unclaimedPrincipalBurned'].map(n=>call(id,n,[roundId],tag)));
     return{poolId:id,roundId:String(roundId),status:int(r[0]),sold:int(r[1]),fundingDeadline:int(r[2]),drawDeadline:int(r[3]),winningTicket:int(r[8]),winner:r[9],

@@ -14,6 +14,8 @@
 .player-page .sparkdraw-masthead { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 30px 0 22px; }
 .player-page .sparkdraw-wordmark { display: inline-flex; align-items: center; gap: 15px; text-decoration: none; color: var(--spark-ink); }
 .sparkdraw-wordmark img { width: 48px; height: 48px; flex: none; }
+.sparkdraw-wordmark picture { display:block; flex:none; }
+.player-page .processor-chip picture { display:block; }
 .sparkdraw-wordmark > span { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
 .sparkdraw-wordmark strong { font: 750 29px/1.2 "Segoe UI", sans-serif; letter-spacing: -.8px; }
 .sparkdraw-wordmark strong { overflow-wrap: anywhere; }

@@ -4,13 +4,21 @@ const METHODS = new Set(['eth_chainId', 'eth_blockNumber', 'eth_getBlockByNumber
 
 // Coalesce one render's reads into the server's existing 25-item JSON-RPC batches.
 // No wallet request or signing method is supported here.
-export function createReadRpcBatcher({ fetchImpl = globalThis.fetch, endpoint = '/rpc',
+export function createReadRpcBatcher({ fetchImpl = globalThis.fetch, endpoint = '/rpc', now = Date.now,
   retryDelay = attempt => new Promise(resolve => setTimeout(resolve, 300 * 2 ** attempt + Math.floor(Math.random() * 200))) } = {}) {
-  let serial = 0, scheduled = false, queue = [];
+  let serial = 0, scheduled = false, queue = [], retryAt = 0;
   const unavailable = () => Object.assign(new Error('Chain reads are temporarily unavailable'), { code: 'RPC_UNAVAILABLE' });
+  const rateLimited = () => Object.assign(unavailable(), { status: 429, retryAfter: Math.max(0, retryAt-now())/1000 });
+  function pauseReads(raw) {
+    const time=now(),seconds=typeof raw==='string'&&/^\d+(?:\.\d+)?$/.test(raw.trim())?Number(raw)*1000:NaN;
+    const dated=typeof raw==='string'?Date.parse(raw)-time:NaN;
+    const delay=Math.min(60000,Math.max(0,Number.isFinite(seconds)?seconds:Number.isFinite(dated)?dated:5000));
+    retryAt=Math.max(retryAt,time+delay);
+  }
   async function dispatch(items, attempt = 0) {
     items = items.filter(item => !item.finished);
     if (!items.length) return;
+    if(now()<retryAt){for(const item of items)item.finish(false,rateLimited());return;}
     try {
       const rows = await withRequestTimeout(20000, async signal => {
         let response;
@@ -18,7 +26,12 @@ export function createReadRpcBatcher({ fetchImpl = globalThis.fetch, endpoint = 
           response = await fetchImpl(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(items.map(item => item.request)), signal });
         } catch { throw Object.assign(unavailable(), { retryable: true }); }
-        if ([429, 502, 503, 504].includes(response.status)) throw Object.assign(unavailable(), { retryable: true });
+        if(response.status===429){
+          // A busy endpoint must not receive immediate retries from every open
+          // page. Fail fast during Retry-After instead of holding wallet flows.
+          pauseReads(response.headers.get('retry-after'));throw rateLimited();
+        }
+        if ([502, 503, 504].includes(response.status)) throw Object.assign(unavailable(), { retryable: true });
         if (!response.ok || !response.headers.get('content-type')?.includes('application/json')) throw unavailable();
         return response.json();
       }), expected = new Set(items.map(item => item.request.id));
@@ -35,7 +48,7 @@ export function createReadRpcBatcher({ fetchImpl = globalThis.fetch, endpoint = 
       if (busy.length) { await retryDelay(attempt); await dispatch(busy, attempt + 1); }
     } catch (error) {
       if (error.retryable && attempt < 2) { await retryDelay(attempt); await dispatch(items, attempt + 1); }
-      else for (const item of items) item.finish(false, unavailable());
+      else for (const item of items) item.finish(false, error.status===429?rateLimited():unavailable());
     }
   }
   function flush() {
@@ -57,6 +70,7 @@ export function createReadRpcBatcher({ fetchImpl = globalThis.fetch, endpoint = 
   return function rpc(method, params = [], signal) {
     if (!METHODS.has(method)) return Promise.reject(new Error('Read-only method required'));
     if (signal?.aborted) return Promise.reject(Object.assign(new Error('Read cancelled'), { name: 'AbortError' }));
+    if(now()<retryAt)return Promise.reject(rateLimited());
     if (queue.length >= 250) return Promise.reject(unavailable());
     return new Promise((resolve, reject) => {
       const item = { request: { jsonrpc: '2.0', id: ++serial, method, params }, finished: false };
