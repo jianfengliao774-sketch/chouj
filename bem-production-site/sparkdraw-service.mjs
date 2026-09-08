@@ -101,7 +101,13 @@ export async function createSparkDrawService({rpc=createReadRpc(),directory,cred
         const round=url.searchParams.get('round');if(round){if(!/^[1-9][0-9]{0,20}$/.test(round))throw Error('Invalid round');rows=rows.filter(x=>x.roundId===round||x.displayRoundId===round);}
         rows.sort((a,b)=>Number(b.roundId)-Number(a.roundId));
         const claims=kind==='wallet'?walletClaimGroups(rows,ids):undefined;
-        return respond(res,200,{version:5,...pageRows(rows,url.searchParams),claims,indexes:Object.fromEntries(ids.map(id=>[id,index.metadata(id)]))});
+        const page=pageRows(rows,url.searchParams);
+        if(kind==='winners'&&url.searchParams.has('address')){
+          const viewerAccount=getAddress(url.searchParams.get('address'));
+          const tickets=new Map(ids.flatMap(id=>index.view(id).wallet(viewerAccount,now)).map(r=>[r.poolId+':'+r.roundId,r.tickets]));
+          page.rows=page.rows.map(r=>({...r,viewerAccount,viewerTickets:tickets.get(r.poolId+':'+r.roundId)||0}));
+        }
+        return respond(res,200,{version:5,...page,claims,indexes:Object.fromEntries(ids.map(id=>[id,index.metadata(id)]))});
       }
       if(req.method==='GET'&&url.pathname==='/api/burns/summary')return respond(res,200,await cached('burn-summary',300000,()=>({totalBaseUnits:SALES_POOL_IDS.flatMap(id=>index.view(id).burns).reduce((a,b)=>a+BigInt(b.amountBaseUnits),0n).toString(),updatedAt:new Date().toISOString(),indexes:Object.fromEntries(SALES_POOL_IDS.map(id=>[id,index.metadata(id)]))})));
       if(url.pathname.startsWith('/api/admin/')){
